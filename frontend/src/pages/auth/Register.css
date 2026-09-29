@@ -1,0 +1,899 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@400;500&display=swap");
+
+
+/* ========================================
+   GLOBAL
+======================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+.register-page {
+  width: 100%;
+  min-height: 100vh;
+
+  display: flex;
+
+  background: #f8f6f3;
+  color: #302936;
+
+  font-family: "DM Sans", sans-serif;
+}
+
+
+/* ========================================
+   LEFT REGISTER PANEL
+======================================== */
+
+.register-panel {
+  width: 50%;
+  min-height: 100vh;
+
+  display: flex;
+  justify-content: center;
+
+  background: #faf9f7;
+}
+
+.register-inner {
+  width: 100%;
+  max-width: 570px;
+
+  padding: 34px 55px;
+}
+
+
+/* ========================================
+   TOP BAR
+======================================== */
+
+.top-line {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  color: #817783;
+
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 1.4px;
+
+  text-transform: uppercase;
+}
+
+.back-link {
+  padding: 0;
+
+  border: none;
+  background: transparent;
+
+  color: #817783;
+
+  font-family: "DM Sans", sans-serif;
+  font-size: 9px;
+  letter-spacing: 1px;
+
+  cursor: pointer;
+
+  transition: color 0.2s ease;
+}
+
+.back-link:hover {
+  color: #72558e;
+}
+
+
+/* ========================================
+   FEXA BRAND
+======================================== */
+
+.brand {
+  margin-top: 48px;
+}
+
+.brand h1 {
+  margin: 0;
+
+  color: #302936;
+
+  font-family: "Playfair Display", serif;
+  font-size: 34px;
+  font-weight: 400;
+
+  letter-spacing: 9px;
+}
+
+.brand p {
+  margin: 5px 0 0;
+
+  color: #817783;
+
+  font-size: 8px;
+  letter-spacing: 4px;
+}
+
+
+/* ========================================
+   INTRODUCTION
+======================================== */
+
+.intro {
+  margin-top: 45px;
+}
+
+.eyebrow {
+  color: #72558e;
+
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 1.2px;
+
+  text-transform: uppercase;
+}
+
+.intro h2 {
+  margin: 14px 0 0;
+
+  color: #302936;
+
+  font-family: "Playfair Display", serif;
+  font-size: 39px;
+  font-weight: 400;
+
+  line-height: 1.12;
+}
+
+.intro p {
+  max-width: 410px;
+
+  margin: 15px 0 0;
+
+  color: #817783;
+
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+
+/* ========================================
+   GOOGLE BUTTON
+======================================== */
+
+.google-btn {
+  width: 100%;
+  height: 47px;
+
+  margin-top: 28px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #ded9df;
+  border-radius: 6px;
+
+  background: #ffffff;
+
+  color: #403744;
+
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.google-btn:hover {
+  border-color: #b7a6c3;
+
+  box-shadow: 0 3px 12px rgba(70, 50, 80, 0.06);
+}
+
+.google-btn strong {
+  margin-right: 10px;
+
+  color: #72558e;
+
+  font-size: 15px;
+}
+
+
+/* ========================================
+   DIVIDER
+======================================== */
+
+.divider {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  margin: 27px 0;
+}
+
+.divider span {
+  flex: 1;
+
+  height: 1px;
+
+  background: #e5e0e5;
+}
+
+.divider small {
+  color: #928995;
+
+  font-size: 8px;
+  font-weight: 400;
+  letter-spacing: 1px;
+
+  white-space: nowrap;
+}
+
+
+/* ========================================
+   FORM
+======================================== */
+
+.field {
+  width: 100%;
+
+  margin-bottom: 18px;
+}
+
+.field label {
+  display: block;
+
+  margin-bottom: 7px;
+
+  color: #514954;
+
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 1.3px;
+
+  text-transform: uppercase;
+}
+
+.field input {
+  width: 100%;
+  height: 45px;
+
+  padding: 0 13px;
+
+  border: 1px solid #ddd7de;
+  border-radius: 5px;
+
+  outline: none;
+
+  background: #ffffff;
+
+  color: #302936;
+
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.field input::placeholder {
+  color: #aaa2ad;
+}
+
+.field input:hover {
+  border-color: #c9c0cc;
+}
+
+.field input:focus {
+  border-color: #72558e;
+
+  box-shadow:
+    0 0 0 3px rgba(114, 85, 142, 0.08);
+}
+
+
+/* ========================================
+   PASSWORD
+======================================== */
+
+.password-box {
+  position: relative;
+
+  width: 100%;
+}
+
+.password-box input {
+  padding-right: 60px;
+}
+
+.password-box button {
+  position: absolute;
+
+  top: 50%;
+  right: 12px;
+
+  transform: translateY(-50%);
+
+  padding: 4px;
+
+  border: none;
+  background: transparent;
+
+  color: #806f88;
+
+  font-family: "DM Sans", sans-serif;
+  font-size: 9px;
+
+  cursor: pointer;
+}
+
+.password-box button:hover {
+  color: #72558e;
+}
+
+
+/* Password strength */
+
+.strength {
+  width: 100%;
+
+  display: flex;
+
+  gap: 4px;
+
+  margin-top: 6px;
+}
+
+.strength span {
+  flex: 1;
+
+  height: 3px;
+
+  border-radius: 2px;
+
+  background: #ddd6e0;
+}
+
+.strength span:first-child {
+  background: #72558e;
+}
+
+.field > small {
+  display: block;
+
+  margin-top: 6px;
+
+  color: #958c96;
+
+  font-size: 9px;
+}
+
+
+/* ========================================
+   TERMS
+======================================== */
+
+.terms {
+  display: flex;
+  align-items: flex-start;
+
+  gap: 8px;
+
+  margin: 20px 0;
+}
+
+.terms input {
+  width: 14px;
+  height: 14px;
+
+  margin: 1px 0 0;
+
+  accent-color: #72558e;
+
+  cursor: pointer;
+}
+
+.terms label {
+  color: #817783;
+
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.terms a {
+  color: #604873;
+
+  text-decoration: underline;
+}
+
+
+/* ========================================
+   CREATE ACCOUNT BUTTON
+======================================== */
+
+.create-btn {
+  width: 100%;
+  height: 48px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 10px;
+
+  border: none;
+  border-radius: 7px;
+
+  background: #72558e;
+
+  color: #ffffff;
+
+  font-family: "DM Sans", sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 1.2px;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease,
+    box-shadow 0.2s ease;
+}
+
+.create-btn:hover {
+  background: #604676;
+
+  box-shadow: 0 7px 18px rgba(92, 65, 113, 0.18);
+}
+
+.create-btn:active {
+  transform: translateY(1px);
+}
+
+.create-btn span {
+  font-size: 16px;
+}
+
+
+/* ========================================
+   LOGIN LINK
+======================================== */
+
+.login-link {
+  margin-top: 20px;
+
+  text-align: center;
+
+  color: #8b818d;
+
+  font-size: 11px;
+}
+
+.login-link a {
+  color: #654b7b;
+
+  font-weight: 500;
+
+  text-decoration: underline;
+}
+
+
+/* ========================================
+   FOOTER
+======================================== */
+
+footer {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-top: 30px;
+  padding-top: 18px;
+
+  border-top: 1px solid #e5e0e5;
+
+  color: #948b95;
+
+  font-size: 8px;
+  letter-spacing: 0.5px;
+}
+
+footer div {
+  display: flex;
+
+  gap: 15px;
+}
+
+footer a {
+  color: #756b7e;
+
+  text-decoration: none;
+
+  transition: color 0.2s ease;
+}
+
+footer a:hover {
+  color: #72558e;
+}
+
+
+/* ========================================
+   RIGHT VISUAL PANEL
+======================================== */
+
+.visual-panel {
+  position: relative;
+
+  width: 50%;
+  min-height: 100vh;
+
+  overflow: hidden;
+
+  background: #765b80;
+}
+
+
+/* ========================================
+   HERO IMAGE
+======================================== */
+
+.hero-image {
+  position: absolute;
+
+  inset: 0;
+
+  width: 100%;
+  height: 100%;
+
+  display: block;
+
+  object-fit: cover;
+
+  /*
+    Change this if you want to move
+    the image up/down/left/right.
+  */
+  object-position: center;
+
+  transform: scale(1.01);
+}
+
+
+/* ========================================
+   IMAGE OVERLAY
+======================================== */
+
+.hero-overlay {
+  position: absolute;
+
+  inset: 0;
+
+  z-index: 1;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(48, 38, 54, 0.05) 0%,
+      rgba(48, 38, 54, 0.08) 45%,
+      rgba(48, 38, 54, 0.24) 100%
+    );
+
+  pointer-events: none;
+}
+
+
+/* ========================================
+   EDITION TAG
+======================================== */
+
+.edition-tag {
+  position: absolute;
+
+  top: 32px;
+  right: 32px;
+
+  z-index: 4;
+
+  padding: 9px 15px;
+
+  border: 1px solid rgba(255, 255, 255, 0.25);
+
+  border-radius: 20px;
+
+  background: rgba(255, 255, 255, 0.88);
+
+  color: #59465f;
+
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 1px;
+
+  backdrop-filter: blur(8px);
+}
+
+
+/* ========================================
+   FRAGRANCE CARD
+======================================== */
+
+.fragrance-card {
+  position: absolute;
+
+  left: 50%;
+  bottom: 52px;
+
+  z-index: 4;
+
+  width: calc(100% - 90px);
+  max-width: 510px;
+
+  transform: translateX(-50%);
+
+  padding: 29px;
+
+  border: 1px solid rgba(255, 255, 255, 0.4);
+
+  border-radius: 7px;
+
+  background: rgba(250, 249, 247, 0.94);
+
+  box-shadow:
+    0 20px 50px rgba(30, 20, 40, 0.22);
+
+  backdrop-filter: blur(12px);
+}
+
+.fragrance-card > span {
+  color: #72558e;
+
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 1px;
+}
+
+.fragrance-card h3 {
+  margin: 12px 0 0;
+
+  color: #302936;
+
+  font-family: "Playfair Display", serif;
+  font-size: 29px;
+  font-weight: 400;
+
+  line-height: 1.1;
+}
+
+.fragrance-card p {
+  margin: 8px 0 0;
+
+  color: #857a86;
+
+  font-family: "Playfair Display", serif;
+  font-size: 12px;
+  font-style: italic;
+}
+
+
+/* ========================================
+   FRAGRANCE NOTES
+======================================== */
+
+.notes {
+  display: flex;
+  flex-wrap: wrap;
+
+  gap: 6px;
+
+  margin-top: 16px;
+}
+
+.notes span {
+  padding: 5px 9px;
+
+  border-radius: 20px;
+
+  background: #eee8f0;
+
+  color: #67566d;
+
+  font-size: 7px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+
+/* ========================================
+   QUOTE
+======================================== */
+
+.fragrance-card blockquote {
+  margin: 20px 0 0;
+  padding-top: 17px;
+
+  border-top: 1px solid #ddd6df;
+
+  color: #443947;
+
+  font-family: "Playfair Display", serif;
+  font-size: 16px;
+  font-style: italic;
+
+  line-height: 1.4;
+}
+
+.fragrance-card small {
+  display: block;
+
+  margin-top: 12px;
+
+  color: #8c7f8d;
+
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+
+
+/* ========================================
+   TABLET
+======================================== */
+
+@media (max-width: 1100px) {
+
+  .register-inner {
+    padding: 30px 40px;
+  }
+
+  .intro h2 {
+    font-size: 34px;
+  }
+
+  .fragrance-card {
+    width: calc(100% - 60px);
+
+    padding: 24px;
+  }
+
+}
+
+
+/* ========================================
+   MOBILE
+======================================== */
+
+@media (max-width: 850px) {
+
+  .register-page {
+    min-height: 100vh;
+
+    display: block;
+  }
+
+  .visual-panel {
+    display: none;
+  }
+
+  .register-panel {
+    width: 100%;
+    min-height: 100vh;
+  }
+
+  .register-inner {
+    width: 100%;
+    max-width: 620px;
+
+    margin: 0 auto;
+
+    padding: 30px 28px;
+  }
+
+}
+
+
+/* ========================================
+   SMALL MOBILE
+======================================== */
+
+@media (max-width: 500px) {
+
+  .register-inner {
+    padding: 24px 20px;
+  }
+
+  .top-line {
+    font-size: 8px;
+  }
+
+  .top-line span {
+    display: none;
+  }
+
+  .brand {
+    margin-top: 38px;
+  }
+
+  .brand h1 {
+    font-size: 29px;
+    letter-spacing: 7px;
+  }
+
+  .intro {
+    margin-top: 38px;
+  }
+
+  .intro h2 {
+    font-size: 32px;
+  }
+
+  .intro p {
+    font-size: 12px;
+  }
+
+  .google-btn {
+    height: 46px;
+  }
+
+  .divider {
+    margin: 23px 0;
+  }
+
+  .divider small {
+    font-size: 7px;
+  }
+
+  .field {
+    margin-bottom: 16px;
+  }
+
+  .terms label {
+    font-size: 9px;
+  }
+
+  footer {
+    flex-direction: column;
+    align-items: flex-start;
+
+    gap: 12px;
+  }
+
+  footer div {
+    gap: 12px;
+  }
+
+}
+
+
+/* ========================================
+   VERY SMALL MOBILE
+======================================== */
+
+@media (max-width: 360px) {
+
+  .register-inner {
+    padding: 22px 16px;
+  }
+
+  .intro h2 {
+    font-size: 29px;
+  }
+
+  .brand h1 {
+    font-size: 26px;
+  }
+
+  .divider small {
+    font-size: 6px;
+  }
+
+}

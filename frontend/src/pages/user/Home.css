@@ -1,0 +1,548 @@
+/* ========================================
+   HOME PAGE
+======================================== */
+
+.home-page {
+  min-height: 100vh;
+
+  background: #faf8fc;
+
+  color: #30283d;
+
+  font-family: "DM Sans", sans-serif;
+}
+
+
+/* ========================================
+   NAVBAR
+======================================== */
+
+.home-navbar {
+  width: 100%;
+
+  height: 78px;
+
+  display: flex;
+  align-items: center;
+
+  justify-content: space-between;
+
+  padding: 0 6%;
+
+  box-sizing: border-box;
+
+  background: #ffffff;
+
+  border-bottom: 1px solid #eee8f3;
+}
+
+
+/* ========================================
+   LOGO
+======================================== */
+
+.home-logo {
+  display: flex;
+  flex-direction: column;
+
+  min-width: 170px;
+}
+
+.home-logo h1 {
+  margin: 0;
+
+  font-family: "Playfair Display", serif;
+
+  font-size: 24px;
+
+  font-weight: 500;
+
+  letter-spacing: 4px;
+
+  color: #352b40;
+}
+
+.home-logo span {
+  margin-top: 2px;
+
+  font-size: 7px;
+
+  letter-spacing: 2.5px;
+
+  color: #a487c3;
+}
+
+
+/* ========================================
+   NAV LINKS
+======================================== */
+
+.home-nav-links {
+  display: flex;
+  align-items: center;
+
+  gap: 35px;
+}
+
+.home-nav-links button {
+  border: none;
+
+  background: transparent;
+
+  padding: 8px 0;
+
+  color: #81768c;
+
+  font-family: "DM Sans", sans-serif;
+
+  font-size: 10px;
+
+  letter-spacing: 1.3px;
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+.home-nav-links button:hover {
+  color: #8c69ae;
+}
+
+.home-nav-links button.active {
+  color: #8c69ae;
+
+  border-bottom: 1px solid #b99de2;
+}
+
+
+/* ========================================
+   NAV RIGHT
+======================================== */
+
+.home-nav-right {
+  min-width: 170px;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  gap: 16px;
+}
+
+.welcome-name {
+  color: #756b81;
+
+  font-size: 11px;
+
+  max-width: 100px;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+}
+
+
+/* ========================================
+   PROFILE ICON
+======================================== */
+
+.profile-button {
+  width: 36px;
+  height: 36px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #e5ddec;
+
+  border-radius: 50%;
+
+  background: #ffffff;
+
+  color: #8d70aa;
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+.profile-button:hover {
+  background: #f3ecf9;
+
+  border-color: #cbb4e2;
+
+  transform: translateY(-1px);
+}
+
+.profile-icon {
+  font-size: 18px;
+}
+
+
+/* ========================================
+   MAIN CONTENT
+======================================== */
+
+.home-content {
+  width: min(1100px, 88%);
+
+  margin: 0 auto;
+
+  padding: 90px 0 70px;
+}
+
+
+/* ========================================
+   WELCOME
+======================================== */
+
+.welcome-section {
+  max-width: 650px;
+
+  padding: 30px 0 70px;
+}
+
+.small-label {
+  display: block;
+
+  margin-bottom: 18px;
+
+  color: #a184bd;
+
+  font-size: 10px;
+
+  font-weight: 600;
+
+  letter-spacing: 2.5px;
+}
+
+.welcome-section h2 {
+  margin: 0;
+
+  font-family: "Playfair Display", serif;
+
+  font-size: clamp(50px, 7vw, 82px);
+
+  font-weight: 500;
+
+  line-height: 0.98;
+
+  letter-spacing: -2px;
+
+  color: #30263c;
+}
+
+.welcome-section p {
+  max-width: 480px;
+
+  margin: 28px 0;
+
+  color: #817789;
+
+  font-size: 14px;
+
+  line-height: 1.8;
+}
+
+
+/* ========================================
+   EXPLORE BUTTON
+======================================== */
+
+.explore-button {
+  display: flex;
+  align-items: center;
+
+  gap: 18px;
+
+  height: 48px;
+
+  padding: 0 22px;
+
+  border: none;
+
+  border-radius: 6px;
+
+  background: #b99de2;
+
+  color: #ffffff;
+
+  font-family: "DM Sans", sans-serif;
+
+  font-size: 10px;
+
+  font-weight: 600;
+
+  letter-spacing: 1.5px;
+
+  cursor: pointer;
+
+  transition: 0.25s;
+}
+
+.explore-button span {
+  font-size: 18px;
+
+  transition: 0.25s;
+}
+
+.explore-button:hover {
+  background: #a88bce;
+
+  box-shadow: 0 8px 20px rgba(150, 115, 185, 0.18);
+}
+
+.explore-button:hover span {
+  transform: translateX(4px);
+}
+
+
+/* ========================================
+   FEATURE CARDS
+======================================== */
+
+.home-features {
+  display: grid;
+
+  grid-template-columns: repeat(3, 1fr);
+
+  gap: 18px;
+
+  margin-bottom: 60px;
+}
+
+.feature-card {
+  min-height: 190px;
+
+  padding: 28px;
+
+  box-sizing: border-box;
+
+  background: #ffffff;
+
+  border: 1px solid #eee7f2;
+
+  transition: 0.25s;
+}
+
+.feature-card:hover {
+  transform: translateY(-3px);
+
+  border-color: #d8c8e5;
+
+  box-shadow: 0 12px 30px rgba(70, 45, 90, 0.06);
+}
+
+.feature-card > span {
+  color: #b39ac9;
+
+  font-size: 10px;
+
+  letter-spacing: 2px;
+}
+
+.feature-card h3 {
+  margin: 20px 0 12px;
+
+  font-family: "Playfair Display", serif;
+
+  font-size: 25px;
+
+  line-height: 1.1;
+
+  font-weight: 500;
+
+  color: #3a2e47;
+}
+
+.feature-card p {
+  margin: 0;
+
+  color: #918698;
+
+  font-size: 11px;
+
+  line-height: 1.7;
+}
+
+
+/* ========================================
+   AUTH STATUS
+======================================== */
+
+.auth-status {
+  display: flex;
+  align-items: center;
+
+  gap: 14px;
+
+  padding: 18px 22px;
+
+  background: #f2ebf8;
+
+  border: 1px solid #e3d7ec;
+
+  border-radius: 8px;
+
+  max-width: 450px;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+
+  border-radius: 50%;
+
+  background: #9b7abb;
+
+  box-shadow: 0 0 0 4px rgba(155, 122, 187, 0.12);
+}
+
+.auth-status strong {
+  display: block;
+
+  color: #49375a;
+
+  font-size: 12px;
+}
+
+.auth-status p {
+  margin: 4px 0 0;
+
+  color: #8c7d96;
+
+  font-size: 11px;
+}
+
+
+/* ========================================
+   LOGOUT
+======================================== */
+
+.logout-button {
+  margin-top: 25px;
+
+  border: none;
+
+  background: transparent;
+
+  color: #9a7bb4;
+
+  font-family: "DM Sans", sans-serif;
+
+  font-size: 9px;
+
+  font-weight: 600;
+
+  letter-spacing: 1.5px;
+
+  cursor: pointer;
+}
+
+.logout-button:hover {
+  color: #6f4d87;
+
+  text-decoration: underline;
+}
+
+
+/* ========================================
+   FOOTER
+======================================== */
+
+.home-footer {
+  height: 70px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 9px;
+
+  border-top: 1px solid #eee8f3;
+
+  background: #ffffff;
+
+  color: #b0a6b7;
+
+  font-size: 8px;
+
+  letter-spacing: 1.5px;
+}
+
+
+/* ========================================
+   RESPONSIVE
+======================================== */
+
+@media (max-width: 850px) {
+
+  .home-navbar {
+    height: auto;
+
+    padding: 20px 5%;
+
+    flex-wrap: wrap;
+
+    gap: 20px;
+  }
+
+  .home-logo {
+    min-width: auto;
+  }
+
+  .home-nav-links {
+    order: 3;
+
+    width: 100%;
+
+    justify-content: center;
+
+    gap: 25px;
+  }
+
+  .home-nav-right {
+    min-width: auto;
+  }
+
+  .home-content {
+    padding-top: 60px;
+  }
+
+  .home-features {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+@media (max-width: 500px) {
+
+  .home-navbar {
+    padding: 18px 20px;
+  }
+
+  .home-nav-links {
+    gap: 15px;
+  }
+
+  .home-nav-links button {
+    font-size: 8px;
+  }
+
+  .welcome-section h2 {
+    font-size: 48px;
+  }
+
+  .home-content {
+    width: calc(100% - 40px);
+
+    padding: 45px 0 50px;
+  }
+
+  .welcome-section {
+    padding-bottom: 50px;
+  }
+}
