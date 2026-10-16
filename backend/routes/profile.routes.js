@@ -10,10 +10,22 @@ const authMiddleware = require("../middlewares/auth.middleware");
 // Profile controller
 const {
   getProfile,
+  getAddresses,
   updateProfile,
   uploadProfileImage,
   addAddress,
+  updateAddress,
+  deleteAddress,
+  verifyEmailChange,
+  resendEmailChangeOtp,
 } = require("../controllers/profile.controller");
+
+const fs = require("fs");
+
+const uploadDir = path.join(__dirname, "../uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 // ========================================
 // MULTER CONFIGURATION
@@ -21,7 +33,7 @@ const {
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/");
+    cb(null, uploadDir);
   },
 
   filename: (req, file, cb) => {
@@ -46,7 +58,7 @@ const fileFilter = (req, file, cb) => {
     "image/webp",
   ];
 
-  if (allowedTypes.includes(file.mimetype)) {
+  if (allowedTypes.includes(file.mimetype.toLowerCase())) {
     cb(null, true);
   } else {
     cb(
@@ -69,6 +81,29 @@ const upload = multer({
   },
 });
 
+const handleMulterUpload = (req, res, next) => {
+  upload.single("profileImage")(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({
+          success: false,
+          message: "Profile image must be smaller than 5MB",
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    } else if (err) {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
+    next();
+  });
+};
+
 // ========================================
 // GET PROFILE
 // ========================================
@@ -90,14 +125,44 @@ router.put(
 );
 
 // ========================================
+// VERIFY EMAIL CHANGE
+// ========================================
+
+router.post(
+  "/verify-email-change",
+  authMiddleware,
+  verifyEmailChange
+);
+
+// ========================================
+// RESEND EMAIL CHANGE OTP
+// ========================================
+
+router.post(
+  "/resend-email-change-otp",
+  authMiddleware,
+  resendEmailChangeOtp
+);
+
+// ========================================
 // UPLOAD PROFILE IMAGE
 // ========================================
 
 router.post(
   "/upload-image",
   authMiddleware,
-  upload.single("profileImage"),
+  handleMulterUpload,
   uploadProfileImage
+);
+
+// ========================================
+// GET SAVED ADDRESSES
+// ========================================
+
+router.get(
+  "/addresses",
+  authMiddleware,
+  getAddresses
 );
 
 // ========================================
@@ -108,6 +173,26 @@ router.post(
   "/addresses",
   authMiddleware,
   addAddress
+);
+
+// ========================================
+// UPDATE ADDRESS
+// ========================================
+
+router.put(
+  "/addresses/:addressId",
+  authMiddleware,
+  updateAddress
+);
+
+// ========================================
+// DELETE ADDRESS
+// ========================================
+
+router.delete(
+  "/addresses/:addressId",
+  authMiddleware,
+  deleteAddress
 );
 
 module.exports = router;

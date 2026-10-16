@@ -33,20 +33,40 @@ const authMiddleware = (req, res, next) => {
 
 
     // Verify token
-    const decoded =
-      jwt.verify(
-        token,
-        process.env.JWT_SECRET
-      );
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-
-    // Store user information
-    // inside request
+    // Store user information inside request
     req.user = decoded;
 
+    // Check if user is blocked in DB
+    const User = require("../models/user.model");
+    User.findById(decoded.id)
+      .select("isBlocked role")
+      .then((user) => {
+        if (!user) {
+          res.clearCookie("token");
+          return res.status(401).json({
+            success: false,
+            message: "User account no longer exists",
+          });
+        }
 
-    // Continue to controller
-    next();
+        if (user.isBlocked) {
+          res.clearCookie("token");
+          return res.status(403).json({
+            success: false,
+            message: "Your account has been blocked. Please contact the administrator.",
+          });
+        }
+
+        next();
+      })
+      .catch((err) => {
+        return res.status(501).json({
+          success: false,
+          message: "Internal authentication error",
+        });
+      });
 
 
   } catch (error) {

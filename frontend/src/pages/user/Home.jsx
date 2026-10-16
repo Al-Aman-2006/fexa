@@ -1,8 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import Navbar from "../../components/common/Navbar";
 import "./Home.css";
-
-
 
 function Home() {
   const navigate = useNavigate();
@@ -15,60 +14,8 @@ function Home() {
 
   return (
     <div className="home-page">
-
       {/* ================= NAVBAR ================= */}
-
-      <nav className="home-navbar">
-
-        {/* Logo */}
-        <div className="home-logo">
-          <h1>FEXA</h1>
-          <span>HAUTE PARFUMERIE</span>
-        </div>
-
-
-        {/* Navigation */}
-        <div className="home-nav-links">
-
-          <button className="active">
-            HOME
-          </button>
-
-          <button>
-            SHOP
-          </button>
-
-          <button>
-            COLLECTIONS
-          </button>
-
-          <button>
-            ABOUT
-          </button>
-
-        </div>
-
-
-        {/* Right side */}
-        <div className="home-nav-right">
-
-          <span className="welcome-name">
-            {user?.name || "Guest"}
-          </span>
-
-          {/* Profile icon */}
-      <button
-  className="profile-icon"
-  onClick={() => navigate("/profile")}
->
-    <span className="profile-icon">
-              ♙
-            </span> 
-</button>
-
-        </div>
-
-      </nav>
+      <Navbar activePage="home" />
 
 
       {/* ================= MAIN ================= */}
@@ -92,7 +39,7 @@ function Home() {
             carefully created for unforgettable moments.
           </p>
 
-          <button className="explore-button">
+          <button className="explore-button" onClick={() => navigate("/collections")}>
             EXPLORE COLLECTION
             <span>→</span>
           </button>

@@ -1,0 +1,346 @@
+/* ========================================
+   FEXA PRODUCT IMAGE ZOOM VIEWER (LIGHTBOX)
+   (Haute Parfumerie Luxury Full-Screen Lightbox)
+======================================== */
+
+.fexa-zoom-viewer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: rgba(10, 8, 14, 0.94);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+  overflow: hidden;
+  animation: viewerFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Header Bar */
+.viewer-header-bar {
+  padding: 1.25rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 10;
+  background: linear-gradient(180deg, rgba(10, 8, 14, 0.8) 0%, rgba(10, 8, 14, 0) 100%);
+}
+
+.viewer-product-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.viewer-brand-tag {
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: #cbb8de;
+  text-transform: uppercase;
+  background: rgba(203, 184, 222, 0.12);
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid rgba(203, 184, 222, 0.2);
+}
+
+.viewer-product-title {
+  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.viewer-counter-badge {
+  font-size: 0.72rem;
+  color: #a497b7;
+  font-family: monospace;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.viewer-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.viewer-icon-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.viewer-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+.viewer-icon-btn.close-btn:hover {
+  background: rgba(220, 53, 69, 0.4);
+  border-color: rgba(220, 53, 69, 0.6);
+}
+
+/* Viewport Area */
+.viewer-viewport {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: default;
+}
+
+.viewer-image-stage {
+  max-width: 82vw;
+  max-height: 72vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.viewer-image-stage.dragging {
+  transition: none !important;
+}
+
+.viewer-image-stage.zoomed {
+  cursor: grab;
+}
+
+.viewer-image-stage.zoomed.dragging {
+  cursor: grabbing;
+}
+
+.viewer-main-image {
+  max-width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.6));
+  pointer-events: auto;
+}
+
+/* Navigation Arrows */
+.viewer-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(20, 16, 28, 0.65);
+  border: 1px solid rgba(203, 184, 222, 0.25);
+  color: #ffffff;
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s ease;
+  z-index: 20;
+}
+
+.viewer-nav-btn:hover {
+  background: rgba(43, 33, 56, 0.9);
+  border-color: #cbb8de;
+  transform: translateY(-50%) scale(1.08);
+}
+
+.viewer-nav-btn.prev-btn {
+  left: 2rem;
+  padding-right: 3px;
+}
+
+.viewer-nav-btn.next-btn {
+  right: 2rem;
+  padding-left: 3px;
+}
+
+/* Bottom Floating Control Bar */
+.viewer-bottom-bar {
+  padding: 1.25rem 2rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
+  z-index: 10;
+  background: linear-gradient(0deg, rgba(10, 8, 14, 0.9) 0%, rgba(10, 8, 14, 0) 100%);
+}
+
+.viewer-controls-pill {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(24, 19, 32, 0.85);
+  border: 1px solid rgba(203, 184, 222, 0.28);
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.pill-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.pill-action-btn:hover:not(:disabled) {
+  background: rgba(203, 184, 222, 0.3);
+  color: #ffffff;
+}
+
+.pill-action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pill-scale-text {
+  font-family: monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #cbb8de;
+  min-width: 54px;
+  text-align: center;
+  padding: 0 0.4rem;
+}
+
+.pill-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(203, 184, 222, 0.25);
+  margin: 0 0.5rem;
+}
+
+.pill-reset-btn {
+  background: none;
+  border: none;
+  color: #cbb8de;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pill-reset-btn:hover:not(:disabled) {
+  background: rgba(203, 184, 222, 0.15);
+  color: #ffffff;
+}
+
+.pill-reset-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Gallery Thumbnails Strip */
+.viewer-thumbnails-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 90vw;
+  overflow-x: auto;
+  padding: 0.3rem;
+}
+
+.viewer-thumb-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #191422;
+  padding: 2px;
+  cursor: pointer;
+  overflow: hidden;
+  opacity: 0.55;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.viewer-thumb-btn:hover {
+  opacity: 0.85;
+  border-color: rgba(203, 184, 222, 0.5);
+}
+
+.viewer-thumb-btn.active {
+  opacity: 1;
+  border-color: #cbb8de;
+  box-shadow: 0 0 0 2px rgba(203, 184, 222, 0.4);
+  transform: translateY(-2px);
+}
+
+.viewer-thumb-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+@keyframes viewerFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .viewer-header-bar {
+    padding: 1rem 1.25rem;
+  }
+
+  .viewer-product-title {
+    font-size: 0.95rem;
+  }
+
+  .viewer-nav-btn {
+    width: 42px;
+    height: 42px;
+    font-size: 1.5rem;
+  }
+
+  .viewer-nav-btn.prev-btn {
+    left: 0.85rem;
+  }
+
+  .viewer-nav-btn.next-btn {
+    right: 0.85rem;
+  }
+
+  .viewer-bottom-bar {
+    padding: 0.75rem 1rem 1.25rem;
+  }
+
+  .viewer-image-stage {
+    max-width: 92vw;
+    max-height: 65vh;
+  }
+}

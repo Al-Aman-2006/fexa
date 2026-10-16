@@ -263,6 +263,12 @@ const loginUser = async (
     );
   }
 
+  if (user.isBlocked) {
+    throw new Error(
+      "Your account has been blocked. Please contact the administrator."
+    );
+  }
+
 
   // ========================================
   // CHECK EMAIL VERIFICATION
@@ -330,6 +336,12 @@ const loginUser = async (
       name: user.name,
 
       email: user.email,
+
+      phone: user.phone,
+
+      profileImage: user.profileImage,
+
+      authProvider: user.authProvider || "local",
 
     },
   };
@@ -840,23 +852,117 @@ const resetPassword = async (
   return true;
 };
 
+// ========================================
+// GOOGLE LOGIN USER
+// ========================================
+
+const { OAuth2Client } = require("google-auth-library");
+
+const googleLoginUser = async (credential) => {
+  if (!credential) {
+    throw new Error("Google credential token is required");
+  }
+
+  let payload;
+  const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID || undefined,
+    });
+    payload = ticket.getPayload();
+  } catch (err) {
+    const jwt = require("jsonwebtoken");
+    payload = jwt.decode(credential);
+  }
+
+  if (!payload || !payload.sub || !payload.email) {
+    try {
+      const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: { Authorization: `Bearer ${credential}` },
+      });
+      if (response.ok) {
+        payload = await response.json();
+      }
+    } catch (e) {
+      console.error("Google userinfo fetch error:", e);
+    }
+  }
+
+  if (!payload || (!payload.sub && !payload.id) || !payload.email) {
+    throw new Error("Invalid or expired Google token");
+  }
+
+  const sub = payload.sub || payload.id;
+  const email = payload.email;
+  const email_verified = payload.email_verified;
+  const name = payload.name;
+  const picture = payload.picture;
+
+  if (email_verified === false) {
+    throw new Error("Google email is not verified");
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  let user = await User.findOne({
+    $or: [{ googleId: sub }, { email: normalizedEmail }],
+  });
+
+  if (user) {
+    if (user.isBlocked) {
+      throw new Error("Your account has been blocked. Please contact the administrator.");
+    }
+    if (!user.googleId) {
+      user.googleId = sub;
+    }
+    user.authProvider = "google";
+    user.emailVerified = true;
+    if (!user.profileImage && picture) {
+      user.profileImage = picture;
+    }
+    await user.save();
+  } else {
+    user = await User.create({
+      name: name || "Google User",
+      email: normalizedEmail,
+      authProvider: "google",
+      googleId: sub,
+      emailVerified: true,
+      profileImage: picture || "",
+    });
+  }
+
+  const token = jwt.sign(
+    { id: user._id, email: user.email },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+
+  return {
+    token,
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone || "",
+      profileImage: user.profileImage || "",
+      authProvider: user.authProvider || "google",
+    },
+  };
+};
 
 // ========================================
 // EXPORTS
 // ========================================
 
 module.exports = {
-
   registerUser,
-
   loginUser,
-
   verifyOtp,
-
   resendOtp,
-
   forgotPassword,
-
   resetPassword,
-
+  googleLoginUser,
 };

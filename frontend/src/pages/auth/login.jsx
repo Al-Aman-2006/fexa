@@ -1,21 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useGoogleLogin } from "@react-oauth/google";
 
 import "./Login.css";
 
 function Login() {
+  // ========================================
+  // STATE
+  // ========================================
+
   const [showPassword, setShowPassword] = useState(false);
-
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { login, user } = useAuth();
-
-  // If already logged in, redirect to home or previous page
-  if (user) {
-    navigate(location.state?.from?.pathname || "/home", { replace: true });
-    return null;
-  }
 
   const [formData, setFormData] = useState({
     email: "",
@@ -23,8 +18,143 @@ function Login() {
     remember: false,
   });
 
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+
   // ========================================
-  // HANDLE INPUT CHANGE
+  // ROUTER / AUTH
+  // ========================================
+
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { login, user } = useAuth();
+
+  // ========================================
+  // REDIRECT IF ALREADY LOGGED IN
+  // ========================================
+
+  useEffect(() => {
+    if (user) {
+      navigate(
+        location.state?.from?.pathname || "/home",
+        { replace: true }
+      );
+    }
+  }, [user, navigate, location]);
+
+  // ========================================
+  // GOOGLE LOGIN
+  // ========================================
+
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        const response = await fetch(
+          "http://localhost:5000/api/auth/google",
+          {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              credential: tokenResponse.access_token,
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          setErrors((prev) => ({
+            ...prev,
+            email:
+              data.message ||
+              "Google authentication failed.",
+          }));
+          return;
+        }
+
+        login(data.user);
+
+        navigate("/home", {
+          replace: true,
+        });
+      } catch (err) {
+        console.error("Google auth error:", err);
+
+        setErrors((prev) => ({
+          ...prev,
+          email:
+            "Unable to connect to Google auth server.",
+        }));
+      }
+    },
+
+    onError: (err) => {
+      console.error("Google OAuth error:", err);
+
+      setErrors((prev) => ({
+        ...prev,
+        email: "Google sign-in failed.",
+      }));
+    },
+  });
+
+  // ========================================
+  // EMAIL VALIDATION
+  // ========================================
+
+  const validateEmail = (email) => {
+    return /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/.test(
+      email
+    );
+  };
+
+  // ========================================
+  // FIELD VALIDATION
+  // ========================================
+
+  const validateField = (name, value) => {
+    let error = "";
+
+    if (name === "email") {
+      if (!value.trim()) {
+        error = "Email is required.";
+      } else if (!validateEmail(value)) {
+        error = "Please enter a valid email address.";
+      }
+    }
+
+    if (name === "password") {
+      if (!value) {
+        error = "Password is required.";
+      }
+    }
+
+    return error;
+  };
+
+  // ========================================
+  // INPUT BLUR
+  // ========================================
+
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+
+    setTouched((prev) => ({
+      ...prev,
+      [name]: true,
+    }));
+
+    setErrors((prev) => ({
+      ...prev,
+      [name]: validateField(name, value),
+    }));
+  };
+
+  // ========================================
+  // INPUT CHANGE
   // ========================================
 
   const handleChange = (e) => {
@@ -35,34 +165,68 @@ function Login() {
       checked,
     } = e.target;
 
+    const val =
+      type === "checkbox"
+        ? checked
+        : value;
+
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        type === "checkbox"
-          ? checked
-          : value,
+      [name]: val,
     }));
+
+    if (touched[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: validateField(name, val),
+      }));
+    }
   };
 
-
   // ========================================
-  // LOGIN
+  // NORMAL LOGIN
   // ========================================
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validate fields
+    const newErrors = {
+      email: validateField(
+        "email",
+        formData.email
+      ),
+      password: validateField(
+        "password",
+        formData.password
+      ),
+    };
+
+    setErrors(newErrors);
+
+    setTouched({
+      email: true,
+      password: true,
+    });
+
+    // Stop if validation failed
+    if (
+      Object.values(newErrors).some(
+        (err) => err
+      )
+    ) {
+      return;
+    }
 
     try {
       const response = await fetch(
         "http://localhost:5000/api/auth/login",
         {
           method: "POST",
-          credentials: "include", // Send cookies
+          credentials: "include",
           headers: {
-            "Content-Type":
-              "application/json",
+            "Content-Type": "application/json",
           },
-
           body: JSON.stringify({
             email: formData.email,
             password: formData.password,
@@ -72,50 +236,61 @@ function Login() {
 
       const data = await response.json();
 
-      // ========================================
-      // LOGIN FAILED
-      // ========================================
-
       if (!response.ok) {
-        alert(
-          data.message ||
-            "Login failed."
-        );
+        if (data.errors) {
+          setErrors((prev) => ({
+            ...prev,
+            ...data.errors,
+          }));
+        } else {
+          setErrors((prev) => ({
+            ...prev,
+            password:
+              data.message ||
+              "Login failed.",
+          }));
+        }
 
         return;
       }
-
-      // ========================================
-      // LOGIN SUCCESSFUL
-      // ========================================
 
       console.log(
         "Login successful:",
         data
       );
 
-      // Store user information in context
+      // Save user in AuthContext
       login(data.user);
 
-      // Clean up any old tokens just in case
-      localStorage.removeItem("token");
+      // Save token for cross-origin / header authentication fallback
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+      } else {
+        localStorage.removeItem("token");
+      }
       localStorage.removeItem("user");
 
-      // Go to home page or previous attempted page
-      navigate(location.state?.from?.pathname || "/home", { replace: true });
-
+      // Navigate
+      navigate(
+        location.state?.from?.pathname ||
+          "/home",
+        {
+          replace: true,
+        }
+      );
     } catch (error) {
       console.error(
         "Login error:",
         error
       );
 
-      alert(
-        "Unable to connect to the server."
-      );
+      setErrors((prev) => ({
+        ...prev,
+        email:
+          "Unable to connect to the server.",
+      }));
     }
   };
-
 
   // ========================================
   // PAGE
@@ -146,7 +321,6 @@ function Login() {
 
         </div>
 
-
         {/* ========================================
             HEADING
         ======================================== */}
@@ -164,6 +338,43 @@ function Login() {
 
         </div>
 
+        {/* ========================================
+            GOOGLE LOGIN
+        ======================================== */}
+
+        <button
+          type="button"
+          className="google-btn"
+          onClick={() =>
+            handleGoogleLogin()
+          }
+          style={{
+            width: "100%",
+            padding: "12px",
+            background: "#1a1622",
+            border: "1px solid #332a3d",
+            color: "#f5f0e6",
+            borderRadius: "6px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "10px",
+            marginBottom: "20px",
+            fontSize: "14px",
+            fontWeight: "600",
+          }}
+        >
+          <strong
+            style={{
+              color: "#a184bd",
+            }}
+          >
+            G
+          </strong>
+
+          Continue with Google
+        </button>
 
         {/* ========================================
             LOGIN FORM
@@ -174,9 +385,7 @@ function Login() {
           className="login-form"
         >
 
-          {/* ========================================
-              EMAIL
-          ======================================== */}
+          {/* EMAIL */}
 
           <div className="input-group">
 
@@ -197,17 +406,21 @@ function Login() {
                 placeholder="Enter your email"
                 value={formData.email}
                 onChange={handleChange}
+                onBlur={handleBlur}
                 required
               />
 
             </div>
 
+            {touched.email && errors.email && (
+              <span className="field-error">
+                {errors.email}
+              </span>
+            )}
+
           </div>
 
-
-          {/* ========================================
-              PASSWORD
-          ======================================== */}
+          {/* PASSWORD */}
 
           <div className="input-group">
 
@@ -216,10 +429,6 @@ function Login() {
               <label htmlFor="password">
                 PASSWORD
               </label>
-
-              {/* ========================================
-                  FORGOT PASSWORD
-              ======================================== */}
 
               <button
                 type="button"
@@ -234,7 +443,6 @@ function Login() {
               </button>
 
             </div>
-
 
             <div className="input-wrapper">
 
@@ -253,12 +461,9 @@ function Login() {
                 placeholder="Enter your password"
                 value={formData.password}
                 onChange={handleChange}
+                onBlur={handleBlur}
                 required
               />
-
-              {/* ========================================
-                  SHOW / HIDE PASSWORD
-              ======================================== */}
 
               <button
                 type="button"
@@ -277,12 +482,15 @@ function Login() {
 
             </div>
 
+            {touched.password && errors.password && (
+              <span className="field-error">
+                {errors.password}
+              </span>
+            )}
+
           </div>
 
-
-          {/* ========================================
-              REMEMBER ME
-          ======================================== */}
+          {/* REMEMBER ME */}
 
           <label className="remember-me">
 
@@ -295,18 +503,10 @@ function Login() {
               onChange={handleChange}
             />
 
-            <span className="custom-checkbox"></span>
-
-            <span>
-              Remember me
-            </span>
-
+            
           </label>
 
-
-          {/* ========================================
-              LOGIN BUTTON
-          ======================================== */}
+          {/* LOGIN BUTTON */}
 
           <button
             type="submit"
@@ -317,11 +517,9 @@ function Login() {
             <span>
               →
             </span>
-
           </button>
 
         </form>
-
 
         {/* ========================================
             REGISTER
@@ -343,7 +541,6 @@ function Login() {
           </button>
 
         </div>
-
 
         {/* ========================================
             FOOTER
@@ -367,7 +564,6 @@ function Login() {
 
       </div>
 
-
       {/* ========================================
           DECORATIVE SIDE
       ======================================== */}
@@ -377,7 +573,6 @@ function Login() {
         <div className="decoration-circle circle-one"></div>
 
         <div className="decoration-circle circle-two"></div>
-
 
         <div className="decoration-content">
 

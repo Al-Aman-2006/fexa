@@ -1,0 +1,28 @@
+import { useEffect } from "react";
+import { useLocation, useNavigationType } from "react-router-dom";
+
+/**
+ * ScrollToTop component
+ * Resets window scroll position to the top upon route navigation (PUSH and REPLACE).
+ * Preserves browser scroll restoration during POP navigation (Back / Forward).
+ */
+export default function ScrollToTop() {
+  const { pathname, search } = useLocation();
+  const navType = useNavigationType();
+
+  useEffect(() => {
+    if (navType !== "POP") {
+      const params = new URLSearchParams(search);
+      // When navigating to collections with a category filter (e.g. ?category=men),
+      // allow Collections component to position directly at the catalogue section.
+      if (pathname === "/collections" && params.has("category")) {
+        return;
+      }
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+  }, [pathname, search, navType]);
+
+  return null;
+}

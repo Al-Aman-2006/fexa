@@ -1,0 +1,227 @@
+/* ========================================
+   FEXA ADMIN SIDEBAR (Matching Reference 2)
+======================================== */
+
+.fexa-admin-sidebar {
+  width: 250px;
+  min-width: 250px;
+  height: 100vh;
+  background: #09070c;
+  border-right: 1px solid rgba(161, 132, 189, 0.18);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 200;
+  box-sizing: border-box;
+  padding: 24px 16px;
+  color: #f4effa;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(161, 132, 189, 0.3) transparent;
+}
+
+/* BRAND HEADER */
+.admin-sidebar-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 8px 12px 8px;
+}
+
+.brand-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-dot {
+  color: #a184bd;
+  font-size: 14px;
+}
+
+.brand-name {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #ffffff;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.brand-icon {
+  font-size: 14px;
+  margin-left: auto;
+}
+
+.brand-subtext {
+  font-size: 10px;
+  font-family: monospace;
+  color: #88789c;
+  letter-spacing: 1px;
+}
+
+.admin-sidebar-divider {
+  height: 1px;
+  background: rgba(161, 132, 189, 0.15);
+  margin: 12px 0 16px 0;
+}
+
+/* NAVIGATION MENU */
+.admin-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.admin-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 8px;
+  color: #9d8fae;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.admin-nav-item:hover {
+  background: rgba(161, 132, 189, 0.08);
+  color: #ffffff;
+}
+
+.admin-nav-item.active {
+  background: rgba(161, 132, 189, 0.16);
+  border: 1px solid rgba(161, 132, 189, 0.35);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 #a184bd;
+}
+
+.admin-nav-item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-nav-icon {
+  font-size: 14px;
+  width: 18px;
+  text-align: center;
+}
+
+.admin-nav-label {
+  font-size: 12px;
+}
+
+.admin-nav-badge {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+}
+
+/* FOOTER STATUS & LOGOUT */
+.admin-sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(161, 132, 189, 0.15);
+  margin-top: 16px;
+}
+
+.admin-system-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-family: monospace;
+  color: #88789c;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pulse-dot {
+  color: #40c057;
+  font-size: 10px;
+  animation: pulseGreen 2s infinite;
+}
+
+@keyframes pulseGreen {
+  0% { opacity: 1; }
+  50% { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
+.status-label {
+  letter-spacing: 0.5px;
+}
+
+.tls-version {
+  color: #6d5d82;
+}
+
+.admin-terminate-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(220, 53, 69, 0.08);
+  border: 1px solid rgba(220, 53, 69, 0.25);
+  border-radius: 8px;
+  color: #ff737d;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.admin-terminate-btn:hover {
+  background: rgba(220, 53, 69, 0.2);
+  border-color: #dc3545;
+  color: #ffffff;
+}
+
+.power-icon {
+  font-size: 12px;
+}
+
+.esc-key {
+  font-size: 9px;
+  font-family: monospace;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #bfa8d8;
+}
+
+/* RESPONSIVE MOBILE OVERLAY */
+@media (max-width: 1024px) {
+  .fexa-admin-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .fexa-admin-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+}

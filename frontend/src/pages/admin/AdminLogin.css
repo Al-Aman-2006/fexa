@@ -1,0 +1,176 @@
+.admin-login-page {
+  min-height: 100vh;
+  background-color: #0d0b10;
+  background-image: 
+    radial-gradient(at 20% 20%, rgba(161, 132, 189, 0.15) 0px, transparent 50%),
+    radial-gradient(at 80% 80%, rgba(124, 92, 153, 0.12) 0px, transparent 50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #f4effa;
+}
+
+.admin-login-container {
+  width: 100%;
+  max-width: 440px;
+  background: rgba(23, 18, 30, 0.75);
+  border: 1px solid rgba(161, 132, 189, 0.2);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 40px 36px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(161, 132, 189, 0.08);
+}
+
+.admin-login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.admin-login-logo {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: #ffffff;
+  margin: 0 0 6px 0;
+  text-transform: uppercase;
+}
+
+.admin-login-logo span {
+  color: #a184bd;
+  font-weight: 400;
+  font-size: 13px;
+  letter-spacing: 2px;
+  display: block;
+  margin-top: 4px;
+}
+
+.admin-login-title {
+  font-size: 14px;
+  color: #9d8fae;
+  margin: 0;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+}
+
+.admin-error-banner {
+  background: rgba(220, 53, 69, 0.15);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  color: #ff848e;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 24px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.admin-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.admin-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-form-group label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #bfa8d8;
+}
+
+.admin-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.admin-input-wrapper input {
+  width: 100%;
+  padding: 13px 16px;
+  background: rgba(13, 11, 16, 0.6);
+  border: 1px solid rgba(161, 132, 189, 0.25);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.admin-input-wrapper input:focus {
+  border-color: #a184bd;
+  box-shadow: 0 0 0 3px rgba(161, 132, 189, 0.2);
+  background: rgba(13, 11, 16, 0.85);
+}
+
+.admin-input-wrapper input.has-error {
+  border-color: #e55353;
+}
+
+.admin-toggle-password-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #a184bd;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  transition: color 0.2s ease;
+}
+
+.admin-toggle-password-btn:hover {
+  color: #ffffff;
+}
+
+.admin-field-error {
+  font-size: 12px;
+  color: #ff737d;
+  margin-top: 6px;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  word-wrap: break-word;
+}
+
+.admin-login-btn {
+  margin-top: 8px;
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #7c5c99 0%, #a184bd 100%);
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(124, 92, 153, 0.3);
+}
+
+.admin-login-btn:hover:not(:disabled) {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(161, 132, 189, 0.4);
+}
+
+.admin-login-btn:disabled {
+  background: #3b3046;
+  color: #7b6f8a;
+  cursor: not-allowed;
+  box-shadow: none;
+}

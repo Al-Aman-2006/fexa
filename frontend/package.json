@@ -12,8 +12,10 @@
     "vite": "^8.3.0"
   },
   "dependencies": {
+    "@react-oauth/google": "^0.13.5",
     "axios": "^1.20.0",
     "multer": "^2.4.0",
+    "react-easy-crop": "^6.2.4",
     "react-router-dom": "^7.18.4"
   }
 }

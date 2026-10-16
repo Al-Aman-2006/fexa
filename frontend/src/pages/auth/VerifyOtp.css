@@ -7,6 +7,8 @@
 
 .otp-page {
   min-height: 100vh;
+  width: 100%;
+  flex: 1 0 auto;
 
   display: flex;
   align-items: center;

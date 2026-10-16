@@ -8,6 +8,7 @@
 .login-page {
   min-height: 100vh;
   width: 100%;
+  flex: 1 0 auto;
 
   display: flex;
 
@@ -650,4 +651,13 @@
   .login-footer {
     margin-top: 35px;
   }
+}
+.field-error {
+  color: #e74c3c;
+  font-size: 0.85rem;
+  margin-top: 6px;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  word-wrap: break-word;
 }

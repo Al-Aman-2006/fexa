@@ -15,8 +15,8 @@ const userSchema = new mongoose.Schema(
         "Name must be at least 2 characters",
       ],
       maxlength: [
-        50,
-        "Name cannot exceed 50 characters",
+        100,
+        "Name cannot exceed 100 characters",
       ],
     },
 
@@ -34,17 +34,45 @@ const userSchema = new mongoose.Schema(
 
     password: {
       type: String,
-      required: [true, "Password is required"],
-      minlength: [
-        8,
-        "Password must be at least 8 characters",
-      ],
+      required: function () {
+        return this.authProvider === "local";
+      },
     },
 
     phone: {
       type: String,
       trim: true,
       default: "",
+    },
+
+    // ========================================
+    // AUTHENTICATION PROVIDER
+    // ========================================
+
+    authProvider: {
+      type: String,
+      enum: ["local", "google"],
+      default: "local",
+    },
+
+    googleId: {
+      type: String,
+      default: null,
+    },
+
+    // ========================================
+    // ROLE & ACCOUNT STATUS
+    // ========================================
+
+    role: {
+      type: String,
+      enum: ["user", "admin"],
+      default: "user",
+    },
+
+    isBlocked: {
+      type: Boolean,
+      default: false,
     },
 
 
@@ -90,6 +118,28 @@ const userSchema = new mongoose.Schema(
     profileImage: {
       type: String,
       default: "",
+    },
+
+
+    // ========================================
+    // EMAIL CHANGE VERIFICATION
+    // ========================================
+
+    pendingEmail: {
+      type: String,
+      default: null,
+      lowercase: true,
+      trim: true,
+    },
+
+    emailChangeOtpHash: {
+      type: String,
+      default: null,
+    },
+
+    emailChangeOtpExpiresAt: {
+      type: Date,
+      default: null,
     },
 
 
@@ -157,6 +207,17 @@ const userSchema = new mongoose.Schema(
           type: Boolean,
           default: false,
         },
+      },
+    ],
+
+    // ========================================
+    // WISHLIST
+    // ========================================
+
+    wishlist: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product",
       },
     ],
   },

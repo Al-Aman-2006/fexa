@@ -1,12 +1,43 @@
 import { useState } from "react";
 import "./Register.css";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { useGoogleLogin } from "@react-oauth/google";
 import heroImage from "../../assets/hero.png";
+import { validateName, normalizeName } from "../../utils/validation";
 
 
 function Register() {
 
 const navigate = useNavigate();
+  const { login } = useAuth();
+
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        const response = await fetch("http://localhost:5000/api/auth/google", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ credential: tokenResponse.access_token }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          setErrors((prev) => ({ ...prev, email: data.message || "Google authentication failed." }));
+          return;
+        }
+        login(data.user);
+        navigate("/home", { replace: true });
+      } catch (err) {
+        console.error("Google auth error:", err);
+        setErrors((prev) => ({ ...prev, email: "Unable to connect to Google auth server." }));
+      }
+    },
+    onError: (err) => {
+      console.error("Google OAuth error:", err);
+      setErrors((prev) => ({ ...prev, email: "Google sign-in failed." }));
+    },
+  });
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -15,68 +46,112 @@ const navigate = useNavigate();
     confirmPassword: "",
   });
 
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  const validateEmail = (email) => {
+    return /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/.test(email);
+  };
+
+  const validateField = (name, value, currentFormData = formData) => {
+    let error = "";
+    if (name === "fullName") {
+      error = validateName(value) || "";
+    } else if (name === "email") {
+      if (!value.trim()) error = "Email is required.";
+      else if (!validateEmail(value)) error = "Please enter a valid email address.";
+    } else if (name === "password") {
+      if (!value) error = "Password is required.";
+      else if (value.length < 8) error = "Password must be at least 8 characters.";
+      else if (!/[A-Z]/.test(value)) error = "Password must contain at least one uppercase letter.";
+      else if (!/[a-z]/.test(value)) error = "Password must contain at least one lowercase letter.";
+      else if (!/[0-9]/.test(value)) error = "Password must contain at least one number.";
+      else if (!/[^A-Za-z0-9]/.test(value)) error = "Password must contain at least one special character.";
+    } else if (name === "confirmPassword") {
+      if (!value) error = "Please confirm your password.";
+      else if (value !== currentFormData.password) error = "Passwords do not match.";
+    }
+    return error;
+  };
+
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    setTouched((prev) => ({ ...prev, [name]: true }));
+    setErrors((prev) => ({ ...prev, [name]: validateField(name, value) }));
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    const newFormData = { ...formData, [name]: value };
+    setFormData(newFormData);
+    
+    // Validate instantly if touched
+    if (touched[name]) {
+      setErrors((prev) => ({ ...prev, [name]: validateField(name, value, newFormData) }));
+    }
+    if (name === "password" && touched.confirmPassword) {
+      setErrors((prev) => ({ ...prev, confirmPassword: validateField("confirmPassword", newFormData.confirmPassword, newFormData) }));
+    }
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  if (formData.password !== formData.confirmPassword) {
-    alert("Passwords do not match.");
-    return;
-  }
-
-  try {
-    const response = await fetch(
-      "http://localhost:5000/api/auth/register",
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-        },
-
-        body: JSON.stringify({
-          name: formData.fullName,
-          email: formData.email,
-          password: formData.password,
-        }),
+    e.preventDefault();
+    
+    // Validate all
+    const newErrors = {
+      fullName: validateField("fullName", formData.fullName),
+      email: validateField("email", formData.email),
+      password: validateField("password", formData.password),
+      confirmPassword: validateField("confirmPassword", formData.confirmPassword),
+    };
+    
+    setErrors(newErrors);
+    setTouched({ fullName: true, email: true, password: true, confirmPassword: true });
+    
+    if (Object.values(newErrors).some(err => err)) {
+      const firstInvalidField = Object.keys(newErrors).find(key => newErrors[key]);
+      if (firstInvalidField) {
+        document.getElementById(firstInvalidField)?.focus();
       }
-    );
-
-    const data = await response.json();
-
-    // Registration failed
-    if (!response.ok) {
-      alert(data.message || "Registration failed.");
       return;
     }
 
-    // Registration successful
-    console.log("Registration successful:", data);
+    try {
+      const response = await fetch("http://localhost:5000/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: normalizeName(formData.fullName),
+          email: formData.email.trim(),
+          password: formData.password,
+        }),
+      });
 
-    // Go to OTP verification page
-    navigate("/verify-otp", {
-      state: {
-        email: formData.email,
-      },
-    });
+      const data = await response.json();
 
-  } catch (error) {
-    console.error("Registration error:", error);
+      if (!response.ok) {
+        if (data.errors) {
+          const mappedErrors = { ...data.errors };
+          if (data.errors.name && !data.errors.fullName) {
+            mappedErrors.fullName = data.errors.name;
+          }
+          setErrors(prev => ({ ...prev, ...mappedErrors }));
+        } else if (data.message && data.message.toLowerCase().includes("email already exists")) {
+          setErrors(prev => ({ ...prev, email: "An account with this email already exists." }));
+        } else {
+          setErrors(prev => ({ ...prev, email: data.message || "Registration failed." }));
+        }
+        return;
+      }
 
-    alert("Unable to connect to the server.");
-  }
-};
+      navigate("/verify-otp", { state: { email: formData.email } });
+    } catch (error) {
+      console.error("Registration error:", error);
+      setErrors(prev => ({ ...prev, email: "Unable to connect to the server." }));
+    }
+  };
 
   return (
     <div className="register-page">
@@ -120,7 +195,7 @@ const navigate = useNavigate();
           </div>
 
           {/* GOOGLE */}
-          <button type="button" className="google-btn">
+          <button type="button" className="google-btn" onClick={() => handleGoogleLogin()}>
             <strong>G</strong>
             Continue with Google
           </button>
@@ -133,7 +208,7 @@ const navigate = useNavigate();
           </div>
 
           {/* FORM */}
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
 
             <div className="field">
               <label htmlFor="fullName">
@@ -147,8 +222,11 @@ const navigate = useNavigate();
                 placeholder="e.g. Elena Moreau"
                 value={formData.fullName}
                 onChange={handleChange}
+                onBlur={handleBlur}
+                className={touched.fullName && errors.fullName ? "input-error" : ""}
                 required
               />
+              {touched.fullName && errors.fullName && <span className="field-error">{errors.fullName}</span>}
             </div>
 
             <div className="field">
@@ -163,8 +241,10 @@ const navigate = useNavigate();
                 placeholder="elena@example.com"
                 value={formData.email}
                 onChange={handleChange}
+                onBlur={handleBlur}
                 required
               />
+              {touched.email && errors.email && <span className="field-error">{errors.email}</span>}
             </div>
 
             <div className="field">
@@ -180,6 +260,7 @@ const navigate = useNavigate();
                   placeholder="Create a password"
                   value={formData.password}
                   onChange={handleChange}
+                onBlur={handleBlur}
                   minLength={8}
                   required
                 />
@@ -193,6 +274,7 @@ const navigate = useNavigate();
                   {showPassword ? "Hide" : "Show"}
                 </button>
               </div>
+              {touched.password && errors.password && <span className="field-error">{errors.password}</span>}
 
               <div className="strength">
                 <span />
@@ -222,6 +304,7 @@ const navigate = useNavigate();
                   placeholder="Confirm your password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
+                onBlur={handleBlur}
                   required
                 />
 
@@ -236,6 +319,7 @@ const navigate = useNavigate();
                   {showConfirmPassword ? "Hide" : "Show"}
                 </button>
               </div>
+              {touched.confirmPassword && errors.confirmPassword && <span className="field-error">{errors.confirmPassword}</span>}
             </div>
 
             <div className="terms">

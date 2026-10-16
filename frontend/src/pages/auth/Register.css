@@ -11,6 +11,7 @@
 
 .register-page {
   width: 100%;
+  flex: 1 0 auto;
   min-height: 100vh;
 
   display: flex;
@@ -896,4 +897,9 @@ footer a:hover {
     font-size: 6px;
   }
 
+}
+.field-error { color: #e74c3c; font-size: 0.85rem; margin-top: 4px; display: block; }
+.field input.input-error {
+  border-color: #dc3545 !important;
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.12) !important;
 }

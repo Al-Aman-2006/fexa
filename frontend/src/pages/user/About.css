@@ -1,0 +1,799 @@
+/* ========================================================
+   FEXA ABOUT US — HAUTE PARFUMERIE LUXURY EDITORIAL
+   Palette: Lavender & White (#faf8fc, #ffffff, #b69ad8, #30263b)
+======================================================== */
+
+.fexa-about-page {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+  background-color: #faf8fc;
+  color: #30263b;
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
+}
+
+/* ================= SHARED TYPOGRAPHY & TAGS ================= */
+.about-eyebrow {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #8c69ae;
+  background: #f4ecfa;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid #e7daf2;
+  margin-bottom: 1.25rem;
+}
+
+.about-section-title {
+  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-size: 2.5rem;
+  font-weight: 500;
+  color: #241a30;
+  margin: 0 0 1rem;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+}
+
+.about-section-subtitle {
+  font-size: 1.05rem;
+  color: #776d80;
+  margin: 0 auto;
+  max-width: 640px;
+  line-height: 1.6;
+}
+
+.about-section-header-center {
+  text-align: center;
+  max-width: 800px;
+  margin: 0 auto 3.5rem;
+}
+
+/* ================= SHARED BUTTONS ================= */
+.about-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #241a30;
+  color: #ffffff;
+  border: 1px solid #241a30;
+  padding: 1rem 2.2rem;
+  border-radius: 40px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 6px 20px rgba(36, 26, 48, 0.12);
+}
+
+.about-btn-primary:hover {
+  background: #765493;
+  border-color: #765493;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(118, 84, 147, 0.25);
+}
+
+.about-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #30263b;
+  border: 1px solid #dcd1e8;
+  padding: 1rem 2.2rem;
+  border-radius: 40px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.about-btn-secondary:hover {
+  background: #f7f3fb;
+  border-color: #b69ad8;
+  color: #765493;
+  transform: translateY(-2px);
+}
+
+/* ================= 2. HERO SECTION ================= */
+.about-hero-section {
+  padding: 5rem 2rem 6rem;
+  background: linear-gradient(180deg, #ffffff 0%, #faf8fc 100%);
+  border-bottom: 1px solid #f0e8f6;
+  position: relative;
+  overflow: hidden;
+}
+
+.about-hero-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 4rem;
+  align-items: center;
+}
+
+.about-hero-content {
+  max-width: 580px;
+}
+
+.about-hero-title {
+  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-size: 3.5rem;
+  font-weight: 500;
+  color: #1e1528;
+  line-height: 1.15;
+  margin: 0 0 1.5rem;
+  letter-spacing: -0.01em;
+}
+
+.about-title-italic {
+  font-style: italic;
+  font-weight: 400;
+  color: #765493;
+}
+
+.about-hero-desc {
+  font-size: 1.15rem;
+  line-height: 1.7;
+  color: #645a72;
+  margin: 0 0 2.5rem;
+}
+
+.about-hero-actions {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.about-hero-visual {
+  display: flex;
+  justify-content: center;
+}
+
+.about-hero-image-frame {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(100, 70, 130, 0.12);
+  border: 1px solid #ebe2f4;
+  background: #ffffff;
+  transition: transform 0.4s ease;
+}
+
+.about-hero-image-frame:hover {
+  transform: translateY(-4px);
+}
+
+.about-hero-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+}
+
+.about-hero-badge {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  padding: 0.85rem 1.2rem;
+  border-radius: 12px;
+  border: 1px solid rgba(230, 217, 241, 0.8);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.badge-flacon {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: #241a30;
+}
+
+.badge-atelier {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: #8c69ae;
+}
+
+/* ================= 3. OUR STORY SECTION ================= */
+.about-story-section {
+  padding: 6.5rem 2rem;
+  background: #ffffff;
+  border-bottom: 1px solid #f0e8f6;
+}
+
+.about-story-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5rem;
+  align-items: center;
+}
+
+.about-story-media {
+  position: relative;
+}
+
+.story-media-wrapper {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(90, 60, 120, 0.08);
+  border: 1px solid #ebe4f3;
+}
+
+.about-story-img {
+  width: 100%;
+  height: 520px;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.5s ease;
+}
+
+.story-media-wrapper:hover .about-story-img {
+  transform: scale(1.02);
+}
+
+.story-caption-card {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  right: 24px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  border-radius: 10px;
+  padding: 1rem 1.4rem;
+  border: 1px solid #e7daf2;
+}
+
+.story-caption-tag {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #765493;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.story-caption-card p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #554a62;
+  line-height: 1.45;
+}
+
+.about-story-text-col {
+  max-width: 540px;
+}
+
+.about-story-body {
+  margin: 1.75rem 0 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.about-story-body p {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.75;
+  color: #584c66;
+}
+
+.about-signature-block {
+  border-top: 1px solid #f0e8f6;
+  padding-top: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.signature-fexa {
+  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-size: 1.6rem;
+  letter-spacing: 0.24em;
+  font-weight: 700;
+  color: #241a30;
+}
+
+.signature-sub {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8c69ae;
+}
+
+/* ================= 4. OUR PHILOSOPHY SECTION ================= */
+.about-philosophy-section {
+  padding: 6.5rem 2rem;
+  background: #faf8fc;
+  border-bottom: 1px solid #f0e8f6;
+}
+
+.about-philosophy-container {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.about-philosophy-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2.25rem;
+}
+
+.philosophy-card {
+  background: #ffffff;
+  border: 1px solid #ebe4f3;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(106, 79, 130, 0.05);
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.philosophy-card:hover {
+  transform: translateY(-6px);
+  border-color: #d6c4e8;
+  box-shadow: 0 18px 45px rgba(106, 79, 130, 0.12);
+}
+
+.philosophy-card-image-wrap {
+  position: relative;
+  width: 100%;
+  height: 280px;
+  overflow: hidden;
+  background: #f4ecfa;
+}
+
+.philosophy-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.philosophy-card:hover .philosophy-card-img {
+  transform: scale(1.05);
+}
+
+.philosophy-card-number {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  font-family: "Didot", serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #765493;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid #e7daf2;
+}
+
+.philosophy-card-content {
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.philosophy-card-title {
+  font-family: "Didot", Georgia, serif;
+  font-size: 1.25rem;
+  letter-spacing: 0.08em;
+  color: #241a30;
+  margin: 0 0 0.85rem;
+  font-weight: 600;
+}
+
+.philosophy-card-text {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: #635770;
+}
+
+/* ================= 5. CURATED CATEGORIES ================= */
+.about-categories-section {
+  padding: 6.5rem 2rem;
+  background: #ffffff;
+  border-bottom: 1px solid #f0e8f6;
+}
+
+.about-categories-container {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.about-categories-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2.25rem;
+}
+
+.category-editorial-card {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid #ebe4f3;
+  background: #faf8fc;
+  box-shadow: 0 12px 36px rgba(90, 60, 120, 0.06);
+  display: flex;
+  flex-direction: column;
+  transition: all 0.35s ease;
+  cursor: pointer;
+}
+
+.category-editorial-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 50px rgba(90, 60, 120, 0.14);
+  border-color: #d6c4e8;
+}
+
+.category-card-media {
+  position: relative;
+  height: 380px;
+  overflow: hidden;
+  background: #ebe4f3;
+}
+
+.category-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.category-editorial-card:hover .category-card-img {
+  transform: scale(1.06);
+}
+
+.category-overlay-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 60%, rgba(36, 26, 48, 0.4) 100%);
+}
+
+.category-card-info {
+  padding: 2rem;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.category-tag-pill {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: #765493;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.category-card-heading {
+  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-size: 1.85rem;
+  letter-spacing: 0.1em;
+  color: #241a30;
+  margin: 0 0 0.65rem;
+}
+
+.category-card-desc {
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: #645a72;
+  margin: 0 0 1.5rem;
+  flex: 1;
+}
+
+.category-explore-btn {
+  background: #fbf9fd;
+  color: #241a30;
+  border: 1px solid #dcd1e8;
+  padding: 0.85rem 1.4rem;
+  border-radius: 30px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: all 0.2s ease;
+}
+
+.category-explore-btn:hover {
+  background: #765493;
+  color: #ffffff;
+  border-color: #765493;
+}
+
+/* ================= 6. THE BEAUTY OF FRAGRANCE ================= */
+.about-beauty-section {
+  padding: 6.5rem 2rem;
+  background: #faf8fc;
+  border-bottom: 1px solid #f0e8f6;
+}
+
+.about-beauty-container {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.about-beauty-card {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #ebe4f3;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  box-shadow: 0 20px 60px rgba(90, 60, 120, 0.06);
+}
+
+.about-beauty-content {
+  padding: 4.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.about-beauty-text {
+  margin: 1.5rem 0 2.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.about-beauty-text p {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: #554963;
+}
+
+.about-beauty-visual {
+  position: relative;
+  background: #f4ecfa;
+}
+
+.about-beauty-img {
+  width: 100%;
+  height: 100%;
+  min-height: 440px;
+  object-fit: cover;
+  display: block;
+}
+
+.beauty-visual-quote {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  left: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  padding: 1rem 1.5rem;
+  border-radius: 10px;
+  border: 1px solid #e7daf2;
+  text-align: center;
+}
+
+.beauty-visual-quote p {
+  margin: 0;
+  font-family: "Didot", serif;
+  font-style: italic;
+  font-size: 1rem;
+  color: #765493;
+}
+
+/* ================= 7. BRAND VALUES ================= */
+.about-values-section {
+  padding: 6.5rem 2rem 7rem;
+  background: #ffffff;
+}
+
+/* ================= 10. LUXURY FOOTER ================= */
+.about-footer {
+  margin-top: auto;
+  background: #ffffff;
+  border-top: 1px solid #eee7f2;
+  color: #30263b;
+  width: 100%;
+}
+
+.about-footer-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 4.5rem 2rem 3rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 3rem;
+  flex-wrap: wrap;
+}
+
+.about-footer-brand {
+  max-width: 360px;
+}
+
+.footer-fexa-logo {
+  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-size: 1.8rem;
+  letter-spacing: 0.22em;
+  font-weight: 700;
+  color: #241a30;
+  margin: 0 0 4px;
+}
+
+.footer-fexa-sub {
+  font-size: 0.62rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: #8c69ae;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.footer-fexa-tagline {
+  font-size: 0.88rem;
+  line-height: 1.65;
+  color: #776d80;
+  margin: 0;
+}
+
+.about-footer-links-group {
+  display: flex;
+  gap: 4rem;
+}
+
+.footer-nav-col h4 {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #241a30;
+  margin: 0 0 1.25rem;
+}
+
+.footer-nav-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.footer-nav-col button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font-size: 0.85rem;
+  color: #645a72;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.footer-nav-col button:hover {
+  color: #765493;
+}
+
+.about-footer-bottom {
+  border-top: 1px solid #f2eaf7;
+  padding: 1.5rem 2rem;
+}
+
+.footer-bottom-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: #8c809d;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+/* ================= 11. RESPONSIVE DESIGN ================= */
+@media (max-width: 1100px) {
+  .about-hero-container {
+    grid-template-columns: 1fr;
+    gap: 3rem;
+    text-align: center;
+  }
+
+  .about-hero-content {
+    max-width: 100%;
+  }
+
+  .about-hero-actions {
+    justify-content: center;
+  }
+
+  .about-story-container {
+    grid-template-columns: 1fr;
+    gap: 3.5rem;
+  }
+
+  .about-story-text-col {
+    max-width: 100%;
+  }
+
+  .about-beauty-card {
+    grid-template-columns: 1fr;
+  }
+
+  .about-beauty-content {
+    padding: 3rem;
+  }
+}
+
+@media (max-width: 850px) {
+  .about-hero-title {
+    font-size: 2.6rem;
+  }
+
+  .about-section-title {
+    font-size: 2rem;
+  }
+
+  .about-philosophy-grid,
+  .about-categories-grid,
+  .about-values-grid {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .about-hero-section,
+  .about-story-section,
+  .about-philosophy-section,
+  .about-categories-section,
+  .about-beauty-section,
+  .about-values-section {
+    padding: 4rem 1.5rem;
+  }
+
+  .about-footer-inner {
+    flex-direction: column;
+    gap: 2.5rem;
+  }
+
+  .about-footer-links-group {
+    gap: 2.5rem;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .about-hero-title {
+    font-size: 2.1rem;
+  }
+
+  .about-hero-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .about-btn-primary,
+  .about-btn-secondary {
+    width: 100%;
+  }
+}

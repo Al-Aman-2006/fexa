@@ -1,0 +1,224 @@
+/* ========================================
+   FEXA USER SIDEBAR (Matching Reference 1)
+======================================== */
+
+.fexa-user-sidebar-card {
+  background: #ffffff;
+  border: 1px solid #eee8f1;
+  border-radius: 16px;
+  padding: 28px 20px;
+  box-shadow: 0 15px 45px rgba(80, 50, 100, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* USER IDENTITY HEADER */
+.sidebar-user-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.sidebar-avatar-wrapper {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  padding: 3px;
+  background: linear-gradient(135deg, #ded5e5 0%, #a184bd 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #ffffff;
+}
+
+.sidebar-avatar-initials {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #e8deee;
+  color: #765493;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 26px;
+  font-weight: 600;
+  border: 3px solid #ffffff;
+}
+
+.sidebar-online-dot {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  width: 14px;
+  height: 14px;
+  background: #40c057;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+}
+
+.sidebar-user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.sidebar-user-name {
+  margin: 0;
+  color: #3b3047;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+.sidebar-user-email {
+  margin: 0;
+  color: #817789;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.sidebar-user-badge {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #f4edf8;
+  border: 1px solid #e0d2e8;
+  color: #765493;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+.badge-check {
+  font-size: 11px;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: #f0ebf2;
+  width: 100%;
+}
+
+/* NAVIGATION MENU */
+.sidebar-nav-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  color: #6f6475;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.sidebar-nav-item:hover {
+  background: #f7f2f9;
+  color: #765493;
+}
+
+.sidebar-nav-item.active {
+  background: #f3ecf9;
+  color: #765493;
+  border-left: 3px solid #765493;
+}
+
+.nav-item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-item-icon {
+  font-size: 14px;
+  width: 18px;
+  text-align: center;
+}
+
+.nav-item-label {
+  font-size: 11px;
+}
+
+.nav-item-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-item-badge {
+  background: #eedef5;
+  color: #765493;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.5px;
+}
+
+.sidebar-nav-item.active .nav-item-badge {
+  background: #765493;
+  color: #ffffff;
+}
+
+.nav-item-arrow {
+  font-size: 14px;
+  color: #bfaecb;
+  transition: transform 0.2s ease;
+}
+
+.sidebar-nav-item:hover .nav-item-arrow,
+.sidebar-nav-item.active .nav-item-arrow {
+  color: #765493;
+  transform: translateX(2px);
+}
+
+/* LOGOUT BUTTON */
+.sidebar-nav-item.logout-item {
+  margin-top: 10px;
+  color: #d9534f;
+  border-top: 1px solid #f0ebf2;
+  padding-top: 14px;
+  border-radius: 0 0 10px 10px;
+}
+
+.sidebar-nav-item.logout-item:hover {
+  background: #fdf2f2;
+  color: #c9302c;
+}
+
+.logout-arrow {
+  font-size: 14px;
+  color: #d9534f;
+}

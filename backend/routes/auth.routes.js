@@ -11,6 +11,7 @@ const {
   resetPasswordController,
   logout,
   checkSession,
+  googleLoginController,
 } = require("../controllers/auth.controller");
 const authMiddleware = require("../middlewares/auth.middleware");
 
@@ -20,6 +21,9 @@ router.post("/register", register);
 
 // Login
 router.post("/login", login);
+
+// Google Login
+router.post("/google", googleLoginController);
 
 // Logout
 router.post("/logout", logout);
