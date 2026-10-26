@@ -1,10 +1,11 @@
-const express = require("express");
-const router = express.Router();
-const {
+import express from "express";
+import {
   getPublicProducts,
   getPublicProductCollections,
   getPublicProductById,
-} = require("../controllers/product.controller");
+} from "../controllers/product.controller.js";
+
+const router = express.Router();
 
 // ========================================
 // PUBLIC READ-ONLY PRODUCT ROUTES
@@ -19,4 +20,4 @@ router.get("/", getPublicProducts);
 // GET /api/products/:id - Single product details by ID or slug
 router.get("/:id", getPublicProductById);
 
-module.exports = router;
+export default router;

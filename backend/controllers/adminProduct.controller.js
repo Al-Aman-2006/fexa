@@ -1,8 +1,12 @@
-const mongoose = require("mongoose");
-const Product = require("../models/product.model");
-const path = require("path");
-const fs = require("fs");
-const { validateProduct, normalizeCategory } = require("../validators/product.validator");
+import mongoose from "mongoose";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+import Product from "../models/product.model.js";
+import { validateProduct, normalizeCategory } from "../validators/product.validator.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Helper to cleanup temporary uploaded files on validation/error failure
 const cleanupUploadedFiles = (files) => {
@@ -160,7 +164,7 @@ const createProduct = async (req, res) => {
     // Format fields for validation
     const payloadToValidate = {
       name: req.body.name,
-      brand: req.body.brand || "FEXA",
+      brand: req.body.brand !== undefined ? req.body.brand : "",
       category: req.body.category,
       price: req.body.price,
       compareAtPrice: req.body.compareAtPrice,
@@ -171,6 +175,24 @@ const createProduct = async (req, res) => {
     };
 
     const uploadedFiles = req.files || [];
+
+    // Contextual Category Security check (if request specified a category context)
+    const expectedContext = req.query.categoryContext || req.headers["x-category-context"];
+    if (expectedContext) {
+      const normExpected = normalizeCategory(expectedContext);
+      const normActual = normalizeCategory(req.body.category);
+      if (normExpected && normActual && normExpected !== normActual) {
+        cleanupUploadedFiles(uploadedFiles);
+        return res.status(400).json({
+          success: false,
+          message: `Category mismatch: Cannot create a "${req.body.category}" product under "${expectedContext}".`,
+          errors: {
+            category: `Category mismatch: Product creation must match the selected category (${normExpected}).`,
+          },
+        });
+      }
+    }
+
     const validationResult = validateProduct(payloadToValidate, {
       isEdit: false,
       imageCount: uploadedFiles.length,
@@ -519,7 +541,16 @@ const toggleProductStatus = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
+  getProducts,
+  getProductById,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  toggleProductStatus,
+};
+
+export default {
   getProducts,
   getProductById,
   createProduct,

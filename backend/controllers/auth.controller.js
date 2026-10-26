@@ -1,4 +1,4 @@
-const {
+import {
   registerUser,
   loginUser,
   verifyOtp,
@@ -6,8 +6,9 @@ const {
   forgotPassword,
   resetPassword,
   googleLoginUser,
-} = require("../services/auth.service");
-const { validateName, normalizeName } = require("../validators/user.validator");
+} from "../services/auth.service.js";
+import { validateName, normalizeName } from "../validators/user.validator.js";
+import User from "../models/user.model.js";
 
 // Validation Helper
 const validateEmail = (email) => {
@@ -345,7 +346,6 @@ const logout = async (req, res) => {
 
 const checkSession = async (req, res) => {
   try {
-    const User = require("../models/user.model");
     const user = await User.findById(req.user.id).select("-password");
     
     if (!user) {
@@ -419,7 +419,19 @@ const googleLoginController = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
+  register,
+  login,
+  verifyOtpController,
+  resendOtpController,
+  forgotPasswordController,
+  resetPasswordController,
+  logout,
+  checkSession,
+  googleLoginController,
+};
+
+export default {
   register,
   login,
   verifyOtpController,

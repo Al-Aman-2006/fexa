@@ -1,7 +1,7 @@
-const { ContactMessage, ALLOWED_REASONS } = require("../models/contact.model");
-const { sendContactConfirmationEmail } = require("../services/email.service");
-const jwt = require("jsonwebtoken");
-const User = require("../models/user.model");
+import { ContactMessage, ALLOWED_REASONS } from "../models/contact.model.js";
+import { sendContactConfirmationEmail } from "../services/email.service.js";
+import jwt from "jsonwebtoken";
+import User from "../models/user.model.js";
 
 // In-memory rate limiter for contact form abuse protection (sliding window)
 // Max 5 inquiries per IP within 10 minutes
@@ -293,7 +293,12 @@ const getContactReasons = (req, res) => {
   });
 };
 
-module.exports = {
+export {
+  submitContactMessage,
+  getContactReasons,
+};
+
+export default {
   submitContactMessage,
   getContactReasons,
 };

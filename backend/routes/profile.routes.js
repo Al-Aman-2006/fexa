@@ -1,14 +1,14 @@
-const express = require("express");
-const multer = require("multer");
-const path = require("path");
-
-const router = express.Router();
+import express from "express";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 
 // Authentication middleware
-const authMiddleware = require("../middlewares/auth.middleware");
+import authMiddleware from "../middlewares/auth.middleware.js";
 
 // Profile controller
-const {
+import {
   getProfile,
   getAddresses,
   updateProfile,
@@ -18,9 +18,12 @@ const {
   deleteAddress,
   verifyEmailChange,
   resendEmailChangeOtp,
-} = require("../controllers/profile.controller");
+} from "../controllers/profile.controller.js";
 
-const fs = require("fs");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const router = express.Router();
 
 const uploadDir = path.join(__dirname, "../uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -195,4 +198,4 @@ router.delete(
   deleteAddress
 );
 
-module.exports = router;
+export default router;

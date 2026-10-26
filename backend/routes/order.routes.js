@@ -1,15 +1,33 @@
-const express = require("express");
-const router = express.Router();
-const authMiddleware = require("../middlewares/auth.middleware");
-const {
+import express from "express";
+import authMiddleware from "../middlewares/auth.middleware.js";
+import {
   createOrder,
   getMyOrders,
   getOrderById,
-} = require("../controllers/order.controller");
+  getRazorpayKey,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
+  recordPaymentFailure,
+  checkOrderStatus,
+  handleRazorpayWebhook,
+} from "../controllers/order.controller.js";
 
+const router = express.Router();
+
+// Razorpay public webhook (called directly by Razorpay servers)
+router.post("/razorpay/webhook", handleRazorpayWebhook);
+
+// Protected routes (require user login)
 router.use(authMiddleware);
 
-// POST /api/orders - Create a new order from current cart
+// Razorpay endpoints
+router.get("/razorpay/key", getRazorpayKey);
+router.post("/razorpay/create-order", createRazorpayOrder);
+router.post("/razorpay/verify-payment", verifyRazorpayPayment);
+router.post("/razorpay/payment-failed", recordPaymentFailure);
+router.get("/razorpay/check-status/:orderId", checkOrderStatus);
+
+// POST /api/orders - Create or convert order from current cart (COD or standard)
 router.post("/", createOrder);
 
 // GET /api/orders - Get user's order history
@@ -18,4 +36,4 @@ router.get("/", getMyOrders);
 // GET /api/orders/:id - Get specific order details
 router.get("/:id", getOrderById);
 
-module.exports = router;
+export default router;

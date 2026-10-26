@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500;600;700&display=swap");
+
 /* ========================================================
    FEXA COLLECTIONS — HAUTE PARFUMERIE EDITORIAL DESIGN
    Palette: Soft Lavender (#faf8fc), Pristine White (#ffffff),
@@ -1919,5 +1921,118 @@
     padding: 0 12px;
   }
 }
+
+/* ========================================================
+   INACTIVE CATEGORY CUSTOMER-FACING STYLES
+   ======================================================== */
+
+.silhouette-card.category-inactive-card {
+  opacity: 0.72;
+  filter: grayscale(25%);
+  cursor: pointer;
+  position: relative;
+}
+
+.silhouette-card.category-inactive-card:hover {
+  opacity: 0.85;
+}
+
+.silhouette-card.category-inactive-card .silhouette-badge {
+  background: rgba(180, 50, 70, 0.85);
+  color: #ffffff;
+}
+
+.silhouette-card.category-inactive-card .silhouette-link {
+  color: #9c7bbd;
+}
+
+.collections-category-toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff4f5;
+  border: 1px solid #f5c2c7;
+  color: #842029;
+  padding: 12px 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(132, 32, 41, 0.08);
+}
+
+.collections-category-toast .toast-close {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  color: #842029;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.collections-inactive-category-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: #ffffff;
+  border: 1px solid #e9dff0;
+  border-left: 4px solid #a184bd;
+  border-radius: 10px;
+  padding: 22px 28px;
+  margin-bottom: 30px;
+  box-shadow: 0 6px 20px rgba(161, 132, 189, 0.1);
+}
+
+.inactive-banner-icon {
+  font-size: 28px;
+  background: #f7f2fa;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.inactive-banner-info {
+  flex: 1;
+  min-width: 250px;
+}
+
+.inactive-banner-info h3 {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 18px;
+  color: #2b2138;
+  margin: 0 0 4px 0;
+}
+
+.inactive-banner-info p {
+  font-size: 13px;
+  color: #726680;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.inactive-banner-action-btn {
+  background: #352b40;
+  color: #ffffff;
+  border: none;
+  padding: 11px 22px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.inactive-banner-action-btn:hover {
+  background: #8c69ae;
+  box-shadow: 0 4px 12px rgba(140, 105, 174, 0.3);
+}
+
 
 

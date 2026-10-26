@@ -1,6 +1,9 @@
-const mongoose = require("mongoose");
-const Product = require("../models/product.model");
-require("dotenv").config();
+import mongoose from "mongoose";
+import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import Product from "../models/product.model.js";
+
+dotenv.config();
 
 const sampleProducts = [
   // MEN'S PERFUMES
@@ -165,8 +168,8 @@ const seedProducts = async () => {
   }
 };
 
-if (require.main === module) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   seedProducts();
 }
 
-module.exports = seedProducts;
+export default seedProducts;

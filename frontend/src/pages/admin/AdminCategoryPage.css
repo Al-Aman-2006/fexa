@@ -1,0 +1,312 @@
+/* ========================================================
+   FEXA ADMIN - DEDICATED CATEGORY MANAGEMENT STYLES
+   Dark-and-Lavender Luxury Atelier Design System
+   ======================================================== */
+
+.category-master-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 24px;
+  background: #110c18;
+  border: 1px solid rgba(161, 132, 189, 0.25);
+  border-radius: 12px;
+  padding: 24px 28px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+.category-master-banner::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(180deg, #a184bd 0%, #685282 100%);
+}
+
+.category-master-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 650px;
+}
+
+.category-title-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.category-avatar-icon {
+  font-size: 32px;
+  background: rgba(161, 132, 189, 0.12);
+  border: 1px solid rgba(161, 132, 189, 0.28);
+  border-radius: 10px;
+  width: 54px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.category-main-heading {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #ffffff;
+  margin: 0 0 4px 0;
+}
+
+.category-main-subtext {
+  font-size: 13px;
+  color: #9d8fae;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Category Activation Action Box */
+.category-activation-action-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.category-status-pill-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-meta-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: #88789c;
+  font-family: monospace;
+}
+
+.category-live-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+}
+
+.category-live-status-badge.active {
+  background: rgba(40, 167, 69, 0.14);
+  border: 1px solid rgba(40, 167, 69, 0.45);
+  color: #40c057;
+}
+
+.category-live-status-badge.inactive {
+  background: rgba(220, 53, 69, 0.14);
+  border: 1px solid rgba(220, 53, 69, 0.45);
+  color: #ff737d;
+}
+
+.status-live-dot {
+  font-size: 10px;
+}
+
+.category-toggle-activation-btn {
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.category-toggle-activation-btn.deactivate-action {
+  background: rgba(220, 53, 69, 0.1);
+  border: 1px solid rgba(220, 53, 69, 0.4);
+  color: #ff737d;
+}
+
+.category-toggle-activation-btn.deactivate-action:hover:not(:disabled) {
+  background: rgba(220, 53, 69, 0.22);
+  border-color: #dc3545;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(220, 53, 69, 0.25);
+}
+
+.category-toggle-activation-btn.activate-action {
+  background: rgba(40, 167, 69, 0.12);
+  border: 1px solid rgba(40, 167, 69, 0.45);
+  color: #40c057;
+}
+
+.category-toggle-activation-btn.activate-action:hover:not(:disabled) {
+  background: rgba(40, 167, 69, 0.25);
+  border-color: #28a745;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(40, 167, 69, 0.25);
+}
+
+.category-toggle-activation-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* CONFIRMATION MODAL */
+.category-confirm-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.category-confirm-modal-box {
+  background: #110c18;
+  border: 1px solid rgba(161, 132, 189, 0.35);
+  border-radius: 12px;
+  max-width: 480px;
+  width: 100%;
+  padding: 24px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  animation: modalFadeIn 0.2s ease;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.category-confirm-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.modal-header-icon {
+  font-size: 22px;
+}
+
+.category-confirm-modal-header h3 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  color: #ffffff;
+  margin: 0;
+}
+
+.category-confirm-modal-body p {
+  font-size: 13px;
+  color: #bfa8d8;
+  line-height: 1.6;
+  margin: 0 0 20px 0;
+}
+
+.category-confirm-modal-body strong {
+  color: #ffffff;
+}
+
+.category-confirm-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.category-modal-cancel-btn {
+  padding: 10px 18px;
+  background: transparent;
+  border: 1px solid rgba(161, 132, 189, 0.3);
+  border-radius: 8px;
+  color: #cbb4de;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.category-modal-cancel-btn:hover:not(:disabled) {
+  background: rgba(161, 132, 189, 0.1);
+  color: #ffffff;
+}
+
+.category-modal-submit-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.category-modal-submit-btn.deactivate-btn {
+  background: #dc3545;
+  color: #ffffff;
+}
+
+.category-modal-submit-btn.deactivate-btn:hover:not(:disabled) {
+  background: #c82333;
+  box-shadow: 0 4px 14px rgba(220, 53, 69, 0.35);
+}
+
+.category-modal-submit-btn.activate-btn {
+  background: #28a745;
+  color: #ffffff;
+}
+
+.category-modal-submit-btn.activate-btn:hover:not(:disabled) {
+  background: #218838;
+  box-shadow: 0 4px 14px rgba(40, 167, 69, 0.35);
+}
+
+.category-modal-submit-btn:disabled,
+.category-modal-cancel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* RESPONSIVE LAYOUT */
+@media (max-width: 768px) {
+  .category-master-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+  }
+
+  .category-activation-action-box {
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .category-toggle-activation-btn {
+    width: 100%;
+  }
+}

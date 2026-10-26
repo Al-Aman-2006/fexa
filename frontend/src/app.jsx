@@ -28,6 +28,10 @@ import Contact from "./pages/user/Contact";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
+import AdminCoupons from "./pages/admin/AdminCoupons";
+import AdminSales from "./pages/admin/AdminSales";
+import AdminCategoryPage from "./pages/admin/AdminCategoryPage";
+import AdminReviews from "./pages/admin/AdminReviews";
 import ScrollToTop from "./components/common/ScrollToTop";
 import ErrorBoundary from "./components/common/ErrorBoundary";
 
@@ -139,16 +143,75 @@ function App() {
 
               <Route
                 path="/admin/products"
+                element={<Navigate to="/admin/categories/all" replace />}
+              />
+
+              <Route
+                path="/admin/coupons"
                 element={
                   <AdminProtectedRoute>
-                    <AdminProducts />
+                    <AdminCoupons />
+                  </AdminProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/admin/sales"
+                element={
+                  <AdminProtectedRoute>
+                    <AdminSales />
+                  </AdminProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/admin/reviews"
+                element={
+                  <AdminProtectedRoute>
+                    <AdminReviews />
+                  </AdminProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/admin/categories/all"
+                element={
+                  <AdminProtectedRoute>
+                    <AdminCategoryPage category="All" />
+                  </AdminProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/admin/categories/men"
+                element={
+                  <AdminProtectedRoute>
+                    <AdminCategoryPage category="Men" />
+                  </AdminProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/admin/categories/women"
+                element={
+                  <AdminProtectedRoute>
+                    <AdminCategoryPage category="Women" />
+                  </AdminProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/admin/categories/unisex"
+                element={
+                  <AdminProtectedRoute>
+                    <AdminCategoryPage category="Unisex" />
                   </AdminProtectedRoute>
                 }
               />
 
               <Route
                 path="/admin/categories"
-                element={<Navigate to="/admin/products" replace />}
+                element={<Navigate to="/admin/categories/all" replace />}
               />
 
               <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />

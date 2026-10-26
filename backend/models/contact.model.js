@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const ALLOWED_REASONS = [
   "General Inquiry",
@@ -83,7 +83,12 @@ contactMessageSchema.index({ createdAt: -1 });
 contactMessageSchema.index({ email: 1 });
 contactMessageSchema.index({ user: 1 });
 
-module.exports = {
-  ContactMessage: mongoose.model("ContactMessage", contactMessageSchema),
+const ContactMessage =
+  mongoose.models.ContactMessage ||
+  mongoose.model("ContactMessage", contactMessageSchema);
+
+export { ContactMessage, ALLOWED_REASONS };
+export default {
+  ContactMessage,
   ALLOWED_REASONS,
 };

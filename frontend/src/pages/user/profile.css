@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&display=swap");
+
 /* ========================================
    PROFILE PAGE (Matching Reference 1)
 ======================================== */
@@ -37,7 +39,7 @@
 
 .logo-brand {
   color: #3b3047;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-size: 24px;
   letter-spacing: 6px;
   line-height: 1;
@@ -176,7 +178,7 @@
 .header-banner-container h1 {
   margin: 8px 0 6px 0;
   color: #3b3047;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-size: 38px;
   font-weight: 400;
 }
@@ -291,7 +293,7 @@
   font-size: 26px;
   font-weight: 700;
   color: #3b3047;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
 }
 
 .stat-card-subtext {
@@ -347,7 +349,7 @@
 
 .profile-photo span {
   color: #765493;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-size: 48px;
 }
 
@@ -388,7 +390,7 @@
 .profile-details-header h2 {
   margin: 6px 0 0 0;
   color: #3b3047;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-size: 26px;
   font-weight: 400;
 }
@@ -575,7 +577,7 @@
 .addresses-header h2 {
   margin: 6px 0 0 0;
   color: #3b3047;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-size: 26px;
   font-weight: 400;
 }
@@ -626,7 +628,7 @@
 .address-form-header h3 {
   margin: 6px 0 0 0;
   color: #3b3047;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-size: 22px;
   font-weight: 400;
 }
@@ -764,7 +766,7 @@
 .no-address h3 {
   margin: 0;
   color: #3b3047;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-size: 20px;
 }
 
@@ -879,7 +881,7 @@
 .tab-card-header h2 {
   margin: 6px 0 20px 0;
   color: #3b3047;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-size: 26px;
   font-weight: 400;
 }
@@ -904,7 +906,7 @@
 .tab-content-placeholder h3 {
   margin: 0;
   color: #3b3047;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-size: 20px;
 }
 
@@ -991,7 +993,7 @@
 .orders-section-header h2 {
   margin: 6px 0 6px 0;
   color: #3b3047;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-size: 28px;
   font-weight: 400;
 }
@@ -1111,7 +1113,7 @@
 .orders-empty-card h3 {
   margin: 0;
   color: #3b3047;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-size: 24px;
   font-weight: 400;
 }
@@ -1419,7 +1421,7 @@
 .order-item-name {
   margin: 0;
   color: #3b3047;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-size: 16px;
   font-weight: 500;
   transition: color 0.15s ease;

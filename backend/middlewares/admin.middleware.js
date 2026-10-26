@@ -1,5 +1,5 @@
-const jwt = require("jsonwebtoken");
-const User = require("../models/user.model");
+import jwt from "jsonwebtoken";
+import User from "../models/user.model.js";
 
 // ========================================
 // ADMIN AUTHORIZATION MIDDLEWARE
@@ -64,4 +64,4 @@ const adminMiddleware = async (req, res, next) => {
   }
 };
 
-module.exports = adminMiddleware;
+export default adminMiddleware;

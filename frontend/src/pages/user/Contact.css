@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500;600;700&display=swap");
+
 /* ========================================================
    FEXA CONTACT US — HAUTE PARFUMERIE LUXURY EDITORIAL
    Palette: Lavender & White (#faf8fc, #ffffff, #8c69ae, #241a30)
@@ -31,7 +33,7 @@
 }
 
 .contact-section-title {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 2.5rem;
   font-weight: 500;
   color: #241a30;
@@ -78,7 +80,7 @@
 }
 
 .contact-hero-title {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 3.5rem;
   font-weight: 500;
   color: #241a30;
@@ -239,7 +241,7 @@
 }
 
 .info-card-title {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.45rem;
   font-weight: 500;
   color: #241a30;
@@ -324,7 +326,7 @@
 }
 
 .form-editorial-title {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 3rem;
   font-weight: 500;
   color: #241a30;
@@ -360,7 +362,7 @@
 }
 
 .pledge-body h4 {
-  font-family: "Didot", serif;
+  font-family: serif;
   font-size: 1.05rem;
   color: #241a30;
   margin: 0 0 0.35rem;
@@ -619,7 +621,7 @@
 }
 
 .success-heading {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 2rem;
   font-weight: 500;
   color: #241a30;
@@ -722,7 +724,7 @@
 }
 
 .faq-q-text {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.15rem;
   font-weight: 500;
   color: #241a30;
@@ -774,7 +776,7 @@
 }
 
 .footer-fexa-logo {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.85rem;
   letter-spacing: 0.22em;
   font-weight: 700;

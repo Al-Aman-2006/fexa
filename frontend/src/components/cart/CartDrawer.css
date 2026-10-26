@@ -9,7 +9,7 @@
   z-index: 2500;
   display: flex;
   justify-content: flex-end;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: #1a1824;
 }
 
@@ -79,7 +79,7 @@
 }
 
 .drawer-title-main {
-  font-family: "Didot", "Playfair Display", "Cinzel", Georgia, serif;
+  font-family: "Playfair Display", "Cinzel", Georgia, serif;
   font-size: 1.55rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -189,7 +189,7 @@
 }
 
 .drawer-auth-prompt h3 {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.35rem;
   color: #0e0d14;
   margin-bottom: 0.5rem;
@@ -243,7 +243,7 @@
 }
 
 .empty-state-headline {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.45rem;
   color: #0e0d14;
   margin: 0 0 0.65rem;
@@ -331,7 +331,7 @@
   flex-direction: column;
   align-items: center;
   color: #8c809c;
-  font-family: "Didot", serif;
+  font-family: serif;
   font-weight: 700;
   font-size: 0.75rem;
 }
@@ -373,7 +373,7 @@
 }
 
 .cart-item-name {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.05rem;
   color: #0e0d14;
   margin: 0.2rem 0 0.25rem;
@@ -509,7 +509,7 @@
 }
 
 .item-unit-price {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.05rem;
   font-weight: 700;
   color: #0e0d14;
@@ -544,7 +544,7 @@
 }
 
 .subtotal-amount {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.75rem;
   font-weight: 700;
   color: #0e0d14;
@@ -700,7 +700,7 @@
 }
 
 .remove-modal-title {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.35rem;
   color: #0e0d14;
   margin: 0 0 0.6rem;

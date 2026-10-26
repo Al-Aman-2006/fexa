@@ -1,12 +1,13 @@
-const express = require("express");
-const router = express.Router();
-const authMiddleware = require("../middlewares/auth.middleware");
-const {
+import express from "express";
+import authMiddleware from "../middlewares/auth.middleware.js";
+import {
   getWishlist,
   addToWishlist,
   removeFromWishlist,
   moveToCart,
-} = require("../controllers/wishlist.controller");
+} from "../controllers/wishlist.controller.js";
+
+const router = express.Router();
 
 // ========================================
 // AUTHENTICATED USER WISHLIST ENDPOINTS
@@ -26,4 +27,4 @@ router.delete("/items/:productId", removeFromWishlist);
 // POST /api/wishlist/move-to-cart - Move item from wishlist directly to cart
 router.post("/move-to-cart", moveToCart);
 
-module.exports = router;
+export default router;

@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500;600;700&display=swap");
+
 /* ========================================================
    FEXA ABOUT US — HAUTE PARFUMERIE LUXURY EDITORIAL
    Palette: Lavender & White (#faf8fc, #ffffff, #b69ad8, #30263b)
@@ -31,7 +33,7 @@
 }
 
 .about-section-title {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 2.5rem;
   font-weight: 500;
   color: #241a30;
@@ -127,7 +129,7 @@
 }
 
 .about-hero-title {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 3.5rem;
   font-weight: 500;
   color: #1e1528;
@@ -307,7 +309,7 @@
 }
 
 .signature-fexa {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.6rem;
   letter-spacing: 0.24em;
   font-weight: 700;
@@ -381,7 +383,7 @@
   right: 14px;
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(8px);
-  font-family: "Didot", serif;
+  font-family: serif;
   font-size: 0.9rem;
   font-weight: 700;
   color: #765493;
@@ -398,7 +400,7 @@
 }
 
 .philosophy-card-title {
-  font-family: "Didot", Georgia, serif;
+  font-family: Georgia, serif;
   font-size: 1.25rem;
   letter-spacing: 0.08em;
   color: #241a30;
@@ -492,7 +494,7 @@
 }
 
 .category-card-heading {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.85rem;
   letter-spacing: 0.1em;
   color: #241a30;
@@ -599,7 +601,7 @@
 
 .beauty-visual-quote p {
   margin: 0;
-  font-family: "Didot", serif;
+  font-family: serif;
   font-style: italic;
   font-size: 1rem;
   color: #765493;
@@ -635,7 +637,7 @@
 }
 
 .footer-fexa-logo {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.8rem;
   letter-spacing: 0.22em;
   font-weight: 700;

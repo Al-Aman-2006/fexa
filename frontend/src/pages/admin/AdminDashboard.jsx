@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { useAdminAuth } from "../../context/AdminAuthContext";
 import AdminSidebar from "../../components/admin/AdminSidebar";
+import AdminPagination from "../../components/admin/AdminPagination";
 import "./AdminDashboard.css";
 
 function AdminDashboard() {
@@ -277,7 +278,11 @@ function AdminDashboard() {
           text: data.message || `Operation completed successfully.`,
         });
         closeModal();
-        fetchUsers(page, appliedSearch);
+        const nextPage = (activeModal === "delete" && users.length === 1 && page > 1) ? page - 1 : page;
+        if (nextPage !== page) {
+          setPage(nextPage);
+        }
+        fetchUsers(nextPage, appliedSearch);
       } else {
         setToast({
           type: "error",
@@ -450,7 +455,8 @@ function AdminDashboard() {
 
           {/* USERS TABLE CARD */}
           <div className="admin-table-card">
-            <table className="admin-users-table">
+            <div className="admin-table-scroll-wrapper">
+              <table className="admin-users-table">
               <thead>
                 <tr>
                   <th>NAME</th>
@@ -542,43 +548,20 @@ function AdminDashboard() {
                 )}
               </tbody>
             </table>
+            </div>
 
             {/* PAGINATION CONTROLS */}
-            {!loading && pagination.totalPages > 1 && (
-              <div className="admin-pagination-container">
-                <div className="admin-pagination-info">
-                  Showing page <strong>{pagination.page}</strong> of{" "}
-                  <strong>{pagination.totalPages}</strong> ({pagination.totalUsers} total users)
-                </div>
-
-                <div className="admin-pagination-controls">
-                  <button
-                    className="page-nav-btn"
-                    onClick={() => handlePageChange(pagination.page - 1)}
-                    disabled={pagination.page <= 1}
-                  >
-                    PREVIOUS
-                  </button>
-
-                  {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((pageNum) => (
-                    <button
-                      key={pageNum}
-                      className={`page-num-btn ${pageNum === pagination.page ? "active" : ""}`}
-                      onClick={() => handlePageChange(pageNum)}
-                    >
-                      {pageNum}
-                    </button>
-                  ))}
-
-                  <button
-                    className="page-nav-btn"
-                    onClick={() => handlePageChange(pagination.page + 1)}
-                    disabled={pagination.page >= pagination.totalPages}
-                  >
-                    NEXT
-                  </button>
-                </div>
-              </div>
+            {!loading && (
+              <AdminPagination
+                currentPage={pagination.page}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalUsers}
+                pageSize={pagination.limit || 10}
+                itemName="users"
+                onPageChange={handlePageChange}
+                loading={loading}
+                variant="card-footer"
+              />
             )}
           </div>
         </main>

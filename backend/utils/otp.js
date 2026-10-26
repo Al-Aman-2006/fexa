@@ -1,19 +1,19 @@
-const crypto = require("crypto");
+import crypto from "crypto";
 
-const generateOtp = () => {
+export const generateOtp = () => {
   return crypto
     .randomInt(100000, 1000000)
     .toString();
 };
 
-const hashOtp = (otp) => {
+export const hashOtp = (otp) => {
   return crypto
     .createHmac("sha256", process.env.JWT_SECRET)
     .update(otp)
     .digest("hex");
 };
 
-module.exports = {
+export default {
   generateOtp,
   hashOtp,
 };

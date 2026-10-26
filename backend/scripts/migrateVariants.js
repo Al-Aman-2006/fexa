@@ -9,10 +9,15 @@
  * - Safe and idempotent: can be rerun safely without duplicating data
  */
 
-const mongoose = require("mongoose");
-const path = require("path");
-require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
-const Product = require("../models/product.model");
+import mongoose from "mongoose";
+import path from "path";
+import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import Product from "../models/product.model.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const runMigration = async () => {
   try {

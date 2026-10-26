@@ -1,6 +1,7 @@
-const mongoose = require("mongoose");
-const Cart = require("../models/cart.model");
-const Product = require("../models/product.model");
+import mongoose from "mongoose";
+import Cart from "../models/cart.model.js";
+import Product from "../models/product.model.js";
+import Category from "../models/category.model.js";
 
 // Format cart helper: cleans up deleted products, computes live subtotal and item count
 const formatCartResponse = async (cartDoc) => {
@@ -21,6 +22,13 @@ const formatCartResponse = async (cartDoc) => {
     select: "_id name slug brand category price compareAtPrice stock images status variants",
   });
 
+  // Retrieve live category activation statuses
+  const allCategories = await Category.find({});
+  const categoryStatusMap = { Men: true, Women: true, Unisex: true };
+  allCategories.forEach((c) => {
+    categoryStatusMap[c.name] = c.isActive;
+  });
+
   const formattedItems = [];
   const validItemsToKeep = [];
   let subtotal = 0;
@@ -35,7 +43,8 @@ const formatCartResponse = async (cartDoc) => {
     }
 
     const prod = item.product;
-    const isInactive = prod.status === "Inactive";
+    const isCategoryInactive = categoryStatusMap[prod.category] === false;
+    const isInactive = prod.status === "Inactive" || isCategoryInactive;
 
     let livePrice = Number(prod.price) || 0;
     let liveOriginalPrice = Number(prod.compareAtPrice) || 0;
@@ -105,6 +114,7 @@ const formatCartResponse = async (cartDoc) => {
       quantity: qty,
       itemTotal: livePrice * qty,
       isInactive,
+      isCategoryInactive,
       isOutOfStock,
       status: prod.status,
     });
@@ -199,7 +209,15 @@ const addToCart = async (req, res) => {
       });
     }
 
-    // 2. Check if product is active
+    // 2. Check if product and its category are active
+    const categoryDoc = await Category.findOne({ name: product.category });
+    if (categoryDoc && !categoryDoc.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: `The ${product.category} collection is currently unavailable.`,
+      });
+    }
+
     if (product.status === "Inactive") {
       return res.status(400).json({
         success: false,
@@ -400,6 +418,14 @@ const updateCartItemQuantity = async (req, res) => {
       });
     }
 
+    const categoryDoc = await Category.findOne({ name: liveProduct.category });
+    if (categoryDoc && !categoryDoc.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: `The ${liveProduct.category} collection is currently unavailable.`,
+      });
+    }
+
     if (liveProduct.status === "Inactive") {
       return res.status(400).json({
         success: false,
@@ -543,7 +569,16 @@ const clearCart = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
+  getCart,
+  addToCart,
+  updateCartItemQuantity,
+  removeCartItem,
+  clearCart,
+  formatCartResponse,
+};
+
+export default {
   getCart,
   addToCart,
   updateCartItemQuantity,

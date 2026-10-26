@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const productSchema = new mongoose.Schema(
   {
@@ -8,6 +8,12 @@ const productSchema = new mongoose.Schema(
       trim: true,
       minlength: [2, "Product name must be at least 2 characters."],
       maxlength: [150, "Product name cannot exceed 150 characters."],
+      validate: {
+        validator: function (v) {
+          return /[\p{L}]/u.test(v);
+        },
+        message: "Product name must contain at least one letter and cannot consist only of numbers or symbols.",
+      },
     },
 
     slug: {
@@ -172,4 +178,4 @@ productSchema.index({ createdAt: -1 });
 const Product =
   mongoose.models.Product || mongoose.model("Product", productSchema);
 
-module.exports = Product;
+export default Product;

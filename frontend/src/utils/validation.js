@@ -305,8 +305,9 @@ export const validateProductName = (value) => {
   ) {
     return "Product name cannot contain HTML or script tags.";
   }
-  if (!/[a-zA-Z0-9\u00C0-\u024F\u1E00-\u1EFF]/.test(trimmed)) {
-    return "Product name must contain letters or numbers.";
+  const productNameRegex = /[\p{L}]/u;
+  if (!productNameRegex.test(trimmed)) {
+    return "Product name must contain at least one letter and cannot consist only of numbers or symbols.";
   }
   return null;
 };
@@ -325,7 +326,7 @@ export const validateBrand = (value) => {
     return "Brand cannot contain HTML or script tags.";
   }
   if (!/[a-zA-Z0-9\u00C0-\u024F\u1E00-\u1EFF]/.test(trimmed)) {
-    return "Brand must contain letters or numbers.";
+    return "Brand cannot consist solely of symbols or special characters. Please include letters or numbers.";
   }
   return null;
 };

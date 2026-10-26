@@ -36,6 +36,34 @@ function ProductDetails() {
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
 
+  // Reviews and ratings state
+  const [reviews, setReviews] = useState([]);
+  const [reviewsSummary, setReviewsSummary] = useState({
+    averageRating: 0,
+    totalReviews: 0,
+    distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    percentages: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  });
+  const [userReview, setUserReview] = useState(null);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsPage, setReviewsPage] = useState(1);
+  const [reviewsTotalPages, setReviewsTotalPages] = useState(1);
+  const [reviewsSort, setReviewsSort] = useState("newest");
+  const [ratingFilter, setRatingFilter] = useState(null);
+
+  // Review modal and interaction state
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewFormData, setReviewFormData] = useState({
+    rating: 5,
+    title: "",
+    comment: "",
+  });
+  const [hoverRating, setHoverRating] = useState(0);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewFormError, setReviewFormError] = useState("");
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
   // Fetch product by ID or slug
   const fetchProduct = useCallback(async (targetId) => {
     try {
@@ -200,6 +228,218 @@ function ProductDetails() {
           text: res.message || "Unable to save to wishlist.",
         });
       }
+    }
+  };
+
+  // ── Product Reviews & Ratings Handlers ──
+
+  // Format ISO review date
+  const formatReviewDate = (isoString) => {
+    if (!isoString) return "";
+    try {
+      const d = new Date(isoString);
+      return d.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch {
+      return "";
+    }
+  };
+
+  // Render gold star icons
+  const renderStarGlyphs = (ratingVal, max = 5) => {
+    const rounded = Math.round(ratingVal);
+    return (
+      <div className="review-stars-wrapper" aria-label={`${ratingVal} out of ${max} stars`}>
+        {Array.from({ length: max }, (_, i) => {
+          const starNum = i + 1;
+          return (
+            <span
+              key={starNum}
+              className={`review-star-char ${starNum <= rounded ? "filled" : "empty"}`}
+            >
+              ★
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Fetch product reviews from API
+  const fetchReviews = useCallback(
+    async (productId, page = 1, sort = "newest", starFilter = null) => {
+      if (!productId) return;
+      try {
+        setReviewsLoading(true);
+        const token = localStorage.getItem("token");
+        const headers = {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        };
+        const queryParams = new URLSearchParams({
+          page: String(page),
+          limit: "5",
+          sort: sort || "newest",
+        });
+        if (starFilter) {
+          queryParams.set("rating", String(starFilter));
+        }
+
+        const res = await fetch(
+          `http://localhost:5000/api/reviews/product/${productId}?${queryParams.toString()}`,
+          {
+            headers,
+            credentials: "include",
+          }
+        );
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setReviews(data.reviews || []);
+          if (data.ratingSummary) {
+            setReviewsSummary(data.ratingSummary);
+          }
+          if (data.pagination) {
+            setReviewsTotalPages(data.pagination.totalPages || 1);
+          }
+          setUserReview(data.userReview || null);
+        }
+      } catch (err) {
+        console.error("Fetch reviews error:", err);
+      } finally {
+        setReviewsLoading(false);
+      }
+    },
+    []
+  );
+
+  // Trigger reviews fetch when product, pagination, sort, ratingFilter, or auth changes
+  useEffect(() => {
+    if (product?._id) {
+      fetchReviews(product._id, reviewsPage, reviewsSort, ratingFilter);
+    }
+  }, [product?._id, reviewsPage, reviewsSort, ratingFilter, user?._id, fetchReviews]);
+
+  // Open review modal (handles pre-fill if user already submitted)
+  const handleOpenReviewModal = () => {
+    if (!user) {
+      setToastMessage({
+        type: "info",
+        text: "Please sign in to share your flacon review.",
+      });
+      navigate("/login", { state: { from: `/products/${product?._id}` } });
+      return;
+    }
+
+    if (userReview) {
+      setReviewFormData({
+        rating: userReview.rating || 5,
+        title: userReview.title || "",
+        comment: userReview.comment || "",
+      });
+    } else {
+      setReviewFormData({
+        rating: 5,
+        title: "",
+        comment: "",
+      });
+    }
+    setHoverRating(0);
+    setReviewFormError("");
+    setIsReviewModalOpen(true);
+  };
+
+  // Submit review
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    if (!user) return;
+
+    if (!reviewFormData.rating || reviewFormData.rating < 1 || reviewFormData.rating > 5) {
+      setReviewFormError("Please select a star rating between 1 and 5.");
+      return;
+    }
+    if (!reviewFormData.comment || reviewFormData.comment.trim().length < 5) {
+      setReviewFormError("Please write a review comment with at least 5 characters.");
+      return;
+    }
+    if (reviewFormData.comment.trim().length > 1000) {
+      setReviewFormError("Review comment must not exceed 1000 characters.");
+      return;
+    }
+
+    try {
+      setReviewSubmitting(true);
+      setReviewFormError("");
+      const token = localStorage.getItem("token");
+      const res = await fetch("http://localhost:5000/api/reviews", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          productId: product._id,
+          rating: Number(reviewFormData.rating),
+          title: reviewFormData.title ? reviewFormData.title.trim() : "",
+          comment: reviewFormData.comment.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to submit review.");
+      }
+
+      setIsReviewModalOpen(false);
+      setToastMessage({
+        type: "success",
+        text: data.message || "Review submitted! Awaiting atelier moderation.",
+      });
+      // Refresh reviews & user review
+      fetchReviews(product._id, 1, reviewsSort, ratingFilter);
+    } catch (err) {
+      console.error("Submit review error:", err);
+      setReviewFormError(err.message || "An error occurred while submitting your review.");
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  // Delete user review
+  const handleDeleteUserReview = async () => {
+    if (!userReview?._id) return;
+    try {
+      setDeleteSubmitting(true);
+      const token = localStorage.getItem("token");
+      const res = await fetch(`http://localhost:5000/api/reviews/${userReview._id}`, {
+        method: "DELETE",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to delete review.");
+      }
+
+      setIsDeleteModalOpen(false);
+      setUserReview(null);
+      setToastMessage({
+        type: "info",
+        text: "Your review has been successfully removed.",
+      });
+      fetchReviews(product._id, 1, reviewsSort, ratingFilter);
+    } catch (err) {
+      console.error("Delete review error:", err);
+      setToastMessage({
+        type: "error",
+        text: err.message || "Failed to delete review.",
+      });
+    } finally {
+      setDeleteSubmitting(false);
     }
   };
 
@@ -545,13 +785,52 @@ function ProductDetails() {
               <h1 className="product-headline">{product.name}</h1>
 
               {/* Rating Seal */}
-              <div className="product-rating-seal">
-                <div className="stars-group" aria-label="Rating 5 out of 5 stars">
-                  ★★★★★
+              <div
+                className="product-rating-seal clickable"
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  const el = document.getElementById("customer-reviews-section");
+                  if (el) el.scrollIntoView({ behavior: "smooth" });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    const el = document.getElementById("customer-reviews-section");
+                    if (el) el.scrollIntoView({ behavior: "smooth" });
+                  }
+                }}
+                title="View customer reviews and ratings"
+              >
+                <div
+                  className="stars-group"
+                  aria-label={`Rating ${reviewsSummary.averageRating} out of 5 stars`}
+                >
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <span
+                      key={star}
+                      className={
+                        star <= Math.round(reviewsSummary.averageRating || 5)
+                          ? "seal-star filled"
+                          : "seal-star empty"
+                      }
+                    >
+                      ★
+                    </span>
+                  ))}
                 </div>
-                <span className="rating-text">5.0</span>
+                <span className="rating-text">
+                  {reviewsSummary.totalReviews > 0
+                    ? reviewsSummary.averageRating.toFixed(1)
+                    : "5.0"}
+                </span>
                 <span className="rating-divider">|</span>
-                <span className="rating-seal-label">ATELIER VERIFIED FLACON</span>
+                <span className="rating-seal-label">
+                  {reviewsSummary.totalReviews > 0
+                    ? `${reviewsSummary.totalReviews} ${
+                        reviewsSummary.totalReviews === 1 ? "PATRON REVIEW" : "PATRON REVIEWS"
+                      }`
+                    : "BE THE FIRST TO REVIEW"}
+                </span>
               </div>
 
               {/* Pricing Section */}
@@ -762,6 +1041,307 @@ function ProductDetails() {
           </div>
         )}
 
+        {/* ================= 5. CUSTOMER REVIEWS & RATINGS ================= */}
+        {!loading && product && (
+          <section
+            id="customer-reviews-section"
+            className="customer-reviews-section"
+            aria-labelledby="reviews-section-heading"
+          >
+            <div className="reviews-section-header">
+              <span className="reviews-eyebrow">AUTHENTIC IMPRESSIONS</span>
+              <h2 id="reviews-section-heading" className="reviews-main-heading">
+                Customer Reviews
+              </h2>
+              <p className="reviews-subheading">
+                Olfactory observations and flacon appraisals shared by verified patrons of the Atelier.
+              </p>
+            </div>
+
+            {/* RATING SUMMARY COMPONENT */}
+            <div className="reviews-summary-card">
+              {/* Column 1: Overall Average Rating */}
+              <div className="summary-score-col">
+                <div className="summary-score-value">
+                  {reviewsSummary.averageRating.toFixed(1)}
+                </div>
+                <div className="summary-stars-display">
+                  {renderStarGlyphs(reviewsSummary.averageRating, 5)}
+                </div>
+                <div className="summary-score-sub">
+                  {reviewsSummary.averageRating.toFixed(1)} out of 5
+                </div>
+                <div className="summary-based-count">
+                  Based on {reviewsSummary.totalReviews}{" "}
+                  {reviewsSummary.totalReviews === 1 ? "review" : "reviews"}
+                </div>
+              </div>
+
+              {/* Column 2: 5-Star Rating Distribution */}
+              <div className="summary-distribution-col">
+                <div className="distribution-table-header">Rating Breakdown</div>
+                {[5, 4, 3, 2, 1].map((stars) => {
+                  const count = reviewsSummary.distribution[stars] || 0;
+                  const pct = reviewsSummary.percentages[stars] || 0;
+                  const isCurrentFilter = ratingFilter === stars;
+
+                  return (
+                    <button
+                      type="button"
+                      key={stars}
+                      className={`distribution-row-btn ${isCurrentFilter ? "is-filtered" : ""}`}
+                      onClick={() => setRatingFilter(isCurrentFilter ? null : stars)}
+                      title={`Filter by ${stars} stars`}
+                    >
+                      <span className="dist-star-label">{stars} stars</span>
+                      <div className="dist-bar-track">
+                        <div
+                          className="dist-bar-fill"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="dist-stats-label">
+                        {count} {count === 1 ? "review" : "reviews"} ({pct}%)
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Column 3: Call to Action */}
+              <div className="summary-cta-col">
+                <div className="summary-cta-card">
+                  <h3 className="cta-headline">Share Your Experience</h3>
+                  <p className="cta-description">
+                    How does {product.name} unfold on your skin? Share your notes on projection, longevity, and sillage.
+                  </p>
+                  {user ? (
+                    <button
+                      type="button"
+                      className="write-review-cta-btn"
+                      onClick={handleOpenReviewModal}
+                    >
+                      {userReview ? "✎ Edit Your Review" : "★ Write a Review"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="write-review-cta-btn"
+                      onClick={() =>
+                        navigate("/login", {
+                          state: { from: `/products/${product._id}` },
+                        })
+                      }
+                    >
+                      Sign In to Review
+                    </button>
+                  )}
+                  <span className="atelier-moderated-tag">
+                    🛡️ Verified & Moderated for Authentic Patron Feedback
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* USER'S OWN PENDING REVIEW NOTICE */}
+            {userReview && userReview.status === "pending" && (
+              <div className="user-pending-review-callout">
+                <div className="callout-icon-box">⏳</div>
+                <div className="callout-body">
+                  <div className="callout-title">
+                    Your Review is Awaiting Atelier Moderation
+                  </div>
+                  <p className="callout-text">
+                    Thank you for reviewing {product.name}! Your {userReview.rating}-star review
+                    {userReview.title ? ` ("${userReview.title}")` : ""} is currently in moderation. It will be publicly published once approved.
+                  </p>
+                </div>
+                <div className="callout-actions">
+                  <button
+                    type="button"
+                    className="callout-edit-btn"
+                    onClick={handleOpenReviewModal}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="callout-delete-btn"
+                    onClick={() => setIsDeleteModalOpen(true)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* FILTER & SORT BAR */}
+            <div className="reviews-filter-bar">
+              <div className="filter-chips-cluster">
+                <span className="filter-chips-label">Filter:</span>
+                <button
+                  type="button"
+                  className={`filter-chip ${ratingFilter === null ? "active" : ""}`}
+                  onClick={() => setRatingFilter(null)}
+                >
+                  All ({reviewsSummary.totalReviews})
+                </button>
+                {[5, 4, 3, 2, 1].map((s) => (
+                  <button
+                    type="button"
+                    key={s}
+                    className={`filter-chip ${ratingFilter === s ? "active" : ""}`}
+                    onClick={() => setRatingFilter(ratingFilter === s ? null : s)}
+                  >
+                    {s} ★ ({reviewsSummary.distribution[s] || 0})
+                  </button>
+                ))}
+              </div>
+
+              <div className="reviews-sort-cluster">
+                <label htmlFor="reviews-sort-dropdown">Sort by:</label>
+                <select
+                  id="reviews-sort-dropdown"
+                  value={reviewsSort}
+                  onChange={(e) => {
+                    setReviewsSort(e.target.value);
+                    setReviewsPage(1);
+                  }}
+                >
+                  <option value="newest">Most Recent</option>
+                  <option value="highest">Highest Rating</option>
+                  <option value="lowest">Lowest Rating</option>
+                </select>
+              </div>
+            </div>
+
+            {/* REVIEWS LIST OR EMPTY STATE */}
+            {reviewsLoading ? (
+              <div className="reviews-loading-panel">
+                <div className="atelier-spinner" />
+                <p>Curating flacon impressions...</p>
+              </div>
+            ) : reviews.length === 0 ? (
+              <div className="reviews-empty-state">
+                <div className="empty-flacon-icon">⚜️</div>
+                <h3 className="empty-state-title">
+                  {ratingFilter
+                    ? `No ${ratingFilter}-Star Reviews Yet`
+                    : "No reviews yet. Be the first to review this product."}
+                </h3>
+                <p className="empty-state-sub">
+                  {ratingFilter
+                    ? "No approved reviews match this star rating filter. Reset your filter to view all verified patron impressions."
+                    : "Share your impressions of the opening notes, sillage, drydown, and flacon craftsmanship."}
+                </p>
+                {ratingFilter ? (
+                  <button
+                    type="button"
+                    className="empty-action-btn"
+                    onClick={() => setRatingFilter(null)}
+                  >
+                    Show All Reviews
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="empty-action-btn"
+                    onClick={handleOpenReviewModal}
+                  >
+                    ★ Write the First Review
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="reviews-stream-container">
+                {reviews.map((rev) => (
+                  <article key={rev._id} className="review-stream-item">
+                    <header className="review-item-header">
+                      <div className="reviewer-identity">
+                        <div className="reviewer-avatar-badge">
+                          {rev.user?.name ? rev.user.name.charAt(0).toUpperCase() : "P"}
+                        </div>
+                        <div className="reviewer-details">
+                          <div className="reviewer-name-row">
+                            <span className="reviewer-display-name">
+                              {rev.user?.name || "Verified Patron"}
+                            </span>
+                            <span className="patron-verified-tag">✓ Verified Patron</span>
+                            {user && rev.user?._id === user._id && (
+                              <span className="own-review-pill">Your Review</span>
+                            )}
+                          </div>
+                          <time className="review-timestamp" dateTime={rev.createdAt}>
+                            {formatReviewDate(rev.createdAt)}
+                          </time>
+                        </div>
+                      </div>
+
+                      <div className="review-stars-score">
+                        {renderStarGlyphs(rev.rating, 5)}
+                        <span className="review-numeric-score">{rev.rating}.0</span>
+                      </div>
+                    </header>
+
+                    {rev.title && (
+                      <h4 className="review-headline-title">{rev.title}</h4>
+                    )}
+
+                    <div className="review-content-body">
+                      <p>{rev.comment}</p>
+                    </div>
+
+                    {user && rev.user?._id === user._id && (
+                      <footer className="review-item-footer">
+                        <button
+                          type="button"
+                          className="review-edit-link-btn"
+                          onClick={handleOpenReviewModal}
+                        >
+                          ✎ Edit Review
+                        </button>
+                        <span className="footer-dot">•</span>
+                        <button
+                          type="button"
+                          className="review-delete-link-btn"
+                          onClick={() => setIsDeleteModalOpen(true)}
+                        >
+                          ✕ Delete
+                        </button>
+                      </footer>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
+
+            {/* REVIEWS PAGINATION */}
+            {reviewsTotalPages > 1 && (
+              <div className="reviews-pagination-row">
+                <button
+                  type="button"
+                  className="reviews-nav-page-btn"
+                  disabled={reviewsPage <= 1}
+                  onClick={() => setReviewsPage((p) => Math.max(1, p - 1))}
+                >
+                  ← Previous
+                </button>
+                <span className="reviews-page-indicator">
+                  Page {reviewsPage} of {reviewsTotalPages}
+                </span>
+                <button
+                  type="button"
+                  className="reviews-nav-page-btn"
+                  disabled={reviewsPage >= reviewsTotalPages}
+                  onClick={() => setReviewsPage((p) => Math.min(reviewsTotalPages, p + 1))}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
         {/* ================= 6. RELATED PRODUCTS ("YOU MAY ALSO LIKE") ================= */}
         {!loading && product && relatedProducts.length > 0 && (
           <section className="related-products-section" aria-labelledby="related-heading">
@@ -843,7 +1423,206 @@ function ProductDetails() {
         />
       )}
 
-      {/* ================= 8. LUXURY FOOTER ================= */}
+      {/* ================= 8. WRITE / EDIT REVIEW MODAL ================= */}
+      {isReviewModalOpen && (
+        <div
+          className="review-modal-overlay"
+          onClick={() => !reviewSubmitting && setIsReviewModalOpen(false)}
+        >
+          <div
+            className="review-modal-card"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="review-modal-title"
+          >
+            <div className="review-modal-header">
+              <div>
+                <span className="modal-eyebrow">HAUTE PARFUMERIE APPRAISAL</span>
+                <h3 id="review-modal-title" className="modal-headline">
+                  {userReview ? "Edit Your Flacon Impression" : "Share Your Flacon Impression"}
+                </h3>
+                <p className="modal-subheading">
+                  {product?.name} • {product?.brand || "FEXA"}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="modal-close-icon-btn"
+                onClick={() => !reviewSubmitting && setIsReviewModalOpen(false)}
+                disabled={reviewSubmitting}
+                aria-label="Close dialog"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitReview} className="review-modal-form">
+              {reviewFormError && (
+                <div className="modal-error-banner" role="alert">
+                  <span className="error-icon">⚠️</span>
+                  <span>{reviewFormError}</span>
+                </div>
+              )}
+
+              {/* Star Rating Picker */}
+              <div className="form-group-rating">
+                <label className="form-field-label">Overall Rating *</label>
+                <div
+                  className="interactive-star-row"
+                  onMouseLeave={() => setHoverRating(0)}
+                >
+                  {[1, 2, 3, 4, 5].map((star) => {
+                    const isFilled =
+                      (hoverRating || reviewFormData.rating) >= star;
+                    return (
+                      <button
+                        type="button"
+                        key={star}
+                        className={`interactive-star-btn ${isFilled ? "active" : ""}`}
+                        onMouseEnter={() => setHoverRating(star)}
+                        onClick={() =>
+                          setReviewFormData((prev) => ({ ...prev, rating: star }))
+                        }
+                        aria-label={`${star} Star`}
+                      >
+                        ★
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="rating-descriptor-text">
+                  {(hoverRating || reviewFormData.rating) === 5 && "★★★★★ 5 Stars — Extraordinary Masterpiece"}
+                  {(hoverRating || reviewFormData.rating) === 4 && "★★★★☆ 4 Stars — Highly Recommended & Distinctive"}
+                  {(hoverRating || reviewFormData.rating) === 3 && "★★★☆☆ 3 Stars — Average & Pleasant"}
+                  {(hoverRating || reviewFormData.rating) === 2 && "★★☆☆☆ 2 Stars — Below Expectations"}
+                  {(hoverRating || reviewFormData.rating) === 1 && "★☆☆☆☆ 1 Star — Disappointing Flacon"}
+                </div>
+              </div>
+
+              {/* Review Title Input */}
+              <div className="form-group-field">
+                <label htmlFor="review-title-input" className="form-field-label">
+                  Headline / Impression Summary (Optional)
+                </label>
+                <input
+                  id="review-title-input"
+                  type="text"
+                  className="modal-text-input"
+                  placeholder="e.g., Mesmerizing opening with exceptional projection"
+                  value={reviewFormData.title}
+                  maxLength={100}
+                  onChange={(e) =>
+                    setReviewFormData((prev) => ({
+                      ...prev,
+                      title: e.target.value,
+                    }))
+                  }
+                  disabled={reviewSubmitting}
+                />
+              </div>
+
+              {/* Review Comment Textarea */}
+              <div className="form-group-field">
+                <div className="textarea-label-row">
+                  <label htmlFor="review-comment-textarea" className="form-field-label">
+                    Detailed Review *
+                  </label>
+                  <span className="char-counter-tag">
+                    {reviewFormData.comment.length} / 1000
+                  </span>
+                </div>
+                <textarea
+                  id="review-comment-textarea"
+                  className="modal-textarea-input"
+                  rows={5}
+                  placeholder="Describe your sensory observations: opening notes, sillage, drydown on skin, longevity, and flacon presentation..."
+                  value={reviewFormData.comment}
+                  maxLength={1000}
+                  onChange={(e) =>
+                    setReviewFormData((prev) => ({
+                      ...prev,
+                      comment: e.target.value,
+                    }))
+                  }
+                  required
+                  disabled={reviewSubmitting}
+                />
+              </div>
+
+              {/* Moderation Note */}
+              <div className="modal-moderation-disclaimer">
+                <span>🛡️</span>
+                <span>
+                  To uphold the integrity of our atelier, all submitted impressions are curated and verified before publication.
+                </span>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="modal-footer-actions">
+                <button
+                  type="button"
+                  className="modal-cancel-btn"
+                  onClick={() => setIsReviewModalOpen(false)}
+                  disabled={reviewSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="modal-submit-btn"
+                  disabled={reviewSubmitting}
+                >
+                  {reviewSubmitting ? "Submitting..." : userReview ? "Update Review" : "Submit Review"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= 9. DELETE REVIEW CONFIRMATION MODAL ================= */}
+      {isDeleteModalOpen && (
+        <div
+          className="review-modal-overlay"
+          onClick={() => !deleteSubmitting && setIsDeleteModalOpen(false)}
+        >
+          <div
+            className="review-modal-card delete-card"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="delete-modal-inner">
+              <div className="delete-warning-icon">🗑️</div>
+              <h3 className="delete-title">Remove Your Flacon Impression?</h3>
+              <p className="delete-sub">
+                Are you sure you wish to permanently delete your review for <strong>{product?.name}</strong>? This action cannot be undone.
+              </p>
+              <div className="delete-actions-row">
+                <button
+                  type="button"
+                  className="modal-cancel-btn"
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  disabled={deleteSubmitting}
+                >
+                  Keep Review
+                </button>
+                <button
+                  type="button"
+                  className="modal-delete-confirm-btn"
+                  onClick={handleDeleteUserReview}
+                  disabled={deleteSubmitting}
+                >
+                  {deleteSubmitting ? "Deleting..." : "Permanently Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= 10. LUXURY FOOTER ================= */}
       <footer className="details-footer-bar">
         <div className="footer-inner-container">
           <div className="footer-col-left">

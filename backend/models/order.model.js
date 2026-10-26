@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const orderItemSchema = new mongoose.Schema(
   {
@@ -95,6 +95,32 @@ const orderSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    coupon: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Coupon",
+      default: null,
+    },
+    couponCode: {
+      type: String,
+      default: null,
+    },
+    couponName: {
+      type: String,
+      default: null,
+    },
+    discountPercentage: {
+      type: Number,
+      default: null,
+    },
+    discountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    eligibleSubtotal: {
+      type: Number,
+      default: null,
+    },
     shippingCost: {
       type: Number,
       default: 0,
@@ -107,7 +133,7 @@ const orderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["COD", "Card", "UPI", "NetBanking"],
+      enum: ["COD", "Card", "UPI", "NetBanking", "Razorpay"],
       default: "COD",
     },
     paymentStatus: {
@@ -120,6 +146,30 @@ const orderSchema = new mongoose.Schema(
       enum: ["Processing", "Dispatched", "Delivered", "Cancelled"],
       default: "Processing",
     },
+    razorpayOrderId: {
+      type: String,
+      default: null,
+    },
+    razorpayPaymentId: {
+      type: String,
+      default: null,
+    },
+    razorpaySignature: {
+      type: String,
+      default: null,
+    },
+    paymentFailureReason: {
+      type: String,
+      default: null,
+    },
+    paymentErrorCode: {
+      type: String,
+      default: null,
+    },
+    paymentAttempts: {
+      type: Number,
+      default: 1,
+    },
   },
   {
     timestamps: true,
@@ -128,4 +178,4 @@ const orderSchema = new mongoose.Schema(
 
 const Order = mongoose.models.Order || mongoose.model("Order", orderSchema);
 
-module.exports = Order;
+export default Order;

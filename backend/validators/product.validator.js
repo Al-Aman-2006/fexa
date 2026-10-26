@@ -27,7 +27,7 @@ const validateProductName = (value) => {
   const trimmed = (value || "").trim();
   if (!trimmed) return "Product name is required.";
   if (trimmed.length < 2) return "Product name must be at least 2 characters.";
-  if (trimmed.length > 100) return "Product name cannot exceed 100 characters.";
+  if (trimmed.length > 150) return "Product name cannot exceed 150 characters.";
   if (
     /<[a-z][\s\S]*>/i.test(trimmed) ||
     /<\/?script/i.test(trimmed) ||
@@ -36,8 +36,9 @@ const validateProductName = (value) => {
   ) {
     return "Product name cannot contain HTML or script tags.";
   }
-  if (!/[a-zA-Z0-9\u00C0-\u024F\u1E00-\u1EFF]/.test(trimmed)) {
-    return "Product name must contain letters or numbers.";
+  const productNameRegex = /[\p{L}]/u;
+  if (!productNameRegex.test(trimmed)) {
+    return "Product name must contain at least one letter and cannot consist only of numbers or symbols.";
   }
   return null;
 };
@@ -55,8 +56,9 @@ const validateBrand = (value) => {
   ) {
     return "Brand cannot contain HTML or script tags.";
   }
+  // Reject symbol-only or punctuation-only input (must contain letters or numbers)
   if (!/[a-zA-Z0-9\u00C0-\u024F\u1E00-\u1EFF]/.test(trimmed)) {
-    return "Brand must contain letters or numbers.";
+    return "Brand cannot consist solely of symbols or special characters. Please include letters or numbers.";
   }
   return null;
 };
@@ -297,9 +299,10 @@ const validateProduct = (data = {}, options = {}) => {
   else sanitized.name = data.name.trim();
 
   // Brand
-  const brandErr = validateBrand(data.brand || "FEXA");
+  const brandVal = data.brand !== undefined ? data.brand : "";
+  const brandErr = validateBrand(brandVal);
   if (brandErr) errors.brand = brandErr;
-  else sanitized.brand = (data.brand || "FEXA").trim();
+  else sanitized.brand = brandVal.trim();
 
   // Category
   const catErr = validateCategory(data.category);
@@ -395,7 +398,23 @@ const validateProduct = (data = {}, options = {}) => {
   };
 };
 
-module.exports = {
+export {
+  normalizeCategory,
+  validateCategory,
+  validateProductName,
+  validateBrand,
+  validatePrice,
+  validateCompareAtPrice,
+  validateStock,
+  validateDescription,
+  validateStatus,
+  validateVolumeMl,
+  validateVariantItem,
+  validateVariants,
+  validateProduct,
+};
+
+export default {
   normalizeCategory,
   validateCategory,
   validateProductName,

@@ -1,14 +1,15 @@
-const express = require("express");
-const router = express.Router();
-const {
+import express from "express";
+import {
   getUsers,
   createUser,
   updateUser,
   deleteUser,
   blockUser,
   unblockUser,
-} = require("../controllers/adminUser.controller");
-const adminMiddleware = require("../middlewares/admin.middleware");
+} from "../controllers/adminUser.controller.js";
+import adminMiddleware from "../middlewares/admin.middleware.js";
+
+const router = express.Router();
 
 // All admin user routes require admin authentication
 router.use(adminMiddleware);
@@ -20,4 +21,4 @@ router.delete("/:userId", deleteUser);
 router.patch("/:userId/block", blockUser);
 router.patch("/:userId/unblock", unblockUser);
 
-module.exports = router;
+export default router;

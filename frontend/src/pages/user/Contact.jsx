@@ -697,41 +697,7 @@ function Contact() {
       </section>
 
       {/* 5. Quick Answers (FAQ Accordion) */}
-      <section className="contact-faq-section">
-        <div className="contact-faq-container">
-          <div className="contact-section-header-center">
-            <span className="contact-eyebrow">QUICK ANSWERS</span>
-            <h2 className="contact-section-title">Frequently Asked Questions</h2>
-            <p className="contact-section-subtitle">
-              Common questions regarding our Grasse formulations, climate dispatch, and ordering process.
-            </p>
-          </div>
-
-          <div className="faq-accordion-list">
-            {faqItems.map((item, idx) => {
-              const isOpen = openFaqIndex === idx;
-              return (
-                <div key={idx} className={`faq-accordion-item ${isOpen ? "open" : ""}`}>
-                  <button
-                    type="button"
-                    className="faq-question-btn"
-                    onClick={() => setOpenFaqIndex(isOpen ? -1 : idx)}
-                    aria-expanded={isOpen}
-                  >
-                    <span className="faq-q-text">{item.q}</span>
-                    <span className="faq-toggle-icon">{isOpen ? "−" : "+"}</span>
-                  </button>
-                  {isOpen && (
-                    <div className="faq-answer-pane">
-                      <p>{item.a}</p>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+      
 
       {/* 6. Luxury Footer */}
       <footer className="contact-footer">

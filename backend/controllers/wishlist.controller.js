@@ -1,8 +1,9 @@
-const mongoose = require("mongoose");
-const User = require("../models/user.model");
-const Product = require("../models/product.model");
-const Cart = require("../models/cart.model");
-const { formatCartResponse } = require("./cart.controller");
+import mongoose from "mongoose";
+import User from "../models/user.model.js";
+import Product from "../models/product.model.js";
+import Category from "../models/category.model.js";
+import Cart from "../models/cart.model.js";
+import { formatCartResponse } from "./cart.controller.js";
 
 // Helper to format wishlist products and prune deleted product references
 const formatWishlistProducts = async (userDoc) => {
@@ -11,6 +12,13 @@ const formatWishlistProducts = async (userDoc) => {
   await userDoc.populate({
     path: "wishlist",
     select: "_id name slug brand category price compareAtPrice stock images status variants",
+  });
+
+  // Retrieve live category activation statuses
+  const allCategories = await Category.find({});
+  const categoryStatusMap = { Men: true, Women: true, Unisex: true };
+  allCategories.forEach((c) => {
+    categoryStatusMap[c.name] = c.isActive;
   });
 
   const formattedItems = [];
@@ -24,7 +32,8 @@ const formatWishlistProducts = async (userDoc) => {
       continue;
     }
 
-    const isInactive = item.status === "Inactive";
+    const isCategoryInactive = categoryStatusMap[item.category] === false;
+    const isInactive = item.status === "Inactive" || isCategoryInactive;
     let isOutOfStock = false;
     let livePrice = Number(item.price) || 0;
     let liveStock = Number(item.stock) || 0;
@@ -57,6 +66,7 @@ const formatWishlistProducts = async (userDoc) => {
       status: item.status,
       variants: item.variants || [],
       isInactive,
+      isCategoryInactive,
       isOutOfStock,
     });
 
@@ -131,7 +141,15 @@ const addToWishlist = async (req, res) => {
       });
     }
 
-    // 3. Product availability check
+    // 3. Category & Product availability check
+    const categoryDoc = await Category.findOne({ name: product.category });
+    if (categoryDoc && !categoryDoc.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: `The ${product.category} collection is currently unavailable.`,
+      });
+    }
+
     if (product.status === "Inactive") {
       return res.status(400).json({
         success: false,
@@ -283,7 +301,15 @@ const moveToCart = async (req, res) => {
       });
     }
 
-    // 3. Check if product is active
+    // 3. Category & Product availability check
+    const categoryDoc = await Category.findOne({ name: product.category });
+    if (categoryDoc && !categoryDoc.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: `The ${product.category} collection is currently unavailable.`,
+      });
+    }
+
     if (product.status === "Inactive") {
       return res.status(400).json({
         success: false,
@@ -420,7 +446,14 @@ const moveToCart = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
+  getWishlist,
+  addToWishlist,
+  removeFromWishlist,
+  moveToCart,
+};
+
+export default {
   getWishlist,
   addToWishlist,
   removeFromWishlist,

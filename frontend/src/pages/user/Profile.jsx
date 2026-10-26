@@ -1615,8 +1615,16 @@ function Profile() {
                             </div>
                             <div className="breakdown-row">
                               <span>Payment Method</span>
-                              <span>{order.paymentMethod === "COD" ? "Cash on Delivery" : order.paymentMethod} ({order.paymentStatus || "Pending"})</span>
+                              <span>{order.paymentMethod === "COD" ? "Cash on Delivery" : order.paymentMethod === "Razorpay" ? "Razorpay Online" : order.paymentMethod} ({order.paymentStatus || "Pending"})</span>
                             </div>
+                            {order.razorpayPaymentId && (
+                              <div className="breakdown-row">
+                                <span>Razorpay Payment ID</span>
+                                <span style={{ fontFamily: "monospace", fontSize: "0.78rem", color: "#6a4f82" }}>
+                                  {order.razorpayPaymentId}
+                                </span>
+                              </div>
+                            )}
                             <div className="breakdown-divider" />
                             <div className="breakdown-row total">
                               <span>Total Paid / Due</span>

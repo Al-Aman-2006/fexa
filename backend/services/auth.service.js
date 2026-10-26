@@ -1,22 +1,23 @@
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
 
-const User = require("../models/user.model");
+import User from "../models/user.model.js";
 
-const {
+import {
   generateOtp,
   hashOtp,
-} = require("../utils/otp");
+} from "../utils/otp.js";
 
-const {
+import {
   generateResetToken,
   hashResetToken,
-} = require("../utils/resetToken");
+} from "../utils/resetToken.js";
 
-const {
+import {
   sendOtpEmail,
   sendPasswordResetEmail,
-} = require("./email.service");
+} from "./email.service.js";
 
 
 // ========================================
@@ -856,8 +857,6 @@ const resetPassword = async (
 // GOOGLE LOGIN USER
 // ========================================
 
-const { OAuth2Client } = require("google-auth-library");
-
 const googleLoginUser = async (credential) => {
   if (!credential) {
     throw new Error("Google credential token is required");
@@ -873,7 +872,6 @@ const googleLoginUser = async (credential) => {
     });
     payload = ticket.getPayload();
   } catch (err) {
-    const jwt = require("jsonwebtoken");
     payload = jwt.decode(credential);
   }
 
@@ -957,7 +955,17 @@ const googleLoginUser = async (credential) => {
 // EXPORTS
 // ========================================
 
-module.exports = {
+export {
+  registerUser,
+  loginUser,
+  verifyOtp,
+  resendOtp,
+  forgotPassword,
+  resetPassword,
+  googleLoginUser,
+};
+
+export default {
   registerUser,
   loginUser,
   verifyOtp,

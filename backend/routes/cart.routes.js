@@ -1,13 +1,14 @@
-const express = require("express");
-const router = express.Router();
-const authMiddleware = require("../middlewares/auth.middleware");
-const {
+import express from "express";
+import authMiddleware from "../middlewares/auth.middleware.js";
+import {
   getCart,
   addToCart,
   updateCartItemQuantity,
   removeCartItem,
   clearCart,
-} = require("../controllers/cart.controller");
+} from "../controllers/cart.controller.js";
+
+const router = express.Router();
 
 // ========================================
 // AUTHENTICATED USER CART ENDPOINTS
@@ -34,4 +35,4 @@ router.delete("/:productId", removeCartItem);
 router.delete("/", clearCart);
 router.delete("/clear/all", clearCart);
 
-module.exports = router;
+export default router;

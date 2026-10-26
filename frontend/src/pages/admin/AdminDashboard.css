@@ -1,3 +1,6 @@
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&display=swap");
+@import "../../components/admin/AdminPagination.css";
+
 /* ========================================
    ADMIN DASHBOARD (Matching Reference 2)
 ======================================== */
@@ -232,7 +235,7 @@
 }
 
 .executive-title {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-size: 32px;
   font-weight: 400;
   color: #ffffff;
@@ -308,7 +311,7 @@
   font-size: 32px;
   font-weight: 700;
   color: #ffffff;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
 }
 
 .admin-stat-card.active .admin-stat-value {
@@ -443,29 +446,86 @@
   box-sizing: border-box;
 }
 
+.admin-table-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  border-radius: 12px 12px 0 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(161, 132, 189, 0.3) transparent;
+}
+
+.admin-table-scroll-wrapper::-webkit-scrollbar {
+  height: 5px;
+}
+
+.admin-table-scroll-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-table-scroll-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(161, 132, 189, 0.3);
+  border-radius: 3px;
+}
+
 .admin-users-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
   font-size: 13px;
+  table-layout: fixed;
+  min-width: 940px;
 }
+
+.admin-users-table th:nth-child(1),
+.admin-users-table td:nth-child(1) { width: 22%; min-width: 150px; text-align: left; } /* NAME */
+
+.admin-users-table th:nth-child(2),
+.admin-users-table td:nth-child(2) { width: 25%; min-width: 180px; text-align: left; } /* EMAIL */
+
+.admin-users-table th:nth-child(3),
+.admin-users-table td:nth-child(3) { width: 14%; min-width: 120px; text-align: left; } /* PHONE */
+
+.admin-users-table th:nth-child(4),
+.admin-users-table td:nth-child(4) { width: 12%; min-width: 115px; text-align: center; } /* STATUS */
+
+.admin-users-table th:nth-child(5),
+.admin-users-table td:nth-child(5) { width: 14%; min-width: 120px; text-align: left; } /* JOINED DATE */
+
+.admin-users-table th:nth-child(6),
+.admin-users-table td:nth-child(6) { width: 240px; min-width: 240px; text-align: right; } /* ACTIONS */
 
 .admin-users-table th {
   background: rgba(13, 11, 16, 0.8);
-  padding: 16px 20px;
+  padding: 13px 14px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 1.5px;
   color: #bfa8d8;
   text-transform: uppercase;
   border-bottom: 1px solid rgba(161, 132, 189, 0.15);
+  white-space: nowrap;
 }
 
 .admin-users-table td {
-  padding: 16px 20px;
+  padding: 13px 14px;
   border-bottom: 1px solid rgba(161, 132, 189, 0.08);
   color: #e2d7f0;
   vertical-align: middle;
+}
+
+.admin-users-table .status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+  box-sizing: border-box;
 }
 
 .admin-users-table tr:hover {
@@ -494,6 +554,7 @@
   border-radius: 20px;
   font-size: 11px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .status-badge.active {
@@ -509,10 +570,13 @@
 }
 
 /* ACTIONS CELL */
-.admin-actions-cell {
+.admin-users-table .admin-actions-cell {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .action-edit-btn {
@@ -530,6 +594,13 @@
 .action-edit-btn:hover {
   background: rgba(161, 132, 189, 0.25);
   color: #ffffff;
+}
+
+.admin-users-table .action-block-btn,
+.admin-users-table .action-unblock-btn {
+  width: 72px;
+  min-width: 72px;
+  text-align: center;
 }
 
 .action-block-btn {
@@ -589,62 +660,7 @@
   font-style: italic;
 }
 
-/* PAGINATION */
-.admin-pagination-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 18px 24px;
-  background: rgba(13, 11, 16, 0.6);
-  border-top: 1px solid rgba(161, 132, 189, 0.1);
-}
-
-.admin-pagination-info {
-  font-size: 12px;
-  color: #9d8fae;
-}
-
-.admin-pagination-controls {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.page-nav-btn {
-  background: rgba(23, 18, 30, 0.8);
-  border: 1px solid rgba(161, 132, 189, 0.2);
-  color: #d8c4eb;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-.page-nav-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.page-num-btn {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: transparent;
-  border: 1px solid rgba(161, 132, 189, 0.2);
-  color: #cbb8de;
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.page-num-btn.active {
-  background: #7c5c99;
-  border-color: #7c5c99;
-  color: #ffffff;
-  font-weight: 700;
-}
+/* PAGINATION: Unified via AdminPagination.css */
 
 /* MODAL OVERLAY & CARD */
 .admin-modal-overlay {
@@ -654,12 +670,15 @@
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(6px);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  padding: 20px;
+  padding: 24px 16px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .admin-modal-card {
@@ -670,12 +689,78 @@
   max-width: 480px;
   width: 100%;
   box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  margin: auto;
+  position: relative;
+}
+
+/* Custom Scrollbar for Modal Card */
+.admin-modal-card::-webkit-scrollbar,
+.admin-modal-overlay::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.admin-modal-card::-webkit-scrollbar-track,
+.admin-modal-overlay::-webkit-scrollbar-track {
+  background: rgba(13, 11, 16, 0.7);
+  border-radius: 8px;
+}
+.admin-modal-card::-webkit-scrollbar-thumb,
+.admin-modal-overlay::-webkit-scrollbar-thumb {
+  background: rgba(161, 132, 189, 0.45);
+  border-radius: 8px;
+  border: 2px solid rgba(13, 11, 16, 0.7);
+}
+.admin-modal-card::-webkit-scrollbar-thumb:hover,
+.admin-modal-overlay::-webkit-scrollbar-thumb:hover {
+  background: #a184bd;
+}
+.admin-modal-card,
+.admin-modal-overlay {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(161, 132, 189, 0.45) rgba(13, 11, 16, 0.7);
+}
+
+.admin-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
 }
 
 .admin-modal-header h3 {
-  margin: 0 0 16px 0;
+  margin: 0;
   font-size: 18px;
   color: #ffffff;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.admin-modal-close-btn {
+  background: rgba(161, 132, 189, 0.1);
+  border: 1px solid rgba(161, 132, 189, 0.25);
+  color: #cbb8de;
+  font-size: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.admin-modal-close-btn:hover:not(:disabled) {
+  background: rgba(161, 132, 189, 0.25);
+  color: #ffffff;
+  border-color: #a184bd;
+  transform: scale(1.05);
 }
 
 .admin-modal-body p {

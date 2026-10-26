@@ -42,6 +42,9 @@ function Collections() {
   const [products, setProducts] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 12, totalProducts: 0, totalPages: 1 });
   const [categoryCounts, setCategoryCounts] = useState({ all: 0, men: 0, women: 0, unisex: 0 });
+  const [categoryStatuses, setCategoryStatuses] = useState({ Men: true, Women: true, Unisex: true });
+  const [isCurrentCategoryInactive, setIsCurrentCategoryInactive] = useState(false);
+  const [categoryAlertToast, setCategoryAlertToast] = useState(null);
 
   // UI interaction states
   const [loading, setLoading] = useState(true);
@@ -130,6 +133,10 @@ function Collections() {
           if (data.categoryCounts) {
             setCategoryCounts(data.categoryCounts);
           }
+          if (data.categoryStatuses) {
+            setCategoryStatuses(data.categoryStatuses);
+          }
+          setIsCurrentCategoryInactive(Boolean(data.isCategoryInactive));
         } else {
           setError(data.message || "Unable to load products.");
         }
@@ -153,6 +160,12 @@ function Collections() {
 
   // Category switch: updates URL search parameters and resets pagination
   const handleSelectCategory = (cat, shouldScrollToCatalogue = false) => {
+    if (cat !== "All" && categoryStatuses[cat] === false) {
+      setCategoryAlertToast(`The ${cat}'s Collection is currently unavailable.`);
+      setTimeout(() => setCategoryAlertToast(null), 4000);
+      return;
+    }
+
     const newParams = new URLSearchParams(searchParams);
     if (cat === "All") {
       newParams.delete("category");
@@ -456,7 +469,9 @@ function Collections() {
           <div className="silhouettes-grid">
             {/* Men's Portfolio Card */}
             <div
-              className={`silhouette-card men ${activeCategory === "Men" ? "selected" : ""}`}
+              className={`silhouette-card men ${activeCategory === "Men" ? "selected" : ""} ${
+                categoryStatuses.Men === false ? "category-inactive-card" : ""
+              }`}
               onClick={() => handleSelectCategory("Men", true)}
             >
               <div className="silhouette-image-wrapper">
@@ -464,13 +479,21 @@ function Collections() {
                 <div className="silhouette-overlay"></div>
               </div>
               <div className="silhouette-card-content">
-                <div className="silhouette-badge">MEN // {categoryCounts.men} FRAGRANCES</div>
+                <div className="silhouette-badge">
+                  {categoryStatuses.Men === false
+                    ? "MEN // UNAVAILABLE"
+                    : `MEN // ${categoryCounts.men} FRAGRANCES`}
+                </div>
                 <h3 className="silhouette-title">Men's Portfolio</h3>
                 <p className="silhouette-notes">
                   Bold, architectural fragrances compounded with smoked Haitian vetiver, dark amber resins, Italian birch, and spicy cracked pepper.
                 </p>
                 <div className="silhouette-link">
-                  <span>EXPLORE MEN'S COLLECTION</span>
+                  <span>
+                    {categoryStatuses.Men === false
+                      ? "COLLECTION CURRENTLY UNAVAILABLE"
+                      : "EXPLORE MEN'S COLLECTION"}
+                  </span>
                   <span className="arrow-sym">→</span>
                 </div>
               </div>
@@ -478,7 +501,9 @@ function Collections() {
 
             {/* Women's Portfolio Card */}
             <div
-              className={`silhouette-card women ${activeCategory === "Women" ? "selected" : ""}`}
+              className={`silhouette-card women ${activeCategory === "Women" ? "selected" : ""} ${
+                categoryStatuses.Women === false ? "category-inactive-card" : ""
+              }`}
               onClick={() => handleSelectCategory("Women", true)}
             >
               <div className="silhouette-image-wrapper">
@@ -486,13 +511,21 @@ function Collections() {
                 <div className="silhouette-overlay"></div>
               </div>
               <div className="silhouette-card-content">
-                <div className="silhouette-badge">WOMEN // {categoryCounts.women} FRAGRANCES</div>
+                <div className="silhouette-badge">
+                  {categoryStatuses.Women === false
+                    ? "WOMEN // UNAVAILABLE"
+                    : `WOMEN // ${categoryCounts.women} FRAGRANCES`}
+                </div>
                 <h3 className="silhouette-title">Women's Portfolio</h3>
                 <p className="silhouette-notes">
                   Luminous, captivating compositions starring Centifolia rose petals, radiant Grasse jasmine sambac, powdery white amber, and delicate iris.
                 </p>
                 <div className="silhouette-link">
-                  <span>EXPLORE WOMEN'S COLLECTION</span>
+                  <span>
+                    {categoryStatuses.Women === false
+                      ? "COLLECTION CURRENTLY UNAVAILABLE"
+                      : "EXPLORE WOMEN'S COLLECTION"}
+                  </span>
                   <span className="arrow-sym">→</span>
                 </div>
               </div>
@@ -500,7 +533,9 @@ function Collections() {
 
             {/* Unisex Portfolio Card */}
             <div
-              className={`silhouette-card unisex ${activeCategory === "Unisex" ? "selected" : ""}`}
+              className={`silhouette-card unisex ${activeCategory === "Unisex" ? "selected" : ""} ${
+                categoryStatuses.Unisex === false ? "category-inactive-card" : ""
+              }`}
               onClick={() => handleSelectCategory("Unisex", true)}
             >
               <div className="silhouette-image-wrapper">
@@ -508,13 +543,21 @@ function Collections() {
                 <div className="silhouette-overlay"></div>
               </div>
               <div className="silhouette-card-content">
-                <div className="silhouette-badge">UNISEX // {categoryCounts.unisex} FRAGRANCES</div>
+                <div className="silhouette-badge">
+                  {categoryStatuses.Unisex === false
+                    ? "UNISEX // UNAVAILABLE"
+                    : `UNISEX // ${categoryCounts.unisex} FRAGRANCES`}
+                </div>
                 <h3 className="silhouette-title">Unisex Portfolio</h3>
                 <p className="silhouette-notes">
                   Fragrance without boundaries. Fluid olfactory mastery balancing sparkling Calabrian bergamot, mineral sea salt crystals, and cashmeran musk.
                 </p>
                 <div className="silhouette-link">
-                  <span>EXPLORE UNISEX COLLECTION</span>
+                  <span>
+                    {categoryStatuses.Unisex === false
+                      ? "COLLECTION CURRENTLY UNAVAILABLE"
+                      : "EXPLORE UNISEX COLLECTION"}
+                  </span>
                   <span className="arrow-sym">→</span>
                 </div>
               </div>
@@ -537,29 +580,35 @@ function Collections() {
                 <span className="tab-count-pill">{categoryCounts.all}</span>
               </button>
 
-              <button
-                className={`category-tab-btn ${activeCategory === "Men" ? "active" : ""}`}
-                onClick={() => handleSelectCategory("Men")}
-              >
-                <span>MEN</span>
-                <span className="tab-count-pill">{categoryCounts.men}</span>
-              </button>
+              {categoryStatuses.Men !== false && (
+                <button
+                  className={`category-tab-btn ${activeCategory === "Men" ? "active" : ""}`}
+                  onClick={() => handleSelectCategory("Men")}
+                >
+                  <span>MEN</span>
+                  <span className="tab-count-pill">{categoryCounts.men}</span>
+                </button>
+              )}
 
-              <button
-                className={`category-tab-btn ${activeCategory === "Women" ? "active" : ""}`}
-                onClick={() => handleSelectCategory("Women")}
-              >
-                <span>WOMEN</span>
-                <span className="tab-count-pill">{categoryCounts.women}</span>
-              </button>
+              {categoryStatuses.Women !== false && (
+                <button
+                  className={`category-tab-btn ${activeCategory === "Women" ? "active" : ""}`}
+                  onClick={() => handleSelectCategory("Women")}
+                >
+                  <span>WOMEN</span>
+                  <span className="tab-count-pill">{categoryCounts.women}</span>
+                </button>
+              )}
 
-              <button
-                className={`category-tab-btn ${activeCategory === "Unisex" ? "active" : ""}`}
-                onClick={() => handleSelectCategory("Unisex")}
-              >
-                <span>UNISEX</span>
-                <span className="tab-count-pill">{categoryCounts.unisex}</span>
-              </button>
+              {categoryStatuses.Unisex !== false && (
+                <button
+                  className={`category-tab-btn ${activeCategory === "Unisex" ? "active" : ""}`}
+                  onClick={() => handleSelectCategory("Unisex")}
+                >
+                  <span>UNISEX</span>
+                  <span className="tab-count-pill">{categoryCounts.unisex}</span>
+                </button>
+              )}
             </div>
 
             {/* Search and Sort Form */}
@@ -612,6 +661,41 @@ function Collections() {
       {/* ================= 7. DYNAMIC CATALOGUE VIEW ================= */}
       <main className="collections-main-catalogue">
         <div className="section-container">
+          {/* TOAST NOTIFICATION FOR UNAVAILABLE CATEGORY */}
+          {categoryAlertToast && (
+            <div className="collections-category-toast">
+              <span>⚠️ {categoryAlertToast}</span>
+              <button
+                type="button"
+                className="toast-close"
+                onClick={() => setCategoryAlertToast(null)}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* INACTIVE CATEGORY BANNER */}
+          {isCurrentCategoryInactive && (
+            <div className="collections-inactive-category-banner">
+              <span className="inactive-banner-icon">🔒</span>
+              <div className="inactive-banner-info">
+                <h3>The {activeCategory}'s Collection is currently unavailable.</h3>
+                <p>
+                  This fragrance portfolio is temporarily offline for catalogue maintenance.
+                  Explore our other handcrafted collections below.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="inactive-banner-action-btn"
+                onClick={() => handleSelectCategory("All")}
+              >
+                Browse Available Fragrances →
+              </button>
+            </div>
+          )}
+
           {/* ERROR ALERT */}
           {error && (
             <div className="fexa-alert-card error">

@@ -1,4 +1,4 @@
-const nodemailer = require("nodemailer");
+import nodemailer from "nodemailer";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -364,7 +364,14 @@ const sendContactConfirmationEmail = async ({ name, email, reason, subject, mess
   return true;
 };
 
-module.exports = {
+export {
+  sendOtpEmail,
+  sendPasswordResetEmail,
+  sendEmailChangeOtpEmail,
+  sendContactConfirmationEmail,
+};
+
+export default {
   sendOtpEmail,
   sendPasswordResetEmail,
   sendEmailChangeOtpEmail,

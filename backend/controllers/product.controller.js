@@ -1,5 +1,7 @@
-const mongoose = require("mongoose");
-const Product = require("../models/product.model");
+import mongoose from "mongoose";
+import Product from "../models/product.model.js";
+import Category from "../models/category.model.js";
+import Review from "../models/review.model.js";
 
 // Normalizer for category matching (Men, Women, Unisex)
 const normalizeCategory = (cat) => {
@@ -11,9 +13,19 @@ const normalizeCategory = (cat) => {
   return null;
 };
 
+// Helper to fetch active category map
+const getCategoryStatusMap = async () => {
+  const allCategories = await Category.find({});
+  const statusMap = { Men: true, Women: true, Unisex: true };
+  allCategories.forEach((c) => {
+    statusMap[c.name] = c.isActive;
+  });
+  return statusMap;
+};
+
 // ========================================================
 // GET PUBLIC PRODUCTS (Filtered by category, search, sort, pagination)
-// STRICT: Only returns Active or Out of Stock products (never Inactive)
+// STRICT: Only returns Active or Out of Stock products from ACTIVE categories
 // ========================================================
 const getPublicProducts = async (req, res) => {
   try {
@@ -23,6 +35,12 @@ const getPublicProducts = async (req, res) => {
     const search = req.query.search ? req.query.search.trim() : "";
     const sortParam = (req.query.sort || "featured").toLowerCase().trim();
     const excludeId = req.query.excludeId ? req.query.excludeId.trim() : null;
+
+    // Retrieve live category activation statuses
+    const categoryStatusMap = await getCategoryStatusMap();
+    const activeCategories = Object.keys(categoryStatusMap).filter(
+      (name) => categoryStatusMap[name] === true
+    );
 
     // Build query filter
     // Only show active products (or Out of Stock with stock:0). Never show Inactive.
@@ -38,13 +56,49 @@ const getPublicProducts = async (req, res) => {
     // Category filter: Men, Women, Unisex, or All
     if (rawCategory && rawCategory.toLowerCase() !== "all") {
       const canonicalCategory = normalizeCategory(rawCategory);
-      if (canonicalCategory) {
-        // Safe case-insensitive regex match against category
-        queryFilter.category = { $regex: new RegExp(`^${canonicalCategory}$`, "i") };
+
+      // If category is currently inactive, return 0 products immediately
+      if (canonicalCategory && categoryStatusMap[canonicalCategory] === false) {
+        const [rawMenCount, rawWomenCount, rawUnisexCount] = await Promise.all([
+          Product.countDocuments({ status: { $in: ["Active", "Out of Stock"] }, category: "Men" }),
+          Product.countDocuments({ status: { $in: ["Active", "Out of Stock"] }, category: "Women" }),
+          Product.countDocuments({ status: { $in: ["Active", "Out of Stock"] }, category: "Unisex" }),
+        ]);
+
+        const safeMen = categoryStatusMap.Men ? rawMenCount : 0;
+        const safeWomen = categoryStatusMap.Women ? rawWomenCount : 0;
+        const safeUnisex = categoryStatusMap.Unisex ? rawUnisexCount : 0;
+
+        return res.status(200).json({
+          success: true,
+          products: [],
+          pagination: {
+            page,
+            limit,
+            totalProducts: 0,
+            totalPages: 1,
+          },
+          categoryCounts: {
+            all: safeMen + safeWomen + safeUnisex,
+            men: safeMen,
+            women: safeWomen,
+            unisex: safeUnisex,
+          },
+          isCategoryInactive: true,
+          category: canonicalCategory,
+          categoryStatuses: categoryStatusMap,
+          message: `The ${canonicalCategory} collection is currently unavailable.`,
+        });
+      }
+
+      if (canonicalCategory && categoryStatusMap[canonicalCategory] !== false) {
+        queryFilter.category = canonicalCategory;
       } else {
-        // If an invalid category was explicitly requested, match nothing
         queryFilter.category = "__INVALID__";
       }
+    } else {
+      // General or search catalogue: strictly exclude products from inactive categories
+      queryFilter.category = { $in: activeCategories };
     }
 
     // Search filter across name, brand, category, description (with regex escaping for safety)
@@ -59,13 +113,7 @@ const getPublicProducts = async (req, res) => {
       ];
     }
 
-    // Determine sorting criteria:
-    // 1. featured / default -> latest/featured order
-    // 2. latest -> Newest Arrivals
-    // 3. price-low -> Representative variant price ASC
-    // 4. price-high -> Representative variant price DESC
-    // 5. name-asc / name -> Alphabetical A-Z
-    // 6. name-desc -> Alphabetical Z-A
+    // Determine sorting criteria
     let sortStage = { createdAt: -1, _id: 1 };
     if (sortParam === "price-low") {
       sortStage = { effectivePrice: 1, _id: 1 };
@@ -162,13 +210,17 @@ const getPublicProducts = async (req, res) => {
     }
 
     // Execute aggregation and category counts concurrently
-    const [aggregateResult, menCount, womenCount, unisexCount, allCount] = await Promise.all([
+    const [aggregateResult, menCount, womenCount, unisexCount] = await Promise.all([
       aggregateQuery,
       Product.countDocuments({ status: { $in: ["Active", "Out of Stock"] }, category: "Men" }),
       Product.countDocuments({ status: { $in: ["Active", "Out of Stock"] }, category: "Women" }),
       Product.countDocuments({ status: { $in: ["Active", "Out of Stock"] }, category: "Unisex" }),
-      Product.countDocuments({ status: { $in: ["Active", "Out of Stock"] } }),
     ]);
+
+    const safeMen = categoryStatusMap.Men ? menCount : 0;
+    const safeWomen = categoryStatusMap.Women ? womenCount : 0;
+    const safeUnisex = categoryStatusMap.Unisex ? unisexCount : 0;
+    const safeAll = safeMen + safeWomen + safeUnisex;
 
     const facet = aggregateResult[0] || { metadata: [], data: [] };
     const totalProducts = facet.metadata && facet.metadata.length > 0 ? facet.metadata[0].total : 0;
@@ -185,11 +237,12 @@ const getPublicProducts = async (req, res) => {
         totalPages,
       },
       categoryCounts: {
-        all: allCount,
-        men: menCount,
-        women: womenCount,
-        unisex: unisexCount,
+        all: safeAll,
+        men: safeMen,
+        women: safeWomen,
+        unisex: safeUnisex,
       },
+      categoryStatuses: categoryStatusMap,
     });
   } catch (error) {
     console.error("Get public products error:", error);
@@ -202,33 +255,46 @@ const getPublicProducts = async (req, res) => {
 
 // ========================================================
 // GET PUBLIC COLLECTIONS SUMMARY (All 3 categories in one efficient call)
+// Respects category activation: Inactive categories return empty/inactive
 // ========================================================
 const getPublicProductCollections = async (req, res) => {
   try {
     const safeProjection = "_id name slug description brand category price compareAtPrice stock images status createdAt variants";
+    const categoryStatusMap = await getCategoryStatusMap();
 
-    // Query active products for each category
-    const [menProducts, womenProducts, unisexProducts] = await Promise.all([
-      Product.find({ status: { $in: ["Active", "Out of Stock"] }, category: "Men" })
-        .select(safeProjection)
-        .sort({ createdAt: -1 })
-        .limit(8),
-      Product.find({ status: { $in: ["Active", "Out of Stock"] }, category: "Women" })
-        .select(safeProjection)
-        .sort({ createdAt: -1 })
-        .limit(8),
-      Product.find({ status: { $in: ["Active", "Out of Stock"] }, category: "Unisex" })
-        .select(safeProjection)
-        .sort({ createdAt: -1 })
-        .limit(8),
-    ]);
+    // Query active products for each category only if that category is active
+    const [menProducts, womenProducts, unisexProducts, menCount, womenCount, unisexCount] =
+      await Promise.all([
+        categoryStatusMap.Men
+          ? Product.find({ status: { $in: ["Active", "Out of Stock"] }, category: "Men" })
+              .select(safeProjection)
+              .sort({ createdAt: -1 })
+              .limit(8)
+          : Promise.resolve([]),
+        categoryStatusMap.Women
+          ? Product.find({ status: { $in: ["Active", "Out of Stock"] }, category: "Women" })
+              .select(safeProjection)
+              .sort({ createdAt: -1 })
+              .limit(8)
+          : Promise.resolve([]),
+        categoryStatusMap.Unisex
+          ? Product.find({ status: { $in: ["Active", "Out of Stock"] }, category: "Unisex" })
+              .select(safeProjection)
+              .sort({ createdAt: -1 })
+              .limit(8)
+          : Promise.resolve([]),
+        categoryStatusMap.Men
+          ? Product.countDocuments({ status: { $in: ["Active", "Out of Stock"] }, category: "Men" })
+          : Promise.resolve(0),
+        categoryStatusMap.Women
+          ? Product.countDocuments({ status: { $in: ["Active", "Out of Stock"] }, category: "Women" })
+          : Promise.resolve(0),
+        categoryStatusMap.Unisex
+          ? Product.countDocuments({ status: { $in: ["Active", "Out of Stock"] }, category: "Unisex" })
+          : Promise.resolve(0),
+      ]);
 
-    const [menCount, womenCount, unisexCount, totalCount] = await Promise.all([
-      Product.countDocuments({ status: { $in: ["Active", "Out of Stock"] }, category: "Men" }),
-      Product.countDocuments({ status: { $in: ["Active", "Out of Stock"] }, category: "Women" }),
-      Product.countDocuments({ status: { $in: ["Active", "Out of Stock"] }, category: "Unisex" }),
-      Product.countDocuments({ status: { $in: ["Active", "Out of Stock"] } }),
-    ]);
+    const totalCount = menCount + womenCount + unisexCount;
 
     return res.status(200).json({
       success: true,
@@ -238,18 +304,21 @@ const getPublicProductCollections = async (req, res) => {
           subtitle: "Defined by Presence. Rich smoked woods, amber resins, and Italian leather.",
           count: menCount,
           products: menProducts,
+          isActive: categoryStatusMap.Men !== false,
         },
         women: {
           title: "Women's Collection",
           subtitle: "Crafted for Elegance. Radiant florals, Grasse rose, and powdery white amber.",
           count: womenCount,
           products: womenProducts,
+          isActive: categoryStatusMap.Women !== false,
         },
         unisex: {
           title: "Unisex Collection",
           subtitle: "Fragrance Without Boundaries. Crisp bergamot, mineral sea salt, and velvet cashmeran.",
           count: unisexCount,
           products: unisexProducts,
+          isActive: categoryStatusMap.Unisex !== false,
         },
       },
       counts: {
@@ -258,6 +327,7 @@ const getPublicProductCollections = async (req, res) => {
         women: womenCount,
         unisex: unisexCount,
       },
+      categoryStatuses: categoryStatusMap,
     });
   } catch (error) {
     console.error("Get public collections error:", error);
@@ -270,6 +340,7 @@ const getPublicProductCollections = async (req, res) => {
 
 // ========================================================
 // GET SINGLE PUBLIC PRODUCT (By ID or slug)
+// Respects category activation: Inactive category products return 400 unavailable
 // ========================================================
 const getPublicProductById = async (req, res) => {
   try {
@@ -295,7 +366,19 @@ const getPublicProductById = async (req, res) => {
       });
     }
 
-    // 2. If product exists but is set to Inactive by admin
+    // 2. Check if product's category is currently active
+    const categoryDoc = await Category.findOne({ name: product.category });
+    if (categoryDoc && !categoryDoc.isActive) {
+      return res.status(400).json({
+        success: false,
+        isInactive: true,
+        isCategoryInactive: true,
+        category: product.category,
+        message: `The ${product.category} collection is currently unavailable.`,
+      });
+    }
+
+    // 3. If product exists but is set to Inactive by admin
     if (product.status === "Inactive") {
       return res.status(400).json({
         success: false,
@@ -304,9 +387,13 @@ const getPublicProductById = async (req, res) => {
       });
     }
 
+    // 4. Retrieve approved review stats
+    const ratingSummary = await Review.getProductRatingSummary(product._id);
+
     return res.status(200).json({
       success: true,
       product,
+      ratingSummary,
     });
   } catch (error) {
     console.error("Get public product by ID error:", error);
@@ -317,7 +404,13 @@ const getPublicProductById = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
+  getPublicProducts,
+  getPublicProductCollections,
+  getPublicProductById,
+};
+
+export default {
   getPublicProducts,
   getPublicProductCollections,
   getPublicProductById,

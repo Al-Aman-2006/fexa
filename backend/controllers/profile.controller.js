@@ -1,8 +1,14 @@
-const User = require("../models/user.model");
-const fs = require("fs");
-const path = require("path");
-const { validateAddress } = require("../validators/address.validator");
-const { validateName, normalizeName } = require("../validators/user.validator");
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import User from "../models/user.model.js";
+import { validateAddress } from "../validators/address.validator.js";
+import { validateName, normalizeName } from "../validators/user.validator.js";
+import { generateOtp, hashOtp } from "../utils/otp.js";
+import { sendEmailChangeOtpEmail } from "../services/email.service.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 
 // ========================================
@@ -123,9 +129,6 @@ const updateProfile = async (req, res) => {
           message: "An account with this email already exists.",
         });
       }
-
-      const { generateOtp, hashOtp } = require("../utils/otp");
-      const { sendEmailChangeOtpEmail } = require("../services/email.service");
 
       const otp = generateOtp();
       const otpHash = hashOtp(otp);
@@ -487,7 +490,6 @@ const verifyEmailChange = async (req, res) => {
       });
     }
 
-    const { hashOtp } = require("../utils/otp");
     const enteredOtpHash = hashOtp(otp);
 
     if (enteredOtpHash !== user.emailChangeOtpHash) {
@@ -561,9 +563,6 @@ const resendEmailChangeOtp = async (req, res) => {
       });
     }
 
-    const { generateOtp, hashOtp } = require("../utils/otp");
-    const { sendEmailChangeOtpEmail } = require("../services/email.service");
-
     const otp = generateOtp();
     const otpHash = hashOtp(otp);
     const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
@@ -589,7 +588,19 @@ const resendEmailChangeOtp = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
+  getProfile,
+  getAddresses,
+  updateProfile,
+  uploadProfileImage,
+  addAddress,
+  updateAddress,
+  deleteAddress,
+  verifyEmailChange,
+  resendEmailChangeOtp,
+};
+
+export default {
   getProfile,
   getAddresses,
   updateProfile,

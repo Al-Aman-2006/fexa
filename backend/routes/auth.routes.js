@@ -1,8 +1,5 @@
-const express = require("express");
-
-const router = express.Router();
-
-const {
+import express from "express";
+import {
   register,
   login,
   verifyOtpController,
@@ -12,9 +9,10 @@ const {
   logout,
   checkSession,
   googleLoginController,
-} = require("../controllers/auth.controller");
-const authMiddleware = require("../middlewares/auth.middleware");
+} from "../controllers/auth.controller.js";
+import authMiddleware from "../middlewares/auth.middleware.js";
 
+const router = express.Router();
 
 // Register
 router.post("/register", register);
@@ -32,14 +30,13 @@ router.post("/logout", logout);
 router.get("/session", authMiddleware, checkSession);
 
 // Verify OTP
-router.post("/verify-otp",verifyOtpController);
+router.post("/verify-otp", verifyOtpController);
 
 // Resend OTP
-router.post("/resend-otp",resendOtpController);
+router.post("/resend-otp", resendOtpController);
 
+router.post("/forgot-password", forgotPasswordController);
 
-router.post("/forgot-password",forgotPasswordController);
+router.post("/reset-password/:token", resetPasswordController);
 
-router.post("/reset-password/:token",resetPasswordController);
-
-module.exports = router;
+export default router;

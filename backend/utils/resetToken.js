@@ -1,10 +1,10 @@
-const crypto = require("crypto");
+import crypto from "crypto";
 
 // ========================================
 // GENERATE RESET TOKEN
 // ========================================
 
-const generateResetToken = () => {
+export const generateResetToken = () => {
   return crypto.randomBytes(32).toString("hex");
 };
 
@@ -13,15 +13,14 @@ const generateResetToken = () => {
 // HASH RESET TOKEN
 // ========================================
 
-const hashResetToken = (token) => {
+export const hashResetToken = (token) => {
   return crypto
     .createHash("sha256")
     .update(token)
     .digest("hex");
 };
 
-
-module.exports = {
+export default {
   generateResetToken,
   hashResetToken,
 };

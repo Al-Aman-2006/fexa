@@ -1,14 +1,12 @@
-const jwt = require("jsonwebtoken");
-
+import jwt from "jsonwebtoken";
+import User from "../models/user.model.js";
 
 // ========================================
 // AUTHENTICATION MIDDLEWARE
 // ========================================
 
 const authMiddleware = (req, res, next) => {
-
   try {
-
     // Get token from cookie or Authorization header
     let token;
     
@@ -23,14 +21,11 @@ const authMiddleware = (req, res, next) => {
 
     // Check if token exists
     if (!token) {
-
       return res.status(401).json({
         success: false,
         message: "Authorization token is required",
       });
-
     }
-
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -39,7 +34,6 @@ const authMiddleware = (req, res, next) => {
     req.user = decoded;
 
     // Check if user is blocked in DB
-    const User = require("../models/user.model");
     User.findById(decoded.id)
       .select("isBlocked role")
       .then((user) => {
@@ -68,22 +62,17 @@ const authMiddleware = (req, res, next) => {
         });
       });
 
-
   } catch (error) {
-
     console.error(
       "Authentication error:",
       error.message
     );
 
-
     return res.status(401).json({
       success: false,
       message: "Invalid or expired token",
     });
-
   }
 };
 
-
-module.exports = authMiddleware;
+export default authMiddleware;

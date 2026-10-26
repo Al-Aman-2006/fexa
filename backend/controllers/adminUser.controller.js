@@ -1,5 +1,5 @@
-const bcrypt = require("bcryptjs");
-const User = require("../models/user.model");
+import bcrypt from "bcryptjs";
+import User from "../models/user.model.js";
 
 // Helper: Email format validation
 const validateEmail = (email) => {
@@ -389,7 +389,16 @@ const unblockUser = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
+  getUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+  blockUser,
+  unblockUser,
+};
+
+export default {
   getUsers,
   createUser,
   updateUser,

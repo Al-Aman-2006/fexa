@@ -1,6 +1,6 @@
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const User = require("../models/user.model");
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import User from "../models/user.model.js";
 
 // Email Validator
 const validateEmail = (email) => {
@@ -152,7 +152,13 @@ const adminLogout = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
+  adminLogin,
+  checkAdminSession,
+  adminLogout,
+};
+
+export default {
   adminLogin,
   checkAdminSession,
   adminLogout,

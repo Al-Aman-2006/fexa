@@ -1,0 +1,282 @@
+/* =========================================================================
+   FEXA ADMIN PANEL — UNIFIED PAGINATION SYSTEM
+   Dark & Lavender Luxury Theme
+   ========================================================================= */
+
+.admin-pagination-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+/* Variant 1: Card Footer (Attached to the bottom of .admin-table-card) */
+.admin-pagination-container.card-footer {
+  padding: 16px 24px;
+  background: rgba(13, 11, 16, 0.65);
+  border-top: 1px solid rgba(161, 132, 189, 0.12);
+  border-radius: 0 0 12px 12px;
+}
+
+/* Variant 2: Standalone (Inside reports or standalone section cards) */
+.admin-pagination-container.standalone {
+  padding: 14px 20px;
+  background: rgba(15, 12, 22, 0.7);
+  border: 1px solid rgba(161, 132, 189, 0.18);
+  border-radius: 10px;
+  margin-top: 8px;
+}
+
+/* SUMMARY / INFO TEXT */
+.admin-pagination-info {
+  font-size: 12px;
+  color: #9d8fae;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.admin-pagination-info strong {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.admin-pagination-total-tag {
+  color: #cbb8de;
+  margin-left: 3px;
+  font-weight: 500;
+}
+
+/* CONTROLS (BUTTONS & NUMBERS) */
+.admin-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-page-numbers-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* PREVIOUS & NEXT NAV BUTTONS */
+.admin-page-nav-btn {
+  height: 32px;
+  padding: 0 14px;
+  background: rgba(23, 18, 30, 0.85);
+  border: 1px solid rgba(161, 132, 189, 0.22);
+  border-radius: 6px;
+  color: #d8c4eb;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  outline: none;
+}
+
+.admin-page-nav-btn .nav-arrow {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.admin-page-nav-btn:hover:not(:disabled) {
+  background: rgba(161, 132, 189, 0.18);
+  border-color: #a184bd;
+  color: #ffffff;
+  box-shadow: 0 2px 10px rgba(161, 132, 189, 0.2);
+  transform: translateY(-1px);
+}
+
+.admin-page-nav-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.admin-page-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-color: rgba(161, 132, 189, 0.1);
+  color: #7a6e8a;
+  background: rgba(20, 16, 26, 0.5);
+  box-shadow: none;
+}
+
+/* PAGE NUMBER BUTTONS */
+.admin-page-num-btn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid rgba(161, 132, 189, 0.2);
+  border-radius: 6px;
+  color: #cbb8de;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.admin-page-num-btn:hover:not(.active):not(:disabled) {
+  background: rgba(161, 132, 189, 0.12);
+  border-color: rgba(161, 132, 189, 0.45);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.admin-page-num-btn:active:not(.active):not(:disabled) {
+  transform: translateY(0);
+}
+
+.admin-page-num-btn.active {
+  background: linear-gradient(135deg, #7c5c99 0%, #5d3f78 100%);
+  border-color: #a184bd;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(124, 92, 153, 0.45);
+  cursor: default;
+}
+
+.admin-page-num-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* SMART ELLIPSIS (•••) */
+.admin-page-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 32px;
+  color: #7f6d94;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  user-select: none;
+}
+
+/* ACCESSIBILITY FOCUS RINGS */
+.admin-page-nav-btn:focus-visible,
+.admin-page-num-btn:focus-visible {
+  box-shadow: 0 0 0 2px #0b090f, 0 0 0 4px #a184bd;
+}
+
+/* BACKWARD COMPATIBILITY CLASS ALIASES */
+.page-nav-btn,
+.pagination-btn,
+.sales-page-btn {
+  height: 32px;
+  padding: 0 14px;
+  background: rgba(23, 18, 30, 0.85);
+  border: 1px solid rgba(161, 132, 189, 0.22);
+  border-radius: 6px;
+  color: #d8c4eb;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.page-num-btn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid rgba(161, 132, 189, 0.2);
+  border-radius: 6px;
+  color: #cbb8de;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.page-num-btn.active,
+.current-page-tag,
+.pagination-current-pill {
+  background: #7c5c99;
+  border-color: #a184bd;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* =========================================================================
+   RESPONSIVE BEHAVIOR
+   ========================================================================= */
+
+@media (max-width: 768px) {
+  .admin-pagination-container {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+
+  .admin-pagination-info {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .admin-pagination-controls {
+    justify-content: center;
+    width: 100%;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-pagination-container {
+    padding: 12px 10px;
+    gap: 12px;
+  }
+
+  .admin-page-nav-btn {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 10px;
+  }
+
+  .admin-page-num-btn {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    font-size: 11px;
+  }
+
+  .admin-page-ellipsis {
+    width: 16px;
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
+
+  .admin-pagination-info {
+    font-size: 11px;
+  }
+}

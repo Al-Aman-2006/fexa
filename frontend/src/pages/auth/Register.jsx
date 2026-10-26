@@ -164,23 +164,12 @@ const navigate = useNavigate();
           
 
           <div className="brand">
-         
-          
-
-          
-           
-      <div className="login-brand">
-        <div className="brand-logo">F</div>
-          
-       
-         <h1>FEXA</h1>
-            <p>        </p>
+            <h1>FEXA</h1>
+            <p>HAUTE PARFUMERIE</p>
           </div>
- </div>
+
           <div className="intro">
-            <span className="eyebrow">
-                
-            </span>
+            <span className="eyebrow">NEW ACCOUNT</span>
 
             <h2>
               Begin Your

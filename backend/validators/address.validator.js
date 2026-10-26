@@ -233,7 +233,21 @@ const validateAddress = (data = {}) => {
   };
 };
 
-module.exports = {
+export {
+  validateAddress,
+  validateFullName,
+  validatePhone,
+  validateHouse,
+  validateStreet,
+  validateCity,
+  validateState,
+  validatePincode,
+  validateCountry,
+  validateLabel,
+  normalizePhone,
+};
+
+export default {
   validateAddress,
   validateFullName,
   validatePhone,

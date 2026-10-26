@@ -1,9 +1,10 @@
-const express = require("express");
-const router = express.Router();
-const {
+import express from "express";
+import {
   submitContactMessage,
   getContactReasons,
-} = require("../controllers/contact.controller");
+} from "../controllers/contact.controller.js";
+
+const router = express.Router();
 
 // GET /api/contact/reasons - Return allowed contact reasons
 router.get("/reasons", getContactReasons);
@@ -11,4 +12,4 @@ router.get("/reasons", getContactReasons);
 // POST /api/contact - Submit customer inquiry
 router.post("/", submitContactMessage);
 
-module.exports = router;
+export default router;

@@ -133,6 +133,83 @@
   letter-spacing: 1px;
 }
 
+/* SUBMENU & PARENT GROUP STYLES */
+.admin-nav-parent-group {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.admin-nav-chevron {
+  font-size: 11px;
+  color: #88789c;
+  transition: transform 0.2s ease;
+  user-select: none;
+}
+
+.admin-nav-chevron.open {
+  transform: rotate(180deg);
+  color: #cbb4de;
+}
+
+.admin-nav-item.parent-active {
+  color: #f4effa;
+  background: rgba(161, 132, 189, 0.09);
+  border: 1px solid rgba(161, 132, 189, 0.2);
+}
+
+.admin-submenu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+  margin-bottom: 6px;
+  margin-left: 18px;
+  padding-left: 14px;
+  border-left: 1px solid rgba(161, 132, 189, 0.22);
+}
+
+.admin-submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #9d8fae;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.admin-submenu-item:hover {
+  background: rgba(161, 132, 189, 0.08);
+  color: #ffffff;
+}
+
+.admin-submenu-item.active {
+  background: rgba(161, 132, 189, 0.18);
+  border: 1px solid rgba(161, 132, 189, 0.38);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 #a184bd;
+}
+
+.admin-submenu-icon {
+  font-size: 12px;
+  width: 16px;
+  text-align: center;
+}
+
+.admin-submenu-label {
+  font-size: 11px;
+}
+
 /* FOOTER STATUS & LOGOUT */
 .admin-sidebar-footer {
   display: flex;

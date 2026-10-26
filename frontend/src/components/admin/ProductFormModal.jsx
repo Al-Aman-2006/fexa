@@ -582,9 +582,10 @@ function ProductFormModal({
         dataPayload.append("images", file);
       });
 
+      const categorySlug = (formData.category || "men").toLowerCase();
       const url = isEdit
         ? `http://localhost:5000/api/admin/products/${product._id}`
-        : "http://localhost:5000/api/admin/products";
+        : `http://localhost:5000/api/admin/categories/${categorySlug}/products`;
 
       const method = isEdit ? "PUT" : "POST";
 
@@ -710,17 +711,25 @@ function ProductFormModal({
               {/* Category */}
               <div className="admin-modal-field">
                 <label>CATEGORY *</label>
-                <select
-                  name="category"
-                  value={formData.category}
-                  onChange={(e) => handleFieldChange("category", e.target.value)}
-                  onBlur={() => handleFieldBlur("category")}
-                  className={`admin-modal-select ${modalTouched.category && modalErrors.category ? "input-error" : ""}`}
-                >
-                  <option value="Men">Men</option>
-                  <option value="Women">Women</option>
-                  <option value="Unisex">Unisex</option>
-                </select>
+                {isEdit ? (
+                  <select
+                    name="category"
+                    value={formData.category}
+                    onChange={(e) => handleFieldChange("category", e.target.value)}
+                    onBlur={() => handleFieldBlur("category")}
+                    className={`admin-modal-select ${modalTouched.category && modalErrors.category ? "input-error" : ""}`}
+                  >
+                    <option value="Men">Men</option>
+                    <option value="Women">Women</option>
+                    <option value="Unisex">Unisex</option>
+                  </select>
+                ) : (
+                  <div className="category-readonly-display" id="product-category-readonly-display">
+                    <span className="readonly-category-label">CATEGORY:</span>
+                    <span className="readonly-category-badge">{formData.category.toUpperCase()}</span>
+                    <span className="readonly-category-lock" title="Derived from Category Management route">🔒</span>
+                  </div>
+                )}
                 {modalTouched.category && modalErrors.category && (
                   <span className="modal-field-error">{modalErrors.category}</span>
                 )}

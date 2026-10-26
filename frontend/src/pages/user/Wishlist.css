@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;700&family=DM+Sans:wght@400;500;600;700&display=swap");
+
 /* ========================================================
    FEXA HAUTE PARFUMERIE — FULL WISHLIST PAGE STYLESHEET
    Aesthetic: Luxury Editorial, Ivory / Lavender / Dark Noir
@@ -44,7 +46,7 @@
 }
 
 .wishlist-navbar .brand-title {
-  font-family: "Didot", "Playfair Display", "Cinzel", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.85rem;
   font-weight: 700;
   letter-spacing: 0.22em;
@@ -310,7 +312,7 @@
 }
 
 .wishlist-main-title {
-  font-family: "Didot", "Playfair Display", "Cinzel", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 2.85rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -387,7 +389,7 @@
 }
 
 .empty-title {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.85rem;
   font-weight: 700;
   color: #0e0d14;
@@ -479,7 +481,7 @@
 }
 
 .fallback-brand {
-  font-family: "Didot", serif;
+  font-family: serif;
   font-size: 1.1rem;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -580,7 +582,7 @@
 }
 
 .card-product-name {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.25rem;
   color: #0e0d14;
   font-weight: 700;
@@ -644,7 +646,7 @@
 }
 
 .current-price {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.35rem;
   font-weight: 700;
   color: #0e0d14;
@@ -741,7 +743,7 @@
 }
 
 .modal-heading {
-  font-family: "Didot", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 1.35rem;
   color: #0e0d14;
   margin: 0 0 0.6rem;

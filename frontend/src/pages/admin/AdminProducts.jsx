@@ -5,6 +5,7 @@ import AdminSidebar from "../../components/admin/AdminSidebar";
 import ProductFormModal from "../../components/admin/ProductFormModal";
 import ProductViewModal from "../../components/admin/ProductViewModal";
 import DeleteProductModal from "../../components/admin/DeleteProductModal";
+import AdminPagination from "../../components/admin/AdminPagination";
 import "./AdminDashboard.css";
 import "./AdminProducts.css";
 
@@ -240,7 +241,11 @@ function AdminProducts() {
         });
         setActiveModal(null);
         setSelectedProduct(null);
-        fetchProducts(activeCategoryTab, page, debouncedSearch, statusFilter);
+        const nextPage = products.length === 1 && page > 1 ? page - 1 : page;
+        if (nextPage !== page) {
+          setPage(nextPage);
+        }
+        fetchProducts(activeCategoryTab, nextPage, debouncedSearch, statusFilter);
       } else {
         setToast({
           type: "error",
@@ -511,7 +516,7 @@ function AdminProducts() {
           <div className="admin-table-card">
             {/* Scroll wrapper: ONLY the table scrolls horizontally; pagination stays outside */}
             <div className="admin-table-scroll-wrapper">
-            <table className="admin-users-table">
+            <table className="admin-products-table">
               <thead>
                 <tr>
                   <th>IMAGE</th>
@@ -707,41 +712,17 @@ function AdminProducts() {
             </div>{/* end admin-table-scroll-wrapper */}
 
             {/* PAGINATION CONTROLS */}
-            {!loading && pagination.totalPages > 1 && (
-              <div className="admin-pagination-container">
-                <div className="admin-pagination-info">
-                  Showing page <strong>{pagination.page}</strong> of{" "}
-                  <strong>{pagination.totalPages}</strong> ({pagination.totalProducts} total products)
-                </div>
-
-                <div className="admin-pagination-controls">
-                  <button
-                    className="page-nav-btn"
-                    onClick={() => handlePageChange(pagination.page - 1)}
-                    disabled={pagination.page <= 1}
-                  >
-                    PREVIOUS
-                  </button>
-
-                  {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((pageNum) => (
-                    <button
-                      key={pageNum}
-                      className={`page-num-btn ${pageNum === pagination.page ? "active" : ""}`}
-                      onClick={() => handlePageChange(pageNum)}
-                    >
-                      {pageNum}
-                    </button>
-                  ))}
-
-                  <button
-                    className="page-nav-btn"
-                    onClick={() => handlePageChange(pagination.page + 1)}
-                    disabled={pagination.page >= pagination.totalPages}
-                  >
-                    NEXT
-                  </button>
-                </div>
-              </div>
+            {!loading && (
+              <AdminPagination
+                currentPage={pagination.page}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalProducts}
+                pageSize={pagination.limit || 10}
+                itemName="products"
+                onPageChange={handlePageChange}
+                loading={loading}
+                variant="card-footer"
+              />
             )}
           </div>
         </main>

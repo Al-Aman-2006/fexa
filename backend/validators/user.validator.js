@@ -74,7 +74,12 @@ const validateName = (value) => {
   return null;
 };
 
-module.exports = {
+export {
+  normalizeName,
+  validateName,
+};
+
+export default {
   normalizeName,
   validateName,
 };
