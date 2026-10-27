@@ -80,6 +80,75 @@ function Profile() {
     }
   };
 
+  // CUSTOMER RETURN REQUEST MODAL STATE
+  const [returnModalItem, setReturnModalItem] = useState(null);
+  const [returnModalOrder, setReturnModalOrder] = useState(null);
+  const [returnQuantity, setReturnQuantity] = useState(1);
+  const [returnReason, setReturnReason] = useState("Fragrance does not match personal preference");
+  const [submittingReturn, setSubmittingReturn] = useState(false);
+  const [returnSuccessMsg, setReturnSuccessMsg] = useState("");
+  const [returnErrorMsg, setReturnErrorMsg] = useState("");
+
+  const handleOpenReturnModal = (order, item) => {
+    setReturnModalOrder(order);
+    setReturnModalItem(item);
+    setReturnQuantity(1);
+    setReturnReason("Fragrance does not match personal preference");
+    setReturnSuccessMsg("");
+    setReturnErrorMsg("");
+  };
+
+  const handleCloseReturnModal = () => {
+    setReturnModalOrder(null);
+    setReturnModalItem(null);
+    setReturnSuccessMsg("");
+    setReturnErrorMsg("");
+  };
+
+  const handleSubmitReturn = async (e) => {
+    e.preventDefault();
+    if (!returnModalOrder || !returnModalItem) return;
+
+    try {
+      setSubmittingReturn(true);
+      setReturnErrorMsg("");
+      setReturnSuccessMsg("");
+
+      const token = localStorage.getItem("token");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const res = await fetch(
+        `http://localhost:5000/api/orders/${returnModalOrder._id}/items/${returnModalItem._id}/return`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers,
+          body: JSON.stringify({
+            quantity: returnQuantity,
+            reason: returnReason,
+          }),
+        }
+      );
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setReturnSuccessMsg(data.message || "Return request submitted successfully.");
+        await fetchOrders();
+        setTimeout(() => {
+          handleCloseReturnModal();
+        }, 1500);
+      } else {
+        setReturnErrorMsg(data.message || "Unable to submit return request.");
+      }
+    } catch (err) {
+      console.error("Submit return error:", err);
+      setReturnErrorMsg("Failed to connect to server.");
+    } finally {
+      setSubmittingReturn(false);
+    }
+  };
+
   useEffect(() => {
     fetchOrders();
   }, []);
@@ -1545,9 +1614,25 @@ function Profile() {
                                     >
                                       {it.name}
                                     </h4>
-                                    <span className="order-item-line-total">
-                                      {formatPrice(it.lineTotal)}
-                                    </span>
+                                    <div className="order-item-price-block">
+                                      {it.allocatedCouponDiscount > 0 ? (
+                                        <>
+                                          <span className="item-original-price">
+                                            {formatPrice(it.originalLineAmount || (it.unitPrice * it.quantity))}
+                                          </span>
+                                          <span className="item-discount-pill">
+                                            -{formatPrice(it.allocatedCouponDiscount)}
+                                          </span>
+                                          <span className="item-net-price">
+                                            {formatPrice(it.discountedLineAmount || (it.lineTotal - it.allocatedCouponDiscount))}
+                                          </span>
+                                        </>
+                                      ) : (
+                                        <span className="order-item-line-total">
+                                          {formatPrice(it.lineTotal || (it.unitPrice * it.quantity))}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
 
                                   <div className="order-item-tags-row">
@@ -1574,6 +1659,44 @@ function Profile() {
                                     <span>
                                       Unit Price: <strong>{formatPrice(it.unitPrice)}</strong>
                                     </span>
+                                    {it.allocatedCouponDiscount > 0 && (
+                                      <>
+                                        <span className="pricing-separator">•</span>
+                                        <span className="item-per-unit-note">
+                                          Net: <strong>{formatPrice(it.discountedUnitAmount || (it.unitPrice - (it.allocatedCouponDiscount / it.quantity)))}</strong> / unit
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+
+                                  {/* Return status & actions */}
+                                  <div className="order-item-return-section">
+                                    {it.returnedQuantity > 0 && (
+                                      <span className="order-item-refunded-badge">
+                                        ✓ Returned: {it.returnedQuantity} of {it.quantity} unit(s) • Refunded: {formatPrice(it.refundAmount || 0)}
+                                      </span>
+                                    )}
+                                    {it.itemStatus === "Return Requested" && (
+                                      <span className="order-item-return-badge">
+                                        ⏳ Return Requested ({it.requestedReturnQuantity || (it.quantity - (it.returnedQuantity || 0))} unit(s)) • Pending Verification
+                                      </span>
+                                    )}
+                                    {it.itemStatus === "Return Rejected" && (
+                                      <span className="order-item-return-badge" style={{ background: "rgba(239, 68, 68, 0.15)", borderColor: "rgba(239, 68, 68, 0.3)", color: "#ef4444" }}>
+                                        ✕ Return Rejected
+                                      </span>
+                                    )}
+                                    {order.orderStatus === "Delivered" &&
+                                      (it.quantity - (it.returnedQuantity || 0)) > 0 &&
+                                      it.itemStatus !== "Return Requested" && (
+                                        <button
+                                          type="button"
+                                          className="order-item-return-btn"
+                                          onClick={() => handleOpenReturnModal(order, it)}
+                                        >
+                                          ↺ Request Return
+                                        </button>
+                                      )}
                                   </div>
                                 </div>
                               </div>
@@ -1708,6 +1831,125 @@ function Profile() {
           <span>© 2026 FEXA Haute Parfumerie. Patron Privé Account Portal.</span>
         </div>
       </footer>
+      {/* CUSTOMER ITEM RETURN MODAL */}
+      {returnModalItem && returnModalOrder && (
+        <div className="user-return-modal-overlay" onClick={handleCloseReturnModal}>
+          <div className="user-return-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="user-return-modal-header">
+              <div>
+                <span className="return-modal-eyebrow">FEXA CONCIERGE RETURN</span>
+                <h3>Return Item: {returnModalItem.name}</h3>
+              </div>
+              <button
+                type="button"
+                className="user-return-modal-close"
+                onClick={handleCloseReturnModal}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitReturn} className="user-return-modal-body">
+              <div className="user-return-product-summary">
+                <p>
+                  <strong>Variant:</strong> {returnModalItem.volumeMl ? `${returnModalItem.volumeMl} ml Flacon` : "Standard Flacon"}
+                </p>
+                <p>
+                  <strong>Purchased Quantity:</strong> {returnModalItem.quantity} unit(s)
+                  {returnModalItem.returnedQuantity > 0 && ` (${returnModalItem.returnedQuantity} already returned)`}
+                </p>
+                <p>
+                  <strong>Eligible for Return:</strong> {returnModalItem.quantity - (returnModalItem.returnedQuantity || 0)} unit(s)
+                </p>
+              </div>
+
+              <div className="user-return-form-group">
+                <label>Select Quantity to Return:</label>
+                <select
+                  value={returnQuantity}
+                  onChange={(e) => setReturnQuantity(Number(e.target.value))}
+                >
+                  {Array.from(
+                    { length: returnModalItem.quantity - (returnModalItem.returnedQuantity || 0) },
+                    (_, i) => i + 1
+                  ).map((qty) => (
+                    <option key={qty} value={qty}>
+                      {qty} unit{qty > 1 ? "s" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="user-return-calc-card">
+                <div className="user-return-calc-row">
+                  <span>Unit Selling Price:</span>
+                  <span>{formatPrice(returnModalItem.unitPrice)}</span>
+                </div>
+                {returnModalItem.allocatedCouponDiscount > 0 && (
+                  <div className="user-return-calc-row" style={{ color: "#a855f7" }}>
+                    <span>Coupon Discount Per Unit:</span>
+                    <span>-{formatPrice(returnModalItem.perUnitDiscount || (returnModalItem.allocatedCouponDiscount / returnModalItem.quantity))}</span>
+                  </div>
+                )}
+                <div className="user-return-calc-row" style={{ fontWeight: 600 }}>
+                  <span>Net Price Per Unit:</span>
+                  <span>
+                    {formatPrice(
+                      returnModalItem.discountedUnitAmount ||
+                      (returnModalItem.unitPrice - (returnModalItem.allocatedCouponDiscount / returnModalItem.quantity))
+                    )}
+                  </span>
+                </div>
+                <div className="user-return-calc-row" style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px dashed rgba(168, 85, 247, 0.25)", fontSize: "1rem", color: "#10b981", fontWeight: 700 }}>
+                  <span>Estimated Refund:</span>
+                  <span>
+                    {formatPrice(
+                      returnQuantity *
+                      (returnModalItem.discountedUnitAmount ||
+                        (returnModalItem.unitPrice - (returnModalItem.allocatedCouponDiscount / returnModalItem.quantity)))
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <div className="user-return-form-group">
+                <label>Reason for Return:</label>
+                <textarea
+                  rows="3"
+                  required
+                  placeholder="Please describe why you wish to return this fragrance (e.g. damaged seal, allergic reaction, incorrect item sent)..."
+                  value={returnReason}
+                  onChange={(e) => setReturnReason(e.target.value)}
+                />
+              </div>
+
+              {returnSubmitting && (
+                <p style={{ color: "#a855f7", fontSize: "0.88rem", textAlign: "center" }}>
+                  Submitting return request...
+                </p>
+              )}
+
+              <div className="user-return-modal-footer">
+                <button
+                  type="button"
+                  className="user-return-cancel-btn"
+                  onClick={handleCloseReturnModal}
+                  disabled={returnSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="user-return-submit-btn"
+                  disabled={returnSubmitting}
+                >
+                  {returnSubmitting ? "Submitting..." : "Submit Return Request"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

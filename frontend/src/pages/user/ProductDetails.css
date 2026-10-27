@@ -1454,7 +1454,49 @@
   }
 
   .related-products-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .related-media-box {
+    height: 160px;
+    padding: 10px;
+  }
+
+  .related-body-box {
+    padding: 10px 10px 12px;
+  }
+
+  .related-title {
+    font-size: 13px;
+    margin-bottom: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .related-snippet {
+    display: none;
+  }
+
+  .related-footer-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding-top: 6px;
+  }
+
+  .related-price {
+    font-size: 13.5px;
+  }
+
+  .related-view-btn {
+    width: 100%;
+    padding: 6px 4px;
+    font-size: 8.5px;
+    text-align: center;
+    justify-content: center;
   }
 
   .details-footer-bar .footer-inner-container {

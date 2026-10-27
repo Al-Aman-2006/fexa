@@ -12,12 +12,6 @@ export default function ScrollToTop() {
 
   useEffect(() => {
     if (navType !== "POP") {
-      const params = new URLSearchParams(search);
-      // When navigating to collections with a category filter (e.g. ?category=men),
-      // allow Collections component to position directly at the catalogue section.
-      if (pathname === "/collections" && params.has("category")) {
-        return;
-      }
       window.scrollTo({ top: 0, left: 0, behavior: "instant" });
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;

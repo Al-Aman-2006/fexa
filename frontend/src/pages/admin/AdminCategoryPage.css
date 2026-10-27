@@ -310,3 +310,41 @@
     width: 100%;
   }
 }
+
+@media (max-width: 480px) {
+  .category-master-banner {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .category-avatar-icon {
+    width: 44px;
+    height: 44px;
+    font-size: 24px;
+  }
+
+  .category-main-heading {
+    font-size: 18px;
+  }
+
+  .category-main-subtext {
+    font-size: 12px;
+  }
+
+  .category-confirm-modal-box {
+    padding: 20px 16px;
+    max-width: 95vw;
+  }
+
+  .category-confirm-modal-actions {
+    flex-direction: column-reverse;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .category-modal-submit-btn,
+  .category-modal-cancel-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

@@ -590,7 +590,7 @@ function ProductDetails() {
                 <span className="crumb-sep">/</span>
                 <span
                   className="crumb-link"
-                  onClick={() => navigate(`/collections?category=${encodeURIComponent(product.category.toLowerCase())}`)}
+                  onClick={() => navigate(`/collections/${product.category.toLowerCase()}`)}
                 >
                   {product.category.toUpperCase()}
                 </span>

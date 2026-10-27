@@ -81,6 +81,9 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 #root {
@@ -112,11 +115,12 @@ button {
   cursor: pointer;
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-border-mid); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-accent); }
+/* ── Scrollbar: invisible gutter to eliminate right-side space ── */
+::-webkit-scrollbar {
+  width: 0px;
+  height: 0px;
+  display: none;
+}
 
 /* ── Utility: visually hidden ── */
 .sr-only {

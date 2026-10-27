@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Coupon from "../models/coupon.model.js";
 import Cart from "../models/cart.model.js";
 import Product from "../models/product.model.js";
+import { calculateItemCouponAllocations } from "../utils/couponAllocation.js";
 
 // ========================================================
 // HELPER: Calculate live cart merchandise subtotal from DB
@@ -695,10 +696,16 @@ const applyCoupon = async (req, res) => {
       });
     }
 
-    // 4. Calculate authoritative discount
-    const discountAmount = coupon.calculateDiscount(eligibleSubtotal);
+    // 4. Calculate authoritative product-level discount allocations
+    const allocation = calculateItemCouponAllocations({
+      items: cartCalc.items,
+      coupon,
+      merchandiseSubtotal: eligibleSubtotal,
+    });
+
+    const discountAmount = allocation.totalCouponDiscount;
     const shippingCost = eligibleSubtotal >= 5000 ? 0 : 250;
-    const totalAmount = Math.max(0, eligibleSubtotal - discountAmount) + shippingCost;
+    const totalAmount = Math.max(0, allocation.discountedMerchandiseTotal) + shippingCost;
 
     return res.status(200).json({
       success: true,
@@ -716,12 +723,14 @@ const applyCoupon = async (req, res) => {
         finalTotal: totalAmount,
         minOrderAmount: coupon.minOrderAmount,
         maxDiscount: coupon.maxDiscount,
+        itemAllocations: allocation.allocatedItems,
       },
       calculation: {
         subtotal: eligibleSubtotal,
         discountAmount,
         shippingCost,
         totalAmount,
+        itemAllocations: allocation.allocatedItems,
       },
     });
   } catch (error) {

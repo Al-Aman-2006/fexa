@@ -516,15 +516,45 @@
 
 /* RESPONSIVE */
 @media (max-width: 1024px) {
-  .category-toolbar { flex-wrap: wrap; }
+  .category-toolbar { flex-wrap: wrap; gap: 12px; }
   .category-search-wrapper { flex: 1 1 100%; max-width: 100%; }
   .category-actions-right { flex: 1 1 auto; justify-content: flex-end; }
 }
-@media (max-width: 760px) {
-  .variant-fields-grid { grid-template-columns: 1fr 1fr; }
+
+@media (max-width: 768px) {
+  .product-modal-card {
+    max-width: 95vw !important;
+    width: 95vw !important;
+    padding: 20px 14px !important;
+    border-radius: 12px !important;
+  }
+  .product-form-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .variant-fields-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .category-actions-right {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .category-actions-right .admin-filter-select {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+  .category-actions-right .admin-create-user-btn {
+    flex: 1 1 100%;
+    width: 100%;
+    justify-content: center;
+  }
 }
+
 @media (max-width: 560px) {
-  .variant-fields-grid { grid-template-columns: 1fr; }
-  .category-actions-right { flex-wrap: wrap; }
-  .category-actions-right .admin-create-user-btn { flex: 1 1 auto; }
+  .variant-fields-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
 }

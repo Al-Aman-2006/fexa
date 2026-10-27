@@ -714,9 +714,9 @@ function Contact() {
             <div className="footer-nav-col">
               <h4>EXPLORE</h4>
               <button type="button" onClick={() => navigate("/collections")}>All Fragrances</button>
-              <button type="button" onClick={() => navigate("/collections?category=men")}>Men's Collection</button>
-              <button type="button" onClick={() => navigate("/collections?category=women")}>Women's Collection</button>
-              <button type="button" onClick={() => navigate("/collections?category=unisex")}>Unisex Portfolio</button>
+              <button type="button" onClick={() => navigate("/collections/men")}>Men's Collection</button>
+              <button type="button" onClick={() => navigate("/collections/women")}>Women's Collection</button>
+              <button type="button" onClick={() => navigate("/collections/unisex")}>Unisex Portfolio</button>
             </div>
 
             <div className="footer-nav-col">

@@ -91,6 +91,86 @@
   border-radius: 2px;
 }
 
+/* ========================================================
+   COLLECTIONS DROPDOWN MENU
+   Lavender-and-white theme, Haute Parfumerie aesthetic
+   ======================================================== */
+.collections-nav-item-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.collections-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+}
+
+.collections-trigger-btn.open {
+  color: #8c69ae;
+}
+
+.collections-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 0;
+  min-width: 140px;
+  background: #ffffff;
+  border: 1px solid #eee7f2;
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(43, 33, 56, 0.12);
+  padding: 6px 0;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  animation: collectionsDropdownFade 0.16s ease-out;
+}
+
+@keyframes collectionsDropdownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.collections-dropdown-item {
+  width: 100%;
+  display: block;
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 9px 18px;
+  font-family: "DM Sans", -apple-system, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1.2px;
+  color: #554865;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.collections-dropdown-item:hover {
+  background-color: #f8f4fc;
+  color: #8c69ae;
+}
+
+.collections-dropdown-item.selected {
+  background-color: #f2e8fa;
+  color: #7a52a3;
+  font-weight: 600;
+}
+
+.collections-dropdown-item:focus-visible {
+  outline: 2px solid #b99de2;
+  outline-offset: -2px;
+}
+
 /* ACTIONS BAR */
 .global-navbar-actions {
   display: flex;
@@ -485,6 +565,53 @@
 
   .global-navbar-links {
     display: none;
+  }
+
+  .global-navbar-links.mobile-open {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    position: absolute;
+    top: 68px;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border-bottom: 1px solid #eee7f2;
+    padding: 16px 20px 20px 20px;
+    gap: 14px;
+    box-shadow: 0 12px 30px rgba(43, 33, 56, 0.1);
+    z-index: 1050;
+    animation: mobileNavSlide 0.2s ease-out;
+  }
+
+  @keyframes mobileNavSlide {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .global-navbar-links.mobile-open .collections-nav-item-wrapper {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .global-navbar-links.mobile-open .collections-dropdown-menu {
+    position: static;
+    transform: none;
+    width: 100%;
+    margin-top: 6px;
+    margin-left: 10px;
+    box-shadow: none;
+    background: #faf8fc;
+    border: 1px solid #eee7f2;
+    border-radius: 6px;
   }
 
   .global-mobile-menu-btn {

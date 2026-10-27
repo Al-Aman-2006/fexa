@@ -48,6 +48,13 @@ function AdminSales() {
   const [orderPage, setOrderPage] = useState(1);
   const [orderPagination, setOrderPagination] = useState({ page: 1, totalPages: 1, totalOrders: 0 });
 
+  // Order Inspection & Return Modal State
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [modalProcessing, setModalProcessing] = useState(false);
+  const [modalAlert, setModalAlert] = useState(null);
+  const [returnQtyMap, setReturnQtyMap] = useState({});
+
   // Status & Loading States
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -255,6 +262,95 @@ function AdminSales() {
       alert("Failed to export sales report. Please try again.");
     } finally {
       setExporting(false);
+    }
+  };
+
+  // Order Details Modal & Return Processing Handlers
+  const handleOpenOrderModal = async (order) => {
+    setSelectedOrder(order);
+    setIsOrderModalOpen(true);
+    setModalAlert(null);
+    try {
+      const res = await fetch(`http://localhost:5000/api/admin/sales/orders/${order._id}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.order) {
+        setSelectedOrder(data.order);
+      }
+    } catch (err) {
+      console.error("Fetch full order details error:", err);
+    }
+  };
+
+  const handleCloseOrderModal = () => {
+    setIsOrderModalOpen(false);
+    setSelectedOrder(null);
+    setModalAlert(null);
+  };
+
+  const handleApproveReturn = async (itemId, returnQty) => {
+    if (!selectedOrder) return;
+    try {
+      setModalProcessing(true);
+      setModalAlert(null);
+
+      const res = await fetch(
+        `http://localhost:5000/api/admin/sales/orders/${selectedOrder._id}/items/${itemId}/approve-return`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ quantity: returnQty }),
+        }
+      );
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setModalAlert({ type: "success", message: data.message });
+        if (data.order) setSelectedOrder(data.order);
+        fetchOrdersData();
+        fetchAnalyticsData();
+      } else {
+        setModalAlert({ type: "error", message: data.message || "Failed to approve return." });
+      }
+    } catch (err) {
+      console.error("Approve return error:", err);
+      setModalAlert({ type: "error", message: "Network error approving return." });
+    } finally {
+      setModalProcessing(false);
+    }
+  };
+
+  const handleRejectReturn = async (itemId, reason) => {
+    if (!selectedOrder) return;
+    try {
+      setModalProcessing(true);
+      setModalAlert(null);
+
+      const res = await fetch(
+        `http://localhost:5000/api/admin/sales/orders/${selectedOrder._id}/items/${itemId}/reject-return`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason }),
+        }
+      );
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setModalAlert({ type: "success", message: data.message });
+        if (data.order) setSelectedOrder(data.order);
+        fetchOrdersData();
+      } else {
+        setModalAlert({ type: "error", message: data.message || "Failed to reject return." });
+      }
+    } catch (err) {
+      console.error("Reject return error:", err);
+      setModalAlert({ type: "error", message: "Network error rejecting return." });
+    } finally {
+      setModalProcessing(false);
     }
   };
 
@@ -1052,12 +1148,13 @@ function AdminSales() {
                     </th>
                     <th>PAYMENT</th>
                     <th>STATUS</th>
+                    <th style={{ textAlign: "center" }}>ACTION</th>
                   </tr>
                 </thead>
                 <tbody>
                   {orders.length === 0 ? (
                     <tr>
-                      <td colSpan="11" className="sales-empty-box">
+                      <td colSpan="12" className="sales-empty-box">
                         {appliedOrderSearch
                           ? `No transactions found matching "${appliedOrderSearch}"`
                           : "No orders found in the selected ledger range."}
@@ -1130,6 +1227,17 @@ function AdminSales() {
                             ● {o.orderStatus}
                           </span>
                         </td>
+                        <td style={{ textAlign: "center" }}>
+                          <button
+                            type="button"
+                            className="inspect-order-btn"
+                            onClick={() => handleOpenOrderModal(o)}
+                            title="Inspect item coupon allocation and process returns"
+                          >
+                            <span>🔍</span>
+                            <span>Inspect</span>
+                          </button>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -1150,6 +1258,270 @@ function AdminSales() {
           </section>
         </main>
       </div>
+
+      {/* ADMIN ORDER DETAILS & RETURN MANAGEMENT MODAL */}
+      {isOrderModalOpen && selectedOrder && (
+        <div className="order-modal-overlay" onClick={handleCloseOrderModal}>
+          <div className="order-modal-card" onClick={(e) => e.stopPropagation()}>
+            {/* MODAL HEADER */}
+            <div className="order-modal-header">
+              <h3>
+                <span>📦</span>
+                <span>Manifest Details: {selectedOrder.orderNumber}</span>
+              </h3>
+              <button type="button" className="coupon-modal-close-btn" onClick={handleCloseOrderModal}>
+                ✕
+              </button>
+            </div>
+
+            {/* MODAL BODY */}
+            <div className="order-modal-body">
+              {/* Alert Feedback */}
+              {modalAlert && (
+                <div className={`order-modal-alert ${modalAlert.type}`}>
+                  <span>{modalAlert.type === "success" ? "✓" : "⚠️"}</span>
+                  <span>{modalAlert.message}</span>
+                </div>
+              )}
+
+              {/* META INFO GRID */}
+              <div className="order-modal-meta-grid">
+                <div className="order-meta-card">
+                  <h4>Patron & Delivery Information</h4>
+                  <p>
+                    <strong>Customer:</strong> {selectedOrder.customerName || selectedOrder.user?.name || "Patron"}<br />
+                    <strong>Email:</strong> {selectedOrder.customerEmail || selectedOrder.user?.email || "N/A"}<br />
+                    <strong>Phone:</strong> {selectedOrder.customerPhone || selectedOrder.shippingAddress?.phone || "N/A"}<br />
+                    <strong>Address:</strong> {[
+                      selectedOrder.shippingAddress?.house,
+                      selectedOrder.shippingAddress?.street || selectedOrder.shippingAddress?.addressLine,
+                      selectedOrder.shippingAddress?.city,
+                      selectedOrder.shippingAddress?.state,
+                      selectedOrder.shippingAddress?.pincode,
+                      selectedOrder.shippingAddress?.country,
+                    ].filter(Boolean).join(", ") || "Standard Atelier Delivery"}
+                  </p>
+                </div>
+
+                <div className="order-meta-card">
+                  <h4>Transaction & Manifest Status</h4>
+                  <p>
+                    <strong>Placed On:</strong> {formatDateTime(selectedOrder.createdAt)}<br />
+                    <strong>Payment Method:</strong> {selectedOrder.paymentMethod} ({selectedOrder.paymentStatus})<br />
+                    <strong>Fulfillment Status:</strong> {selectedOrder.orderStatus}<br />
+                    {selectedOrder.razorpayPaymentId && (
+                      <>
+                        <strong>Razorpay Payment ID:</strong>{" "}
+                        <span style={{ fontFamily: "monospace", color: "#a184bd" }}>
+                          {selectedOrder.razorpayPaymentId}
+                        </span>
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* FINANCIAL BREAKDOWN STRIP */}
+              <div className="order-modal-financials-bar">
+                <div className="order-fin-item">
+                  <span>Merchandise Subtotal</span>
+                  <strong>{formatINR(selectedOrder.subtotal)}</strong>
+                </div>
+                <div className="order-fin-item">
+                  <span>Coupon Applied</span>
+                  <strong style={{ color: selectedOrder.couponCode ? "#d4c1e6" : "#8c7f9c" }}>
+                    {selectedOrder.couponCode || "None"}
+                    {selectedOrder.discountPercentage ? ` (${selectedOrder.discountPercentage}%)` : ""}
+                  </strong>
+                </div>
+                <div className="order-fin-item">
+                  <span>Total Coupon Discount</span>
+                  <strong className="discount">
+                    {selectedOrder.discountAmount > 0 ? `-${formatINR(selectedOrder.discountAmount)}` : "₹0"}
+                  </strong>
+                </div>
+                <div className="order-fin-item">
+                  <span>Atelier Shipping</span>
+                  <strong>{selectedOrder.shippingCost > 0 ? formatINR(selectedOrder.shippingCost) : "Complimentary"}</strong>
+                </div>
+                <div className="order-fin-item">
+                  <span>Order Total Paid</span>
+                  <strong className="total">{formatINR(selectedOrder.totalAmount)}</strong>
+                </div>
+                <div className="order-fin-item">
+                  <span>Total Refunded</span>
+                  <strong className="refunded">{formatINR(selectedOrder.totalRefundedAmount || 0)}</strong>
+                </div>
+              </div>
+
+              {/* PER-PRODUCT DISCOUNT ALLOCATION & RETURN TABLE */}
+              <div className="order-modal-table-wrap">
+                <table className="order-modal-table">
+                  <thead>
+                    <tr>
+                      <th>PRODUCT</th>
+                      <th>SIZE</th>
+                      <th style={{ textAlign: "center" }}>QTY</th>
+                      <th>ORIGINAL UNIT</th>
+                      <th>ORIGINAL LINE</th>
+                      <th>COUPON DISCOUNT</th>
+                      <th>DISCOUNTED LINE</th>
+                      <th style={{ textAlign: "center" }}>RETURNED</th>
+                      <th>REFUNDED</th>
+                      <th>ITEM STATUS</th>
+                      <th style={{ minWidth: "160px" }}>RETURN & REFUND ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(!selectedOrder.items || selectedOrder.items.length === 0) ? (
+                      <tr>
+                        <td colSpan="11" style={{ textAlign: "center", padding: "20px" }}>
+                          No fragrance items registered in this order snapshot.
+                        </td>
+                      </tr>
+                    ) : (
+                      selectedOrder.items.map((it) => {
+                        const originalLine = it.originalLineAmount || (it.unitPrice * it.quantity);
+                        const discount = it.allocatedCouponDiscount || 0;
+                        const discountedLine = it.discountedLineAmount || (originalLine - discount);
+                        const returnedQty = it.returnedQuantity || 0;
+                        const availableToReturn = Math.max(0, it.quantity - returnedQty);
+                        const currentSelectQty = returnQtyMap[it._id] || 1;
+                        const effectiveUnitRefund = it.discountedUnitAmount || (discountedLine / it.quantity);
+                        const isReturnRequested = it.itemStatus === "Return Requested";
+
+                        return (
+                          <tr key={it._id || it.variantId}>
+                            <td>
+                              <div style={{ display: "flex", flexDirection: "column" }}>
+                                <strong style={{ color: "#ffffff" }}>{it.name}</strong>
+                                <span style={{ fontSize: "10px", color: "#8c7f9c" }}>{it.brand || "FEXA"}</span>
+                              </div>
+                            </td>
+                            <td>
+                              <span className="variant-pill" style={{ background: "rgba(124, 92, 153, 0.25)" }}>
+                                {it.volumeMl} ml
+                              </span>
+                            </td>
+                            <td style={{ textAlign: "center", fontWeight: 700, color: "#ffffff" }}>
+                              {it.quantity}
+                            </td>
+                            <td>{formatINR(it.unitPrice)}</td>
+                            <td style={{ fontWeight: 600 }}>{formatINR(originalLine)}</td>
+                            <td style={{ color: discount > 0 ? "#ff858d" : "#8c7f9c", fontWeight: 700 }}>
+                              {discount > 0 ? `-${formatINR(discount)}` : "—"}
+                            </td>
+                            <td style={{ fontWeight: 800, color: "#d4c1e6" }}>
+                              {formatINR(discountedLine)}
+                            </td>
+                            <td style={{ textAlign: "center", fontWeight: 700, color: returnedQty > 0 ? "#ffd166" : "#8c7f9c" }}>
+                              {returnedQty} / {it.quantity}
+                            </td>
+                            <td style={{ color: it.refundAmount > 0 ? "#ffd166" : "#8c7f9c", fontWeight: 700 }}>
+                              {it.refundAmount > 0 ? formatINR(it.refundAmount) : "—"}
+                            </td>
+                            <td>
+                              <span
+                                className={`status-badge ${
+                                  it.itemStatus === "Returned"
+                                    ? "paid"
+                                    : it.itemStatus === "Return Requested"
+                                    ? "pending"
+                                    : it.itemStatus === "Partially Returned"
+                                    ? "pending"
+                                    : "paid"
+                                }`}
+                              >
+                                ● {it.itemStatus || "Active"}
+                              </span>
+                            </td>
+                            <td>
+                              <div className="return-action-panel">
+                                {isReturnRequested ? (
+                                  <>
+                                    <span className="return-badge-requested">
+                                      Req: {it.requestedReturnQuantity || 1} unit(s)
+                                    </span>
+                                    {it.returnReason && (
+                                      <span style={{ fontSize: "10px", color: "#ded6e6", fontStyle: "italic" }}>
+                                        "{it.returnReason}"
+                                      </span>
+                                    )}
+                                    <span style={{ fontSize: "11px", color: "#38b2a3", fontWeight: 700 }}>
+                                      Refund: {formatINR((it.requestedReturnQuantity || 1) * effectiveUnitRefund)}
+                                    </span>
+                                    <div className="return-btn-group">
+                                      <button
+                                        type="button"
+                                        className="approve-refund-btn"
+                                        disabled={modalProcessing}
+                                        onClick={() => handleApproveReturn(it._id, it.requestedReturnQuantity || 1)}
+                                      >
+                                        ✓ Approve
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="reject-return-btn"
+                                        disabled={modalProcessing}
+                                        onClick={() => handleRejectReturn(it._id, "Return declined by administration.")}
+                                      >
+                                        ✕ Reject
+                                      </button>
+                                    </div>
+                                  </>
+                                ) : availableToReturn > 0 ? (
+                                  <div className="direct-return-control">
+                                    <select
+                                      className="direct-return-qty-select"
+                                      value={currentSelectQty}
+                                      onChange={(e) =>
+                                        setReturnQtyMap({
+                                          ...returnQtyMap,
+                                          [it._id]: parseInt(e.target.value, 10),
+                                        })
+                                      }
+                                    >
+                                      {Array.from({ length: availableToReturn }, (_, idx) => idx + 1).map((n) => (
+                                        <option key={n} value={n}>
+                                          {n} unit{n > 1 ? "s" : ""}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <button
+                                      type="button"
+                                      className="approve-refund-btn"
+                                      disabled={modalProcessing}
+                                      onClick={() => handleApproveReturn(it._id, currentSelectQty)}
+                                      title={`Process return and refund ${formatINR(currentSelectQty * effectiveUnitRefund)}`}
+                                    >
+                                      Refund {formatINR(currentSelectQty * effectiveUnitRefund)}
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span style={{ color: "#38b2a3", fontSize: "11px", fontWeight: 700 }}>
+                                    ✓ Fully Refunded
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* MODAL FOOTER */}
+            <div className="order-modal-footer">
+              <button type="button" className="coupon-modal-cancel-btn" onClick={handleCloseOrderModal}>
+                Close Manifest
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

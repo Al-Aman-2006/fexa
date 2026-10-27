@@ -47,6 +47,71 @@ const orderItemSchema = new mongoose.Schema(
       required: [true, "Line total is required"],
       min: [0, "Line total cannot be negative"],
     },
+    originalLineAmount: {
+      type: Number,
+      default: null,
+    },
+    allocatedCouponDiscount: {
+      type: Number,
+      default: 0,
+      min: [0, "Allocated discount cannot be negative"],
+    },
+    discountedLineAmount: {
+      type: Number,
+      default: null,
+      min: [0, "Discounted line amount cannot be negative"],
+    },
+    perUnitDiscount: {
+      type: Number,
+      default: 0,
+      min: [0, "Per unit discount cannot be negative"],
+    },
+    discountedUnitAmount: {
+      type: Number,
+      default: null,
+      min: [0, "Discounted unit amount cannot be negative"],
+    },
+    returnedQuantity: {
+      type: Number,
+      default: 0,
+      min: [0, "Returned quantity cannot be negative"],
+    },
+    refundAmount: {
+      type: Number,
+      default: 0,
+      min: [0, "Refund amount cannot be negative"],
+    },
+    itemStatus: {
+      type: String,
+      enum: ["Active", "Return Requested", "Returned", "Partially Returned", "Cancelled"],
+      default: "Active",
+    },
+    returnReason: {
+      type: String,
+      default: null,
+    },
+    requestedReturnQuantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    returnRequestedAt: {
+      type: Date,
+      default: null,
+    },
+    refundStatus: {
+      type: String,
+      enum: ["None", "Pending", "Refunded", "Rejected"],
+      default: "None",
+    },
+    refundedAt: {
+      type: Date,
+      default: null,
+    },
+    refundTransactionId: {
+      type: String,
+      default: null,
+    },
     image: {
       type: String,
       default: null,
@@ -169,6 +234,16 @@ const orderSchema = new mongoose.Schema(
     paymentAttempts: {
       type: Number,
       default: 1,
+    },
+    totalRefundedAmount: {
+      type: Number,
+      default: 0,
+      min: [0, "Total refunded amount cannot be negative"],
+    },
+    hasReturns: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
   },
   {

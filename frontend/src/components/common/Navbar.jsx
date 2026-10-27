@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useCart } from "../../context/CartContext";
 import { useWishlist } from "../../context/WishlistContext";
@@ -7,9 +7,19 @@ import "./Navbar.css";
 
 function Navbar({ activePage, onMobileMenuToggle }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { cart, openCart } = useCart();
   const { wishlistCount, openWishlist } = useWishlist();
+
+  // Collections Dropdown state & ref
+  const [isCollectionsOpen, setIsCollectionsOpen] = useState(false);
+  const collectionsRef = useRef(null);
+  const collectionsBtnRef = useRef(null);
+
+  // Mobile navigation state & ref
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const mobileNavRef = useRef(null);
 
   // Search UI state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -21,6 +31,38 @@ function Navbar({ activePage, onMobileMenuToggle }) {
   const searchContainerRef = useRef(null);
   const searchInputRef = useRef(null);
   const requestIdRef = useRef(0);
+
+  // Close menus on route navigation
+  useEffect(() => {
+    setIsCollectionsOpen(false);
+    setIsMobileNavOpen(false);
+  }, [location.pathname]);
+
+  // Global Escape key handler
+  useEffect(() => {
+    const handleGlobalKeyDown = (event) => {
+      if (event.key === "Escape") {
+        if (isCollectionsOpen) {
+          setIsCollectionsOpen(false);
+          collectionsBtnRef.current?.focus();
+        }
+        if (isSearchOpen) {
+          setIsSearchOpen(false);
+        }
+        if (isMobileNavOpen) {
+          setIsMobileNavOpen(false);
+        }
+      }
+    };
+
+    if (isCollectionsOpen || isSearchOpen || isMobileNavOpen) {
+      document.addEventListener("keydown", handleGlobalKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleGlobalKeyDown);
+    };
+  }, [isCollectionsOpen, isSearchOpen, isMobileNavOpen]);
 
   // Focus search input when search bar opens
   useEffect(() => {
@@ -36,7 +78,7 @@ function Navbar({ activePage, onMobileMenuToggle }) {
     }
   }, [isSearchOpen]);
 
-  // Click outside to close search dropdown
+  // Click outside to close search, collections dropdown, and mobile menu
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -45,9 +87,22 @@ function Navbar({ activePage, onMobileMenuToggle }) {
       ) {
         setIsSearchOpen(false);
       }
+      if (
+        collectionsRef.current &&
+        !collectionsRef.current.contains(event.target)
+      ) {
+        setIsCollectionsOpen(false);
+      }
+      if (
+        mobileNavRef.current &&
+        !mobileNavRef.current.contains(event.target) &&
+        !event.target.closest(".global-mobile-menu-btn")
+      ) {
+        setIsMobileNavOpen(false);
+      }
     };
 
-    if (isSearchOpen) {
+    if (isSearchOpen || isCollectionsOpen || isMobileNavOpen) {
       document.addEventListener("mousedown", handleClickOutside);
       document.addEventListener("touchstart", handleClickOutside);
     }
@@ -56,7 +111,7 @@ function Navbar({ activePage, onMobileMenuToggle }) {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("touchstart", handleClickOutside);
     };
-  }, [isSearchOpen]);
+  }, [isSearchOpen, isCollectionsOpen, isMobileNavOpen]);
 
   // Debounced search effect with request cancellation / race-condition protection
   useEffect(() => {
@@ -149,42 +204,147 @@ function Navbar({ activePage, onMobileMenuToggle }) {
     return `http://localhost:5000${imgPath}`;
   };
 
+  const handleCollectionsToggle = (e) => {
+    e.stopPropagation();
+    setIsCollectionsOpen((prev) => !prev);
+  };
+
+  const handleCategorySelect = (path) => {
+    navigate(path);
+    setIsCollectionsOpen(false);
+    setIsMobileNavOpen(false);
+  };
+
+  const handleNavClick = (target) => {
+    setIsMobileNavOpen(false);
+    setIsCollectionsOpen(false);
+
+    const isHomePage = location.pathname === "/home" || location.pathname === "/";
+
+    if (target === "home") {
+      if (isHomePage) {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        navigate("/home");
+      }
+      return;
+    }
+
+    if (target === "about") {
+      if (isHomePage) {
+        const el = document.getElementById("about-section");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth" });
+        }
+      } else {
+        navigate("/home#about-section", { state: { scrollTo: "about-section" } });
+      }
+      return;
+    }
+
+    if (target === "contact") {
+      if (isHomePage) {
+        const el = document.getElementById("contact-section");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth" });
+        }
+      } else {
+        navigate("/home#contact-section", { state: { scrollTo: "contact-section" } });
+      }
+      return;
+    }
+  };
+
   return (
     <header className="fexa-global-navbar">
       <div className="global-navbar-container">
         {/* Brand Logo */}
-        <div className="global-navbar-brand" onClick={() => navigate("/home")}>
+        <div className="global-navbar-brand" onClick={() => handleNavClick("home")}>
           <h1 className="global-brand-title">FEXA</h1>
           <span className="global-brand-subtitle">HAUTE PARFUMERIE</span>
         </div>
 
         {/* Navigation Links */}
-        <nav className="global-navbar-links">
+        <nav
+          ref={mobileNavRef}
+          className={`global-navbar-links ${isMobileNavOpen ? "mobile-open" : ""}`}
+        >
           <button
             className={`global-nav-btn ${activePage === "home" ? "active" : ""}`}
-            onClick={() => navigate("/home")}
+            onClick={() => handleNavClick("home")}
           >
             HOME
           </button>
           
-          <button
-            className={`global-nav-btn ${
-              activePage === "collections" ? "active" : ""
-            }`}
-            onClick={() => navigate("/collections")}
-          >
-            COLLECTIONS
-          </button>
+          <div className="collections-nav-item-wrapper" ref={collectionsRef}>
+            <button
+              ref={collectionsBtnRef}
+              type="button"
+              className={`global-nav-btn collections-trigger-btn ${
+                activePage === "collections" ||
+                location.pathname.startsWith("/collections")
+                  ? "active"
+                  : ""
+              } ${isCollectionsOpen ? "open" : ""}`}
+              onClick={handleCollectionsToggle}
+              aria-expanded={isCollectionsOpen}
+              aria-haspopup="true"
+              aria-controls="collections-dropdown-menu"
+            >
+              COLLECTIONS
+            </button>
+
+            {isCollectionsOpen && (
+              <div
+                id="collections-dropdown-menu"
+                className="collections-dropdown-menu"
+                role="menu"
+                aria-label="Collections categories"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={`collections-dropdown-item ${
+                    location.pathname === "/collections/men" ? "selected" : ""
+                  }`}
+                  onClick={() => handleCategorySelect("/collections/men")}
+                >
+                  Men
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={`collections-dropdown-item ${
+                    location.pathname === "/collections/women" ? "selected" : ""
+                  }`}
+                  onClick={() => handleCategorySelect("/collections/women")}
+                >
+                  Women
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={`collections-dropdown-item ${
+                    location.pathname === "/collections/unisex" ? "selected" : ""
+                  }`}
+                  onClick={() => handleCategorySelect("/collections/unisex")}
+                >
+                  Unisex
+                </button>
+              </div>
+            )}
+          </div>
+
           <button
             className={`global-nav-btn ${activePage === "about" ? "active" : ""}`}
-            onClick={() => navigate("/about")}
+            onClick={() => handleNavClick("about")}
           >
             ABOUT
           </button>
 
           <button
             className={`global-nav-btn ${activePage === "contact" ? "active" : ""}`}
-            onClick={() => navigate("/contact")}
+            onClick={() => handleNavClick("contact")}
           >
             CONTACT US
           </button>
@@ -376,13 +536,23 @@ function Navbar({ activePage, onMobileMenuToggle }) {
             <span className="user-nav-name">{user?.name || "Account"}</span>
           </button>
 
-          {/* Optional Mobile Menu Toggle (e.g. for Profile) */}
-          {onMobileMenuToggle && (
+          {/* Mobile Menu Toggle */}
+          {onMobileMenuToggle ? (
             <button
               className="global-mobile-menu-btn"
               onClick={onMobileMenuToggle}
+              aria-label="Toggle profile menu"
             >
               ☰ Menu
+            </button>
+          ) : (
+            <button
+              className="global-mobile-menu-btn"
+              onClick={() => setIsMobileNavOpen((prev) => !prev)}
+              aria-label="Toggle navigation menu"
+              aria-expanded={isMobileNavOpen}
+            >
+              {isMobileNavOpen ? "✕" : "☰"}
             </button>
           )}
         </div>

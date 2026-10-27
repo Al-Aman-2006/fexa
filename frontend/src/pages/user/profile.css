@@ -1603,3 +1603,241 @@
   letter-spacing: 0.08em;
   color: #7b6f8a;
 }
+
+/* =========================================================================
+   PRODUCT-LEVEL COUPON DISCOUNT & RETURN MANAGEMENT (LAVENDER & WHITE)
+   ========================================================================= */
+.item-discount-pill {
+  background: #f4ecf8;
+  border: 1px solid #d4c1e6;
+  color: #765493;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.item-original-price {
+  color: #9f8fb3;
+  text-decoration: line-through;
+  font-size: 12px;
+  margin-right: 6px;
+}
+
+.item-net-price {
+  color: #3b3047;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.item-per-unit-note {
+  font-size: 11px;
+  color: #7b6f8a;
+  margin-top: 2px;
+}
+
+.order-item-return-badge {
+  background: #fff9e6;
+  border: 1px solid #f0d488;
+  color: #975a16;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.order-item-refunded-badge {
+  background: #edfdf5;
+  border: 1px solid #9ae6b4;
+  color: #22543d;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.order-item-return-btn {
+  background: #ffffff;
+  border: 1px solid #765493;
+  color: #765493;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 6px;
+  display: inline-block;
+}
+
+.order-item-return-btn:hover {
+  background: #765493;
+  color: #ffffff;
+}
+
+/* CUSTOMER RETURN MODAL */
+.user-return-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(40, 32, 50, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.5rem;
+}
+
+.user-return-modal-card {
+  background: #ffffff;
+  border: 1px solid #e2d6ed;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 16px 40px rgba(59, 48, 71, 0.16);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: couponModalFadeIn 0.2s ease;
+}
+
+.user-return-modal-header {
+  padding: 16px 20px;
+  background: #faf8fc;
+  border-bottom: 1px solid #eee8f1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.user-return-modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-family: "Playfair Display", serif;
+  color: #3b3047;
+}
+
+.user-return-modal-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  color: #7b6f8a;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.user-return-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.user-return-item-summary {
+  background: #faf8fc;
+  border: 1px solid #eee8f1;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.user-return-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.user-return-field label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: #6f6475;
+  text-transform: uppercase;
+}
+
+.user-return-field select,
+.user-return-field textarea {
+  border: 1px solid #d4c1e6;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #3b3047;
+  outline: none;
+  background: #ffffff;
+}
+
+.user-return-field select:focus,
+.user-return-field textarea:focus {
+  border-color: #765493;
+  box-shadow: 0 0 0 2px rgba(118, 84, 147, 0.15);
+}
+
+.user-return-calc-card {
+  background: #f9f6fc;
+  border: 1px solid #e5d8ee;
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.user-return-calc-card span {
+  font-size: 12px;
+  color: #6f6475;
+  font-weight: 600;
+}
+
+.user-return-calc-card strong {
+  font-size: 16px;
+  color: #765493;
+  font-weight: 800;
+}
+
+.user-return-modal-footer {
+  padding: 14px 20px;
+  background: #faf8fc;
+  border-top: 1px solid #eee8f1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.user-return-cancel-btn {
+  background: #ffffff;
+  border: 1px solid #d4c1e6;
+  color: #6f6475;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.user-return-submit-btn {
+  background: #765493;
+  border: none;
+  color: #ffffff;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.user-return-submit-btn:hover:not(:disabled) {
+  background: #5e3f79;
+}
+

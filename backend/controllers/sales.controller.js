@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Order from "../models/order.model.js";
+import { normalizeOrderWithAllocations } from "../utils/couponAllocation.js";
 
 // =========================================================================
 // HELPER: DATE RANGE PARSER
@@ -1050,6 +1051,7 @@ const getDetailedSalesReport = async (req, res) => {
 
     // Format orders safely for admin reporting
     const formattedOrders = orders.map((o) => {
+      const normalizedOrder = normalizeOrderWithAllocations(o);
       const totalUnits = (o.items || []).reduce((acc, it) => acc + (it.quantity || 1), 0);
       const itemsSummary = (o.items || []).map((it) => `${it.name} (${it.volumeMl}ml × ${it.quantity})`).join(", ");
       const sizesSummary = [...new Set((o.items || []).map((it) => `${it.volumeMl}ml`))].join(", ");
@@ -1066,18 +1068,25 @@ const getDetailedSalesReport = async (req, res) => {
         customerName,
         customerEmail: o.user?.email || "N/A",
         customerPhone: o.shippingAddress?.phone || "N/A",
+        shippingAddress: o.shippingAddress || null,
         itemsSummary,
         sizesSummary,
         totalUnits,
         subtotal: o.subtotal,
         couponCode: o.couponCode || null,
+        couponName: o.couponName || null,
         discountPercentage: o.discountPercentage || 0,
         discountAmount: o.discountAmount || 0,
         shippingCost: o.shippingCost || 0,
         totalAmount: o.totalAmount,
+        totalRefundedAmount: o.totalRefundedAmount || 0,
+        hasReturns: o.hasReturns || false,
         paymentMethod: o.paymentMethod,
         paymentStatus: o.paymentStatus,
         orderStatus: o.orderStatus,
+        razorpayOrderId: o.razorpayOrderId || null,
+        razorpayPaymentId: o.razorpayPaymentId || null,
+        items: normalizedOrder.items,
       };
     });
 

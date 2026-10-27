@@ -520,11 +520,59 @@
   color: #ff737d;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
+  .coupon-header-actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 12px;
+  }
+  .create-coupon-btn {
+    width: 100%;
+    justify-content: center;
+    height: 42px;
+  }
+  .coupon-search-wrapper {
+    width: 100%;
+  }
+  .coupon-modal-card {
+    max-width: 95vw;
+    width: 95vw;
+    border-radius: 12px;
+  }
+  .coupon-modal-header {
+    padding: 1.1rem 1.25rem;
+  }
+  .coupon-modal-body {
+    padding: 1.25rem 1.1rem;
+  }
   .coupon-form-grid-2 {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
   .coupon-form-group.full {
     grid-column: span 1;
+  }
+  .coupon-modal-footer {
+    flex-direction: column-reverse;
+    gap: 10px;
+  }
+  .coupon-modal-footer button {
+    width: 100%;
+    justify-content: center;
+    height: 42px;
+  }
+  .coupon-confirm-delete-box {
+    padding: 20px 16px;
+    max-width: 92vw;
+  }
+  .coupon-confirm-actions {
+    flex-direction: column-reverse;
+    gap: 10px;
+    width: 100%;
+  }
+  .coupon-confirm-actions button {
+    width: 100%;
+    justify-content: center;
   }
 }

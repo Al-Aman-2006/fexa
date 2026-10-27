@@ -7,6 +7,12 @@ import Category from "../models/category.model.js";
 import User from "../models/user.model.js";
 import Coupon from "../models/coupon.model.js";
 import { getRazorpayInstance } from "../config/razorpay.js";
+import {
+  calculateItemCouponAllocations,
+  calculateItemRefund,
+  normalizeOrderWithAllocations,
+  roundToPaise,
+} from "../utils/couponAllocation.js";
 
 // ========================================================
 // HELPER: Validate and calculate single coupon for order
@@ -320,11 +326,21 @@ const createOrder = async (req, res) => {
         });
       }
       appliedCoupon = couponResult.coupon;
-      discountAmount = couponResult.discountAmount;
     }
 
+    // Authoritative Product-Level Coupon Allocation
+    const allocation = calculateItemCouponAllocations({
+      items: orderItems,
+      coupon: appliedCoupon,
+      merchandiseSubtotal: calculatedSubtotal,
+    });
+
+    const finalOrderItems = allocation.allocatedItems;
+    discountAmount = allocation.totalCouponDiscount;
+    const discountedMerchandiseTotal = allocation.discountedMerchandiseTotal;
+
     const shippingCost = calculatedSubtotal >= 5000 ? 0 : 250;
-    const totalAmount = Math.max(0, calculatedSubtotal - discountAmount) + shippingCost;
+    const totalAmount = Math.max(0, discountedMerchandiseTotal) + shippingCost;
 
     // 5. Generate unique order number
     const orderNumber = `FEXA-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -338,7 +354,7 @@ const createOrder = async (req, res) => {
     }
 
     if (order && order.paymentStatus !== "Paid") {
-      order.items = orderItems;
+      order.items = finalOrderItems;
       order.shippingAddress = shippingAddressSnapshot;
       order.subtotal = calculatedSubtotal;
       order.coupon = appliedCoupon ? appliedCoupon._id : (order.coupon || null);
@@ -362,7 +378,7 @@ const createOrder = async (req, res) => {
       order = await Order.create({
         orderNumber,
         user: userId,
-        items: orderItems,
+        items: finalOrderItems,
         shippingAddress: shippingAddressSnapshot,
         subtotal: calculatedSubtotal,
         coupon: appliedCoupon ? appliedCoupon._id : null,
@@ -409,7 +425,7 @@ const createOrder = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: "Order placed successfully.",
-      order,
+      order: normalizeOrderWithAllocations(order.toObject ? order.toObject() : order),
     });
   } catch (error) {
     console.error("Create order error:", error);
@@ -445,10 +461,13 @@ const getMyOrders = async (req, res) => {
   try {
     const userId = req.user.id;
     const orders = await Order.find({ user: userId }).sort({ createdAt: -1 });
+    const normalizedOrders = orders.map((o) =>
+      normalizeOrderWithAllocations(o.toObject ? o.toObject() : o)
+    );
 
     return res.status(200).json({
       success: true,
-      orders,
+      orders: normalizedOrders,
     });
   } catch (error) {
     console.error("Get my orders error:", error);
@@ -479,9 +498,13 @@ const getOrderById = async (req, res) => {
       });
     }
 
+    const normalizedOrder = normalizeOrderWithAllocations(
+      order.toObject ? order.toObject() : order
+    );
+
     return res.status(200).json({
       success: true,
-      order,
+      order: normalizedOrder,
     });
   } catch (error) {
     console.error("Get order by ID error:", error);
@@ -700,11 +723,21 @@ const createRazorpayOrder = async (req, res) => {
         });
       }
       appliedCoupon = couponResult.coupon;
-      discountAmount = couponResult.discountAmount;
     }
 
+    // Authoritative Product-Level Coupon Allocation
+    const allocation = calculateItemCouponAllocations({
+      items: orderItems,
+      coupon: appliedCoupon,
+      merchandiseSubtotal: calculatedSubtotal,
+    });
+
+    const finalOrderItems = allocation.allocatedItems;
+    discountAmount = allocation.totalCouponDiscount;
+    const discountedMerchandiseTotal = allocation.discountedMerchandiseTotal;
+
     const shippingCost = calculatedSubtotal >= 5000 ? 0 : 250;
-    const totalAmount = Math.max(0, calculatedSubtotal - discountAmount) + shippingCost;
+    const totalAmount = Math.max(0, discountedMerchandiseTotal) + shippingCost;
 
     if (totalAmount <= 0) {
       return res.status(400).json({
@@ -719,7 +752,7 @@ const createRazorpayOrder = async (req, res) => {
     if (retryOrderId && mongoose.Types.ObjectId.isValid(retryOrderId)) {
       internalOrder = await Order.findOne({ _id: retryOrderId, user: userId });
       if (internalOrder && internalOrder.paymentStatus !== "Paid") {
-        internalOrder.items = orderItems;
+        internalOrder.items = finalOrderItems;
         internalOrder.shippingAddress = shippingAddressSnapshot;
         internalOrder.subtotal = calculatedSubtotal;
         internalOrder.coupon = appliedCoupon ? appliedCoupon._id : (internalOrder.coupon || null);
@@ -745,7 +778,7 @@ const createRazorpayOrder = async (req, res) => {
       internalOrder = await Order.create({
         orderNumber,
         user: userId,
-        items: orderItems,
+        items: finalOrderItems,
         shippingAddress: shippingAddressSnapshot,
         subtotal: calculatedSubtotal,
         coupon: appliedCoupon ? appliedCoupon._id : null,
@@ -1071,22 +1104,31 @@ const verifyRazorpayPayment = async (req, res) => {
       const couponResult = await resolveOrderCoupon(targetCouponCode, calculatedSubtotal, userId);
       if (!couponResult.error && couponResult.coupon) {
         appliedCoupon = couponResult.coupon;
-        discountAmount = couponResult.discountAmount;
       } else if (targetOrder && targetOrder.coupon) {
         appliedCoupon = await Coupon.findById(targetOrder.coupon);
       }
     } else if (targetOrder && targetOrder.coupon) {
       appliedCoupon = await Coupon.findById(targetOrder.coupon);
-      discountAmount = targetOrder.discountAmount || 0;
     }
 
+    // Authoritative Product-Level Coupon Allocation
+    const allocation = calculateItemCouponAllocations({
+      items: orderItems,
+      coupon: appliedCoupon,
+      merchandiseSubtotal: calculatedSubtotal,
+    });
+
+    const finalOrderItems = allocation.allocatedItems;
+    discountAmount = allocation.totalCouponDiscount;
+    const discountedMerchandiseTotal = allocation.discountedMerchandiseTotal;
+
     const shippingCost = calculatedSubtotal >= 5000 ? 0 : 250;
-    const totalAmount = Math.max(0, calculatedSubtotal - discountAmount) + shippingCost;
+    const totalAmount = Math.max(0, discountedMerchandiseTotal) + shippingCost;
 
     let finalOrder = targetOrder;
 
     if (finalOrder) {
-      finalOrder.items = orderItems;
+      finalOrder.items = finalOrderItems;
       finalOrder.shippingAddress = shippingAddressSnapshot;
       finalOrder.subtotal = calculatedSubtotal;
       finalOrder.coupon = appliedCoupon ? appliedCoupon._id : (targetOrder ? targetOrder.coupon : null);
@@ -1111,7 +1153,7 @@ const verifyRazorpayPayment = async (req, res) => {
       finalOrder = await Order.create({
         orderNumber,
         user: userId,
-        items: orderItems,
+        items: finalOrderItems,
         shippingAddress: shippingAddressSnapshot,
         subtotal: calculatedSubtotal,
         coupon: appliedCoupon ? appliedCoupon._id : null,
@@ -1157,7 +1199,7 @@ const verifyRazorpayPayment = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: "Payment successfully verified and order reserved.",
-      order: finalOrder,
+      order: normalizeOrderWithAllocations(finalOrder.toObject ? finalOrder.toObject() : finalOrder),
     });
   } catch (error) {
     console.error("Verify Razorpay payment error:", error);
@@ -1504,6 +1546,267 @@ const handleRazorpayWebhook = async (req, res) => {
   }
 };
 
+// ========================================================
+// 10. USER: REQUEST RETURN FOR A SPECIFIC ORDER ITEM
+// ========================================================
+const requestItemReturn = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { orderId, itemId } = req.params;
+    const { quantity = 1, reason = "Customer Return" } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(orderId) || !mongoose.Types.ObjectId.isValid(itemId)) {
+      return res.status(400).json({ success: false, message: "Invalid order or item identifier." });
+    }
+
+    const order = await Order.findOne({ _id: orderId, user: userId });
+    if (!order) {
+      return res.status(404).json({ success: false, message: "Order not found in your vault history." });
+    }
+
+    if (order.orderStatus !== "Delivered") {
+      return res.status(400).json({
+        success: false,
+        message: "Returns can only be requested for orders that have been successfully delivered.",
+      });
+    }
+
+    const item = order.items.id(itemId);
+    if (!item) {
+      return res.status(404).json({ success: false, message: "Fragrance line item not found in order." });
+    }
+
+    if (item.itemStatus === "Return Requested") {
+      return res.status(400).json({
+        success: false,
+        message: "A return request is already under review for this fragrance.",
+      });
+    }
+
+    const requestedQty = parseInt(quantity, 10);
+    const availableQty = (item.quantity || 1) - (item.returnedQuantity || 0);
+
+    if (isNaN(requestedQty) || requestedQty < 1 || requestedQty > availableQty) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid return quantity. You can return between 1 and ${availableQty} unit(s).`,
+      });
+    }
+
+    item.itemStatus = "Return Requested";
+    item.requestedReturnQuantity = requestedQty;
+    item.returnReason = String(reason || "Customer Return").trim();
+    item.returnRequestedAt = new Date();
+    item.refundStatus = "Pending";
+
+    await order.save();
+
+    const normalized = normalizeOrderWithAllocations(order.toObject ? order.toObject() : order);
+    const updatedItem = normalized.items.find((it) => it._id.toString() === itemId.toString());
+    const refundBase = calculateItemRefund(updatedItem, requestedQty).refundAmount;
+
+    return res.status(200).json({
+      success: true,
+      message: `Return request for ${requestedQty} unit(s) of "${item.name}" submitted successfully.`,
+      order: normalized,
+      estimatedRefund: refundBase,
+    });
+  } catch (error) {
+    console.error("Request item return error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to submit return request.",
+    });
+  }
+};
+
+// ========================================================
+// 11. ADMIN: APPROVE ITEM RETURN & DISBURSE REFUND
+// ========================================================
+const approveItemReturn = async (req, res) => {
+  try {
+    const { orderId, itemId } = req.params;
+    const { quantity } = req.body || {};
+
+    if (!mongoose.Types.ObjectId.isValid(orderId) || !mongoose.Types.ObjectId.isValid(itemId)) {
+      return res.status(400).json({ success: false, message: "Invalid order or item identifier." });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ success: false, message: "Order not found." });
+    }
+
+    const item = order.items.id(itemId);
+    if (!item) {
+      return res.status(404).json({ success: false, message: "Fragrance item not found in order." });
+    }
+
+    const returnQty = parseInt(quantity || item.requestedReturnQuantity || 1, 10);
+    const availableQty = (item.quantity || 1) - (item.returnedQuantity || 0);
+
+    if (isNaN(returnQty) || returnQty < 1 || returnQty > availableQty) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot approve return: requested ${returnQty} unit(s), but only ${availableQty} unit(s) eligible.`,
+      });
+    }
+
+    // Ensure item has stored allocations (reconstructed safely if historical)
+    const normalizedOrder = normalizeOrderWithAllocations(order.toObject ? order.toObject() : order);
+    const normalizedItem = normalizedOrder.items.find((it) => it._id.toString() === itemId.toString());
+
+    // Calculate authoritative refund based on discounted amount actually paid
+    const refundCalc = calculateItemRefund(normalizedItem, returnQty);
+    const refundAmount = refundCalc.refundAmount;
+
+    let refundTransactionId = null;
+
+    // Disburse online Razorpay refund if paid via Razorpay
+    if (order.paymentMethod === "Razorpay" && order.razorpayPaymentId && order.paymentStatus === "Paid") {
+      try {
+        const razorpay = getRazorpayInstance();
+        const refundResponse = await razorpay.payments.refund(order.razorpayPaymentId, {
+          amount: Math.round(refundAmount * 100), // in paise
+          notes: {
+            orderNumber: order.orderNumber,
+            productName: item.name,
+            volumeMl: item.volumeMl,
+            returnedQuantity: returnQty,
+          },
+        });
+        refundTransactionId = refundResponse?.id || `RZP-RFND-${Date.now()}`;
+      } catch (rzpErr) {
+        console.warn("Razorpay API online refund notice (recording internal ledger):", rzpErr.message);
+        refundTransactionId = `RFND-${Date.now()}`;
+      }
+    } else {
+      refundTransactionId = `COD-RFND-${Date.now()}`;
+    }
+
+    // Atomically restore perfume variant inventory stock in MongoDB
+    if (item.product && item.variantId) {
+      await Product.updateOne(
+        { _id: item.product, "variants._id": item.variantId },
+        {
+          $inc: {
+            "variants.$.stock": returnQty,
+            stock: returnQty,
+          },
+        }
+      );
+    }
+
+    // Save allocation snapshot on order item if not previously stored
+    item.allocatedCouponDiscount = normalizedItem.allocatedCouponDiscount;
+    item.discountedLineAmount = normalizedItem.discountedLineAmount;
+    item.perUnitDiscount = normalizedItem.perUnitDiscount;
+    item.discountedUnitAmount = normalizedItem.discountedUnitAmount;
+
+    item.returnedQuantity = (item.returnedQuantity || 0) + returnQty;
+    item.refundAmount = roundToPaise((item.refundAmount || 0) + refundAmount);
+    item.itemStatus = item.returnedQuantity >= item.quantity ? "Returned" : "Partially Returned";
+    item.refundStatus = "Refunded";
+    item.refundedAt = new Date();
+    item.refundTransactionId = refundTransactionId;
+    item.requestedReturnQuantity = 0;
+
+    order.totalRefundedAmount = roundToPaise((order.totalRefundedAmount || 0) + refundAmount);
+    order.hasReturns = true;
+
+    await order.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Return approved for ${returnQty} unit(s) of "${item.name}". Refund of ₹${refundAmount.toLocaleString("en-IN")} authorized.`,
+      order: normalizeOrderWithAllocations(order.toObject ? order.toObject() : order),
+      refund: {
+        refundAmount,
+        returnedQuantity: returnQty,
+        refundTransactionId,
+      },
+    });
+  } catch (error) {
+    console.error("Approve item return error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to process return approval.",
+    });
+  }
+};
+
+// ========================================================
+// 12. ADMIN: REJECT ITEM RETURN REQUEST
+// ========================================================
+const rejectItemReturn = async (req, res) => {
+  try {
+    const { orderId, itemId } = req.params;
+    const { reason = "Return request declined after inspection." } = req.body || {};
+
+    if (!mongoose.Types.ObjectId.isValid(orderId) || !mongoose.Types.ObjectId.isValid(itemId)) {
+      return res.status(400).json({ success: false, message: "Invalid order or item identifier." });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ success: false, message: "Order not found." });
+    }
+
+    const item = order.items.id(itemId);
+    if (!item) {
+      return res.status(404).json({ success: false, message: "Fragrance item not found in order." });
+    }
+
+    item.itemStatus = (item.returnedQuantity || 0) > 0 ? "Partially Returned" : "Active";
+    item.refundStatus = "Rejected";
+    item.returnReason = String(reason || "Return request declined").trim();
+    item.requestedReturnQuantity = 0;
+
+    await order.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Return request for "${item.name}" has been rejected.`,
+      order: normalizeOrderWithAllocations(order.toObject ? order.toObject() : order),
+    });
+  } catch (error) {
+    console.error("Reject item return error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to process return rejection.",
+    });
+  }
+};
+
+// ========================================================
+// 13. ADMIN: GET SINGLE ORDER DETAILS FOR INSPECTION
+// ========================================================
+const getAdminOrderDetails = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ success: false, message: "Invalid order ID." });
+    }
+
+    const order = await Order.findById(orderId).populate("user", "name email phone");
+    if (!order) {
+      return res.status(404).json({ success: false, message: "Order not found." });
+    }
+
+    const normalized = normalizeOrderWithAllocations(order.toObject ? order.toObject() : order);
+    return res.status(200).json({
+      success: true,
+      order: normalized,
+    });
+  } catch (error) {
+    console.error("Get admin order details error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve order details.",
+    });
+  }
+};
+
 export {
   createOrder,
   getMyOrders,
@@ -1514,6 +1817,10 @@ export {
   recordPaymentFailure,
   checkOrderStatus,
   handleRazorpayWebhook,
+  requestItemReturn,
+  approveItemReturn,
+  rejectItemReturn,
+  getAdminOrderDetails,
 };
 
 export default {
@@ -1526,6 +1833,10 @@ export default {
   recordPaymentFailure,
   checkOrderStatus,
   handleRazorpayWebhook,
+  requestItemReturn,
+  approveItemReturn,
+  rejectItemReturn,
+  getAdminOrderDetails,
 };
 
 

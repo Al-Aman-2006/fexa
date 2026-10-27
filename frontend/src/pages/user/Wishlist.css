@@ -914,8 +914,49 @@
   }
 
   .wishlist-grid {
-    grid-template-columns: 1fr;
-    gap: 1.25rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .wishlist-card-media {
+    height: 160px;
+    padding: 10px;
+  }
+
+  .wishlist-card-body {
+    padding: 10px 10px 12px;
+  }
+
+  .wishlist-card-title {
+    font-size: 13px;
+    margin-bottom: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .wishlist-card-desc {
+    display: none;
+  }
+
+  .wishlist-card-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding-top: 6px;
+  }
+
+  .wishlist-card-price {
+    font-size: 13.5px;
+  }
+
+  .wishlist-add-bag-btn {
+    width: 100%;
+    padding: 6px 4px;
+    font-size: 8.5px;
+    text-align: center;
+    justify-content: center;
   }
 
   .footer-inner {

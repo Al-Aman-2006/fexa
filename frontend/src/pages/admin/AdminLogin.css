@@ -174,3 +174,18 @@
   cursor: not-allowed;
   box-shadow: none;
 }
+
+@media (max-width: 480px) {
+  .admin-login-page {
+    padding: 16px 12px;
+  }
+  .admin-login-container {
+    padding: 28px 18px;
+    border-radius: 12px;
+    width: 100%;
+  }
+  .admin-login-logo {
+    font-size: 22px;
+    letter-spacing: 3px;
+  }
+}

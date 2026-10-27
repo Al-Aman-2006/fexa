@@ -69,19 +69,62 @@ function AdminSidebar({ activeTab, setActiveTab, onLogout, isMobileOpen, setIsMo
     }
   };
 
-  return (
-    <aside className={`fexa-admin-sidebar ${isMobileOpen ? "mobile-open" : ""}`}>
-      {/* BRAND HEADER */}
-      <div className="admin-sidebar-brand">
-        <div className="brand-logo-row">
-          <span className="brand-dot">●</span>
-          <span className="brand-name">F E X A</span>
-          <span className="brand-icon">⚗️</span>
-        </div>
-        <div className="brand-subtext">ADMIN TERMINAL // v2.4</div>
-      </div>
+  // Close on Escape key on mobile
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && isMobileOpen && setIsMobileOpen) {
+        setIsMobileOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isMobileOpen, setIsMobileOpen]);
 
-      <div className="admin-sidebar-divider"></div>
+  // Lock body scroll when mobile drawer is open
+  useEffect(() => {
+    if (isMobileOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobileOpen]);
+
+  return (
+    <>
+      {/* MOBILE BACKDROP OVERLAY */}
+      {isMobileOpen && (
+        <div
+          className="admin-sidebar-backdrop"
+          onClick={() => setIsMobileOpen && setIsMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside className={`fexa-admin-sidebar ${isMobileOpen ? "mobile-open" : ""}`}>
+        {/* BRAND HEADER & CLOSE BUTTON */}
+        <div className="admin-sidebar-brand">
+          <div className="brand-logo-row">
+            <span className="brand-dot">●</span>
+            <span className="brand-name">F E X A</span>
+            <span className="brand-icon">⚗️</span>
+            {isMobileOpen && (
+              <button
+                type="button"
+                className="admin-sidebar-close-btn"
+                onClick={() => setIsMobileOpen && setIsMobileOpen(false)}
+                aria-label="Close admin menu"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          <div className="brand-subtext">ADMIN TERMINAL // v2.4</div>
+        </div>
+
+        <div className="admin-sidebar-divider"></div>
 
       {/* NAVIGATION MENU */}
       <nav className="admin-sidebar-nav">
@@ -181,6 +224,7 @@ function AdminSidebar({ activeTab, setActiveTab, onLogout, isMobileOpen, setIsMo
         </button>
       </div>
     </aside>
+    </>
   );
 }
 

@@ -18,6 +18,9 @@ import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
 import Profile from "./pages/user/Profile";
 import Collections from "./pages/user/Collections";
+import MenCollection from "./pages/user/MenCollection";
+import WomenCollection from "./pages/user/WomenCollection";
+import UnisexCollection from "./pages/user/UnisexCollection";
 import ProductDetails from "./pages/user/ProductDetails";
 import Cart from "./pages/user/Cart";
 import Checkout from "./pages/user/Checkout";
@@ -61,9 +64,12 @@ function App() {
                 {/* User Verify OTP page */}
                 <Route path="/verify-otp" element={<PublicRoute><VerifyOtp /></PublicRoute>} />
 
-                {/* Public Collections Route */}
+                {/* Public Collections Routes */}
                 <Route path="/collections" element={<Collections />} />
-                <Route path="/shop" element={<Collections />} />
+                <Route path="/collections/men" element={<MenCollection />} />
+                <Route path="/collections/women" element={<WomenCollection />} />
+                <Route path="/collections/unisex" element={<UnisexCollection />} />
+                <Route path="/shop" element={<Navigate to="/collections" replace />} />
 
                 {/* Public Product Details Route */}
                 <Route path="/products/:id" element={<ProductDetails />} />
@@ -75,22 +81,14 @@ function App() {
                 {/* Checkout Route */}
                 <Route path="/checkout" element={<Checkout />} />
 
-                {/* About Page Route */}
-                <Route path="/about" element={<About />} />
+                {/* Central Brand Landing Page Routes */}
+                <Route path="/" element={<Home />} />
+                <Route path="/home" element={<Home />} />
 
-                {/* Contact Page Routes */}
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/contact-us" element={<Navigate to="/contact" replace />} />
-
-              {/* User Protected Routes */}
-              <Route 
-                path="/home" 
-                element={
-                  <ProtectedRoute>
-                    <Home />
-                  </ProtectedRoute>
-                } 
-              />
+                {/* Legacy About & Contact redirects to Home sections */}
+                <Route path="/about" element={<Navigate to="/home#about-section" replace />} />
+                <Route path="/contact" element={<Navigate to="/home#contact-section" replace />} />
+                <Route path="/contact-us" element={<Navigate to="/home#contact-section" replace />} />
 
               <Route 
                 path="/profile"
@@ -217,7 +215,7 @@ function App() {
               <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
 
               {/* Default page */}
-              <Route path="*" element={<Navigate to="/login" replace />} />
+              <Route path="*" element={<Navigate to="/home" replace />} />
             </Routes>
             </ErrorBoundary>
           </AdminAuthProvider>

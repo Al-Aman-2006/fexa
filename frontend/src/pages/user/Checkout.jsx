@@ -647,7 +647,21 @@ function Checkout() {
                   </div>
                   <div className="confirmed-item-pricing">
                     <span>{formatPrice(it.unitPrice)} × {it.quantity}</span>
-                    <strong>{formatPrice(it.lineTotal)}</strong>
+                    {it.allocatedCouponDiscount > 0 ? (
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", marginTop: "2px" }}>
+                        <span style={{ textDecoration: "line-through", color: "#9ca3af", fontSize: "0.75rem" }}>
+                          {formatPrice(it.originalLineAmount || it.lineTotal)}
+                        </span>
+                        <span style={{ color: "#a855f7", fontSize: "0.72rem", fontWeight: 700 }}>
+                          -{formatPrice(it.allocatedCouponDiscount)}
+                        </span>
+                        <strong style={{ color: "#10b981", fontSize: "0.95rem" }}>
+                          {formatPrice(it.discountedLineAmount || (it.lineTotal - it.allocatedCouponDiscount))}
+                        </strong>
+                      </div>
+                    ) : (
+                      <strong>{formatPrice(it.lineTotal)}</strong>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1272,28 +1286,59 @@ function Checkout() {
 
               <div className="checkout-items-preview">
                 {cart.items && cart.items.length > 0 ? (
-                  cart.items.map((item) => (
-                    <div key={item._id || `${item.productId}-${item.variantId}`} className="chk-preview-item">
-                      <div className="chk-preview-media">
-                        {item.primaryImage ? (
-                          <img src={getImageUrl(item.primaryImage)} alt={item.name} />
-                        ) : (
-                          <span>FEXA</span>
-                        )}
-                        <span className="chk-qty-badge">{item.quantity}</span>
-                      </div>
-                      <div className="chk-preview-details">
-                        <h4>{item.name}</h4>
-                        <small>
-                          {item.brand || "FEXA"} • Size: {item.volumeMl ? `${item.volumeMl} ml` : "100 ml"}
-                        </small>
-                        <div className="chk-pricing-line">
-                          <span className="chk-unit-sub">{formatPrice(item.price)} × {item.quantity}</span>
-                          <span className="chk-price">{formatPrice(item.itemTotal)}</span>
+                  cart.items.map((item) => {
+                    const alloc = appliedCoupon?.itemAllocations?.find(
+                      (a) =>
+                        (item.variantId && String(a.variantId) === String(item.variantId)) ||
+                        (item.productId && String(a.productId) === String(item.productId)) ||
+                        (item._id && String(a._id) === String(item._id))
+                    );
+                    const lineDiscount = alloc
+                      ? alloc.allocatedCouponDiscount
+                      : appliedCoupon && discountAmount > 0 && subtotal > 0
+                      ? Math.round((item.itemTotal * discountAmount) / subtotal)
+                      : 0;
+                    const netLineAmount = alloc
+                      ? alloc.discountedLineAmount
+                      : item.itemTotal - lineDiscount;
+
+                    return (
+                      <div key={item._id || `${item.productId}-${item.variantId}`} className="chk-preview-item">
+                        <div className="chk-preview-media">
+                          {item.primaryImage ? (
+                            <img src={getImageUrl(item.primaryImage)} alt={item.name} />
+                          ) : (
+                            <span>FEXA</span>
+                          )}
+                          <span className="chk-qty-badge">{item.quantity}</span>
+                        </div>
+                        <div className="chk-preview-details">
+                          <h4>{item.name}</h4>
+                          <small>
+                            {item.brand || "FEXA"} • Size: {item.volumeMl ? `${item.volumeMl} ml` : "100 ml"}
+                          </small>
+                          <div className="chk-pricing-line">
+                            <span className="chk-unit-sub">{formatPrice(item.price)} × {item.quantity}</span>
+                            {lineDiscount > 0 ? (
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                <span style={{ textDecoration: "line-through", color: "#9ca3af", fontSize: "0.78rem" }}>
+                                  {formatPrice(item.itemTotal)}
+                                </span>
+                                <span style={{ background: "rgba(168, 85, 247, 0.12)", color: "#a855f7", fontSize: "0.72rem", padding: "1px 6px", borderRadius: "4px", fontWeight: 700 }}>
+                                  -{formatPrice(lineDiscount)}
+                                </span>
+                                <span className="chk-price" style={{ color: "#10b981" }}>
+                                  {formatPrice(netLineAmount)}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="chk-price">{formatPrice(item.itemTotal)}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <p className="chk-empty-note">No items currently in your shopping bag.</p>
                 )}

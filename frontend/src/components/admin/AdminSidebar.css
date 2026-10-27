@@ -3,23 +3,31 @@
 ======================================== */
 
 .fexa-admin-sidebar {
-  width: 250px;
-  min-width: 250px;
+  width: 280px;
+  max-width: 85vw;
+  min-width: 0;
   height: 100vh;
   background: #09070c;
-  border-right: 1px solid rgba(161, 132, 189, 0.18);
+  border-right: 1px solid rgba(161, 132, 189, 0.28);
   display: flex;
   flex-direction: column;
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 200;
+  z-index: 250;
   box-sizing: border-box;
-  padding: 24px 16px;
+  padding: 20px 16px;
   color: #f4effa;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(161, 132, 189, 0.3) transparent;
+  transform: translateX(-100%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 12px 0 35px rgba(0, 0, 0, 0.75);
+}
+
+.fexa-admin-sidebar.mobile-open {
+  transform: translateX(0);
 }
 
 /* BRAND HEADER */
@@ -291,14 +299,67 @@
   color: #bfa8d8;
 }
 
-/* RESPONSIVE MOBILE OVERLAY */
-@media (max-width: 1024px) {
-  .fexa-admin-sidebar {
-    transform: translateX(-100%);
-    transition: transform 0.3s ease;
+/* MOBILE DRAWER & BACKDROP (DEFAULT BASE) */
+.admin-sidebar-backdrop {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(4, 3, 6, 0.78);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 240;
+  animation: sidebarBackdropFade 0.25s ease;
+}
+
+@keyframes sidebarBackdropFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.admin-sidebar-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 8px;
+  background: rgba(161, 132, 189, 0.12);
+  border: 1px solid rgba(161, 132, 189, 0.28);
+  border-radius: 6px;
+  color: #d8c4eb;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.admin-sidebar-close-btn:hover {
+  background: rgba(220, 53, 69, 0.2);
+  border-color: #dc3545;
+  color: #ffffff;
+}
+
+/* DESKTOP PERMANENT SIDEBAR ENHANCEMENT (>= 1025px) */
+@media (min-width: 1025px) {
+  .admin-sidebar-backdrop {
+    display: none !important;
   }
 
-  .fexa-admin-sidebar.mobile-open {
-    transform: translateX(0);
+  .admin-sidebar-close-btn {
+    display: none !important;
+  }
+
+  .fexa-admin-sidebar {
+    width: 250px;
+    min-width: 250px;
+    max-width: 250px;
+    transform: none !important;
+    transition: none;
+    box-shadow: none;
+    z-index: 200;
+    padding: 24px 16px;
+    border-right: 1px solid rgba(161, 132, 189, 0.18);
   }
 }

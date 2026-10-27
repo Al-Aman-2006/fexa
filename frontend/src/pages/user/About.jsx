@@ -22,7 +22,7 @@ function About() {
   }, []);
 
   const handleCategoryNavigate = (cat) => {
-    navigate(`/collections?category=${cat.toLowerCase()}`);
+    navigate(`/collections/${cat.toLowerCase()}`);
   };
 
   const handleCollectionsNavigate = () => {
