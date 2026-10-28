@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Cart from "../models/cart.model.js";
 import Product from "../models/product.model.js";
 import Category from "../models/category.model.js";
+import { getActiveValidOffers, findBestOfferForProduct, roundToPaise } from "../utils/offerCalculator.js";
 
 // Format cart helper: cleans up deleted products, computes live subtotal and item count
 const formatCartResponse = async (cartDoc) => {
@@ -29,9 +30,14 @@ const formatCartResponse = async (cartDoc) => {
     categoryStatusMap[c.name] = c.isActive;
   });
 
+  // Retrieve active valid offers
+  const activeOffers = await getActiveValidOffers();
+
   const formattedItems = [];
   const validItemsToKeep = [];
   let subtotal = 0;
+  let originalSubtotal = 0;
+  let totalOfferDiscount = 0;
   let totalItems = 0;
   let hasModifiedCart = false;
 
@@ -91,9 +97,20 @@ const formatCartResponse = async (cartDoc) => {
 
     const qty = Math.max(1, Number(item.quantity) || 1);
 
+    // Calculate applicable automatic offer for this product & variant
+    const originalUnitPrice = roundToPaise(livePrice);
+    const bestOffer = findBestOfferForProduct(prod, activeOffers, originalUnitPrice);
+    const offerPrice = bestOffer.offerPrice;
+    const unitOfferDiscount = bestOffer.discountAmount;
+    const lineOfferDiscount = roundToPaise(unitOfferDiscount * qty);
+    const lineTotal = roundToPaise(offerPrice * qty);
+    const originalLineTotal = roundToPaise(originalUnitPrice * qty);
+
     // If active and available, add to subtotal and active count
     if (!isInactive && !isOutOfStock) {
-      subtotal += livePrice * qty;
+      subtotal += lineTotal;
+      originalSubtotal += originalLineTotal;
+      totalOfferDiscount += lineOfferDiscount;
       totalItems += qty;
     }
 
@@ -106,13 +123,27 @@ const formatCartResponse = async (cartDoc) => {
       slug: prod.slug,
       brand: prod.brand || "FEXA",
       category: prod.category,
-      price: livePrice,
+      originalPrice: originalUnitPrice,
+      price: offerPrice,
+      unitPrice: offerPrice,
+      offerDiscount: unitOfferDiscount,
+      totalOfferDiscount: lineOfferDiscount,
+      appliedOffer: bestOffer.offer
+        ? {
+            _id: bestOffer.offer._id,
+            name: bestOffer.offer.name,
+            discountType: bestOffer.offer.discountType,
+            discountValue: bestOffer.offer.discountValue,
+            discountPercentage: bestOffer.discountPercentage,
+          }
+        : null,
       compareAtPrice: liveOriginalPrice,
       images: prod.images || [],
       primaryImage: prod.images && prod.images.length > 0 ? prod.images[0] : null,
       stock: liveStock,
       quantity: qty,
-      itemTotal: livePrice * qty,
+      itemTotal: lineTotal,
+      originalItemTotal: originalLineTotal,
       isInactive,
       isCategoryInactive,
       isOutOfStock,
@@ -135,7 +166,9 @@ const formatCartResponse = async (cartDoc) => {
   return {
     _id: cartDoc._id,
     items: formattedItems,
-    subtotal,
+    subtotal: roundToPaise(subtotal),
+    originalSubtotal: roundToPaise(originalSubtotal),
+    totalOfferDiscount: roundToPaise(totalOfferDiscount),
     totalItems,
     freeShippingThreshold: FREE_SHIPPING_THRESHOLD,
     qualifiesForFreeShipping,

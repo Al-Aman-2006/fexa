@@ -42,6 +42,28 @@ const orderItemSchema = new mongoose.Schema(
       type: Number,
       default: null,
     },
+    appliedOffer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Offer",
+      default: null,
+    },
+    offerName: {
+      type: String,
+      default: null,
+    },
+    offerDiscountPercentage: {
+      type: Number,
+      default: null,
+    },
+    offerDiscount: {
+      type: Number,
+      default: 0,
+      min: [0, "Offer discount cannot be negative"],
+    },
+    offerAdjustedUnitPrice: {
+      type: Number,
+      default: null,
+    },
     lineTotal: {
       type: Number,
       required: [true, "Line total is required"],
@@ -158,6 +180,16 @@ const orderSchema = new mongoose.Schema(
     subtotal: {
       type: Number,
       required: true,
+      min: 0,
+    },
+    originalSubtotal: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+    totalOfferDiscount: {
+      type: Number,
+      default: 0,
       min: 0,
     },
     coupon: {

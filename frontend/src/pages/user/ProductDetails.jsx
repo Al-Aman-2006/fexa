@@ -478,13 +478,33 @@ function ProductDetails() {
         ) || product.variants[0]
       : null;
 
-  const currentPrice = selectedVariant
+  const baseSellingPrice = selectedVariant
     ? Number(selectedVariant.sellingPrice)
-    : Number(product?.price || 0);
+    : Number(product?.originalSellingPrice !== undefined ? product.originalSellingPrice : product?.price || 0);
 
-  const currentOriginalPrice = selectedVariant
+  const currentPrice = selectedVariant
+    ? (selectedVariant.offerPrice !== undefined && selectedVariant.offerPrice !== null
+        ? Number(selectedVariant.offerPrice)
+        : Number(selectedVariant.sellingPrice))
+    : (product?.effectiveOfferPrice !== undefined
+        ? Number(product.effectiveOfferPrice)
+        : product?.offerPrice !== undefined
+        ? Number(product.offerPrice)
+        : Number(product?.price || 0));
+
+  const currentOriginalPrice = currentPrice < baseSellingPrice
+    ? baseSellingPrice
+    : selectedVariant
     ? (selectedVariant.originalPrice ? Number(selectedVariant.originalPrice) : null)
     : (product?.compareAtPrice ? Number(product.compareAtPrice) : null);
+
+  const activeOffer = selectedVariant?.appliedOffer || product?.appliedOffer || null;
+  const offerDiscountPct =
+    selectedVariant?.offerDiscountPercentage ||
+    activeOffer?.discountPercentage ||
+    (currentOriginalPrice > currentPrice
+      ? Math.round(((currentOriginalPrice - currentPrice) / currentOriginalPrice) * 100)
+      : null);
 
   const currentStock = selectedVariant
     ? Number(selectedVariant.stock)
@@ -494,7 +514,7 @@ function ProductDetails() {
 
   const isOutOfStock = !isVariantAvailable || currentStock === 0 || product?.status === "Out of Stock";
 
-  const discountBadge = calculateDiscount(currentPrice, currentOriginalPrice);
+  const discountBadge = offerDiscountPct ? `${offerDiscountPct}% OFF` : calculateDiscount(currentPrice, currentOriginalPrice);
   const isSavedInWishlist = product ? isWishlisted(product._id) : false;
 
   const imagesList = product?.images && Array.isArray(product.images) && product.images.length > 0
@@ -846,6 +866,14 @@ function ProductDetails() {
                     <span className="discount-badge-tag">{discountBadge}</span>
                   )}
                 </div>
+                {activeOffer && activeOffer.name && (
+                  <div className="active-offer-callout-pill">
+                    <span className="offer-pill-icon">🏷️</span>
+                    <span className="offer-pill-text">
+                      <strong>Offer Applied:</strong> {activeOffer.name}
+                    </span>
+                  </div>
+                )}
                 <div className="tax-inclusive-label">
                   INCLUSIVE OF ALL TAXES • COMPLIMENTARY COURIER ON ELIGIBLE ORDERS
                 </div>
@@ -869,6 +897,10 @@ function ProductDetails() {
                         selectedVariant._id.toString() === variant._id.toString();
                       const isUnavailable = variant.isAvailable === false;
                       const isZeroStock = variant.stock === 0;
+                      const variantDisplayPrice =
+                        variant.offerPrice !== undefined && variant.offerPrice !== null
+                          ? variant.offerPrice
+                          : variant.sellingPrice;
 
                       return (
                         <button
@@ -887,11 +919,11 @@ function ProductDetails() {
                           title={
                             isUnavailable
                               ? "Size currently unavailable"
-                              : `${variant.volumeMl} ml — ${formatPrice(variant.sellingPrice)}`
+                              : `${variant.volumeMl} ml — ${formatPrice(variantDisplayPrice)}`
                           }
                         >
                           <span className="size-chip-volume">{variant.volumeMl} ml</span>
-                          <span className="size-chip-price">{formatPrice(variant.sellingPrice)}</span>
+                          <span className="size-chip-price">{formatPrice(variantDisplayPrice)}</span>
                           {isUnavailable ? (
                             <span className="size-chip-badge">Unavailable</span>
                           ) : isZeroStock ? (

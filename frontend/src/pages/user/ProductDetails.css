@@ -752,6 +752,23 @@
   border-radius: 4px;
 }
 
+.active-offer-callout-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  border-radius: 6px;
+  padding: 6px 12px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: #5b21b6;
+}
+
+.active-offer-callout-pill .offer-pill-icon {
+  font-size: 14px;
+}
+
 .tax-inclusive-label {
   font-size: 0.68rem;
   letter-spacing: 0.1em;

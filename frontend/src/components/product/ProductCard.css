@@ -111,6 +111,18 @@
   border-left: 2px solid #7c9973;
 }
 
+.card-offer-tag {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);
+  white-space: nowrap;
+}
+
 .card-stock-tag {
   font-size: 8px;
   font-weight: 800;

@@ -13,6 +13,7 @@ import {
   normalizeOrderWithAllocations,
   roundToPaise,
 } from "../utils/couponAllocation.js";
+import { getActiveValidOffers, findBestOfferForProduct } from "../utils/offerCalculator.js";
 
 // ========================================================
 // HELPER: Validate and calculate single coupon for order
@@ -157,8 +158,11 @@ const createOrder = async (req, res) => {
       });
     }
 
+    const activeOffers = await getActiveValidOffers();
     const orderItems = [];
     let calculatedSubtotal = 0;
+    let originalSubtotal = 0;
+    let totalOfferDiscount = 0;
 
     // 2. Validate every item against live MongoDB product & variant records
     for (const item of sourceItems) {
@@ -227,12 +231,18 @@ const createOrder = async (req, res) => {
         });
       }
 
-      // Live MongoDB price calculation
-      const unitPrice = Number(variant.sellingPrice);
-      const originalPrice = variant.originalPrice ? Number(variant.originalPrice) : null;
-      const lineTotal = unitPrice * qty;
+      // Live MongoDB price calculation with automatic offer discount
+      const basePrice = roundToPaise(variant.sellingPrice);
+      const originalPrice = basePrice;
+      const bestOffer = findBestOfferForProduct(product, activeOffers, basePrice);
+      const unitPrice = bestOffer.offerPrice;
+      const unitOfferDiscount = bestOffer.discountAmount;
+      const lineOfferDiscount = roundToPaise(unitOfferDiscount * qty);
+      const lineTotal = roundToPaise(unitPrice * qty);
 
       calculatedSubtotal += lineTotal;
+      originalSubtotal += roundToPaise(originalPrice * qty);
+      totalOfferDiscount += lineOfferDiscount;
 
       orderItems.push({
         product: product._id,
@@ -244,6 +254,11 @@ const createOrder = async (req, res) => {
         quantity: qty,
         unitPrice,
         originalPrice,
+        appliedOffer: bestOffer.offer ? bestOffer.offer._id : null,
+        offerName: bestOffer.offer ? bestOffer.offer.name : null,
+        offerDiscountPercentage: bestOffer.discountPercentage || null,
+        offerDiscount: unitOfferDiscount,
+        offerAdjustedUnitPrice: unitPrice,
         lineTotal,
         image: product.images && product.images.length > 0 ? product.images[0] : null,
       });
@@ -357,6 +372,8 @@ const createOrder = async (req, res) => {
       order.items = finalOrderItems;
       order.shippingAddress = shippingAddressSnapshot;
       order.subtotal = calculatedSubtotal;
+      order.originalSubtotal = originalSubtotal;
+      order.totalOfferDiscount = totalOfferDiscount;
       order.coupon = appliedCoupon ? appliedCoupon._id : (order.coupon || null);
       order.couponCode = appliedCoupon ? appliedCoupon.code : (order.couponCode || null);
       order.couponName = appliedCoupon ? appliedCoupon.name : (order.couponName || null);
@@ -381,6 +398,8 @@ const createOrder = async (req, res) => {
         items: finalOrderItems,
         shippingAddress: shippingAddressSnapshot,
         subtotal: calculatedSubtotal,
+        originalSubtotal,
+        totalOfferDiscount,
         coupon: appliedCoupon ? appliedCoupon._id : null,
         couponCode: appliedCoupon ? appliedCoupon.code : null,
         couponName: appliedCoupon ? appliedCoupon.name : null,
@@ -613,8 +632,11 @@ const createRazorpayOrder = async (req, res) => {
       });
     }
 
+    const activeOffers = await getActiveValidOffers();
     const orderItems = [];
     let calculatedSubtotal = 0;
+    let originalSubtotal = 0;
+    let totalOfferDiscount = 0;
 
     // 3. Validate stock & live price
     for (const item of sourceItems) {
@@ -682,11 +704,18 @@ const createRazorpayOrder = async (req, res) => {
         });
       }
 
-      const unitPrice = Number(variant.sellingPrice);
-      const originalPrice = variant.originalPrice ? Number(variant.originalPrice) : null;
-      const lineTotal = unitPrice * qty;
+      // Live MongoDB price calculation with automatic offer discount
+      const basePrice = roundToPaise(variant.sellingPrice);
+      const originalPrice = basePrice;
+      const bestOffer = findBestOfferForProduct(product, activeOffers, basePrice);
+      const unitPrice = bestOffer.offerPrice;
+      const unitOfferDiscount = bestOffer.discountAmount;
+      const lineOfferDiscount = roundToPaise(unitOfferDiscount * qty);
+      const lineTotal = roundToPaise(unitPrice * qty);
 
       calculatedSubtotal += lineTotal;
+      originalSubtotal += roundToPaise(originalPrice * qty);
+      totalOfferDiscount += lineOfferDiscount;
 
       orderItems.push({
         product: product._id,
@@ -698,6 +727,11 @@ const createRazorpayOrder = async (req, res) => {
         quantity: qty,
         unitPrice,
         originalPrice,
+        appliedOffer: bestOffer.offer ? bestOffer.offer._id : null,
+        offerName: bestOffer.offer ? bestOffer.offer.name : null,
+        offerDiscountPercentage: bestOffer.discountPercentage || null,
+        offerDiscount: unitOfferDiscount,
+        offerAdjustedUnitPrice: unitPrice,
         lineTotal,
         image: product.images && product.images.length > 0 ? product.images[0] : null,
       });
@@ -755,6 +789,8 @@ const createRazorpayOrder = async (req, res) => {
         internalOrder.items = finalOrderItems;
         internalOrder.shippingAddress = shippingAddressSnapshot;
         internalOrder.subtotal = calculatedSubtotal;
+        internalOrder.originalSubtotal = originalSubtotal;
+        internalOrder.totalOfferDiscount = totalOfferDiscount;
         internalOrder.coupon = appliedCoupon ? appliedCoupon._id : (internalOrder.coupon || null);
         internalOrder.couponCode = appliedCoupon ? appliedCoupon.code : (internalOrder.couponCode || null);
         internalOrder.couponName = appliedCoupon ? appliedCoupon.name : (internalOrder.couponName || null);
@@ -781,6 +817,8 @@ const createRazorpayOrder = async (req, res) => {
         items: finalOrderItems,
         shippingAddress: shippingAddressSnapshot,
         subtotal: calculatedSubtotal,
+        originalSubtotal,
+        totalOfferDiscount,
         coupon: appliedCoupon ? appliedCoupon._id : null,
         couponCode: appliedCoupon ? appliedCoupon.code : null,
         couponName: appliedCoupon ? appliedCoupon.name : null,
@@ -980,8 +1018,11 @@ const verifyRazorpayPayment = async (req, res) => {
       });
     }
 
+    const activeOffers = await getActiveValidOffers();
     const orderItems = [];
     let calculatedSubtotal = 0;
+    let originalSubtotal = 0;
+    let totalOfferDiscount = 0;
 
     for (const item of sourceItems) {
       const prodId = item.productId || item.product;
@@ -1026,11 +1067,18 @@ const verifyRazorpayPayment = async (req, res) => {
         });
       }
 
-      const unitPrice = Number(variant.sellingPrice);
-      const originalPrice = variant.originalPrice ? Number(variant.originalPrice) : null;
-      const lineTotal = unitPrice * qty;
+      // Live MongoDB price calculation with automatic offer discount
+      const basePrice = roundToPaise(variant.sellingPrice);
+      const originalPrice = basePrice;
+      const bestOffer = findBestOfferForProduct(product, activeOffers, basePrice);
+      const unitPrice = bestOffer.offerPrice;
+      const unitOfferDiscount = bestOffer.discountAmount;
+      const lineOfferDiscount = roundToPaise(unitOfferDiscount * qty);
+      const lineTotal = roundToPaise(unitPrice * qty);
 
       calculatedSubtotal += lineTotal;
+      originalSubtotal += roundToPaise(originalPrice * qty);
+      totalOfferDiscount += lineOfferDiscount;
 
       orderItems.push({
         product: product._id,
@@ -1042,6 +1090,11 @@ const verifyRazorpayPayment = async (req, res) => {
         quantity: qty,
         unitPrice,
         originalPrice,
+        appliedOffer: bestOffer.offer ? bestOffer.offer._id : null,
+        offerName: bestOffer.offer ? bestOffer.offer.name : null,
+        offerDiscountPercentage: bestOffer.discountPercentage || null,
+        offerDiscount: unitOfferDiscount,
+        offerAdjustedUnitPrice: unitPrice,
         lineTotal,
         image: product.images && product.images.length > 0 ? product.images[0] : null,
       });
@@ -1131,6 +1184,8 @@ const verifyRazorpayPayment = async (req, res) => {
       finalOrder.items = finalOrderItems;
       finalOrder.shippingAddress = shippingAddressSnapshot;
       finalOrder.subtotal = calculatedSubtotal;
+      finalOrder.originalSubtotal = originalSubtotal;
+      finalOrder.totalOfferDiscount = totalOfferDiscount;
       finalOrder.coupon = appliedCoupon ? appliedCoupon._id : (targetOrder ? targetOrder.coupon : null);
       finalOrder.couponCode = appliedCoupon ? appliedCoupon.code : (targetOrder ? targetOrder.couponCode : null);
       finalOrder.couponName = appliedCoupon ? appliedCoupon.name : (targetOrder ? targetOrder.couponName : null);
@@ -1156,6 +1211,8 @@ const verifyRazorpayPayment = async (req, res) => {
         items: finalOrderItems,
         shippingAddress: shippingAddressSnapshot,
         subtotal: calculatedSubtotal,
+        originalSubtotal,
+        totalOfferDiscount,
         coupon: appliedCoupon ? appliedCoupon._id : null,
         couponCode: appliedCoupon ? appliedCoupon.code : null,
         couponName: appliedCoupon ? appliedCoupon.name : null,

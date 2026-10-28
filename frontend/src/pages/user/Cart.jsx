@@ -193,6 +193,35 @@ function Cart() {
                           {/* Unit Price */}
                           <td className="td-price">
                             <span className="price-val">{formatPrice(item.price)}</span>
+                            {item.originalPrice && item.originalPrice > item.price && (
+                              <span
+                                style={{
+                                  textDecoration: "line-through",
+                                  color: "#9c91ad",
+                                  fontSize: "11px",
+                                  display: "block",
+                                  marginTop: "2px",
+                                }}
+                              >
+                                {formatPrice(item.originalPrice)}
+                              </span>
+                            )}
+                            {item.appliedOffer && (
+                              <span
+                                style={{
+                                  fontSize: "10px",
+                                  color: "#7c3aed",
+                                  fontWeight: 700,
+                                  display: "inline-block",
+                                  background: "rgba(124, 58, 237, 0.08)",
+                                  padding: "2px 6px",
+                                  borderRadius: "4px",
+                                  marginTop: "4px",
+                                }}
+                              >
+                                🏷️ {item.appliedOffer.name || "Offer Applied"}
+                              </span>
+                            )}
                           </td>
 
                           {/* Quantity Widget */}
@@ -277,6 +306,27 @@ function Cart() {
                 <h2 className="summary-card-title">ORDER SUMMARY</h2>
 
                 <div className="summary-breakdown">
+                  {cart.totalOfferDiscount > 0 && (
+                    <>
+                      <div className="breakdown-row">
+                        <span>Original Subtotal</span>
+                        <span
+                          className="breakdown-num"
+                          style={{ textDecoration: "line-through", color: "#9c91ad" }}
+                        >
+                          {formatPrice(cart.originalSubtotal)}
+                        </span>
+                      </div>
+                      <div
+                        className="breakdown-row"
+                        style={{ color: "#10b981", fontWeight: 600 }}
+                      >
+                        <span>Automatic Offer Savings</span>
+                        <span className="breakdown-num">- {formatPrice(cart.totalOfferDiscount)}</span>
+                      </div>
+                    </>
+                  )}
+
                   <div className="breakdown-row">
                     <span>Subtotal ({cart.totalItems} items)</span>
                     <span className="breakdown-num">{formatPrice(cart.subtotal)}</span>

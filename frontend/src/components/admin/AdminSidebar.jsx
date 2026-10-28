@@ -38,7 +38,7 @@ function AdminSidebar({ activeTab, setActiveTab, onLogout, isMobileOpen, setIsMo
     },
     { id: "orders", label: "Orders", path: "/admin/dashboard", icon: "📦", badge: "LIVE" },
     { id: "reviews", label: "Reviews", path: "/admin/reviews", icon: "⭐" },
-    { id: "offers", label: "Offers", path: "/admin/dashboard", icon: "🏷️" },
+    { id: "offers", label: "Offers", path: "/admin/offers", icon: "🏷️" },
     { id: "collections", label: "Collections", path: "/admin/dashboard", icon: "🗃️" },
     { id: "coupons", label: "Coupons", path: "/admin/coupons", icon: "🎟️" },
     { id: "returns", label: "Returns", path: "/admin/dashboard", icon: "🔄" },

@@ -32,6 +32,7 @@ import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
 import AdminCoupons from "./pages/admin/AdminCoupons";
+import AdminOffers from "./pages/admin/AdminOffers";
 import AdminSales from "./pages/admin/AdminSales";
 import AdminCategoryPage from "./pages/admin/AdminCategoryPage";
 import AdminReviews from "./pages/admin/AdminReviews";
@@ -149,6 +150,15 @@ function App() {
                 element={
                   <AdminProtectedRoute>
                     <AdminCoupons />
+                  </AdminProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/admin/offers"
+                element={
+                  <AdminProtectedRoute>
+                    <AdminOffers />
                   </AdminProtectedRoute>
                 }
               />

@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Product from "../models/product.model.js";
 import Category from "../models/category.model.js";
 import Review from "../models/review.model.js";
+import { getActiveValidOffers, applyOffersToProduct } from "../utils/offerCalculator.js";
 
 // Normalizer for category matching (Men, Women, Unisex)
 const normalizeCategory = (cat) => {
@@ -225,7 +226,11 @@ const getPublicProducts = async (req, res) => {
     const facet = aggregateResult[0] || { metadata: [], data: [] };
     const totalProducts = facet.metadata && facet.metadata.length > 0 ? facet.metadata[0].total : 0;
     const totalPages = Math.ceil(totalProducts / limit) || 1;
-    const products = facet.data || [];
+    const rawProducts = facet.data || [];
+
+    // Retrieve active valid offers and calculate real-time promotional pricing
+    const activeOffers = await getActiveValidOffers();
+    const products = rawProducts.map((p) => applyOffersToProduct(p, activeOffers));
 
     return res.status(200).json({
       success: true,
@@ -296,6 +301,13 @@ const getPublicProductCollections = async (req, res) => {
 
     const totalCount = menCount + womenCount + unisexCount;
 
+    // Retrieve active valid offers and calculate real-time promotional pricing
+    const activeOffers = await getActiveValidOffers();
+
+    const enrichedMenProducts = (menProducts || []).map((p) => applyOffersToProduct(p, activeOffers));
+    const enrichedWomenProducts = (womenProducts || []).map((p) => applyOffersToProduct(p, activeOffers));
+    const enrichedUnisexProducts = (unisexProducts || []).map((p) => applyOffersToProduct(p, activeOffers));
+
     return res.status(200).json({
       success: true,
       collections: {
@@ -303,21 +315,21 @@ const getPublicProductCollections = async (req, res) => {
           title: "Men's Collection",
           subtitle: "Defined by Presence. Rich smoked woods, amber resins, and Italian leather.",
           count: menCount,
-          products: menProducts,
+          products: enrichedMenProducts,
           isActive: categoryStatusMap.Men !== false,
         },
         women: {
           title: "Women's Collection",
           subtitle: "Crafted for Elegance. Radiant florals, Grasse rose, and powdery white amber.",
           count: womenCount,
-          products: womenProducts,
+          products: enrichedWomenProducts,
           isActive: categoryStatusMap.Women !== false,
         },
         unisex: {
           title: "Unisex Collection",
           subtitle: "Fragrance Without Boundaries. Crisp bergamot, mineral sea salt, and velvet cashmeran.",
           count: unisexCount,
-          products: unisexProducts,
+          products: enrichedUnisexProducts,
           isActive: categoryStatusMap.Unisex !== false,
         },
       },
@@ -390,9 +402,13 @@ const getPublicProductById = async (req, res) => {
     // 4. Retrieve approved review stats
     const ratingSummary = await Review.getProductRatingSummary(product._id);
 
+    // Retrieve active valid offers and calculate real-time promotional pricing
+    const activeOffers = await getActiveValidOffers();
+    const enrichedProduct = applyOffersToProduct(product, activeOffers);
+
     return res.status(200).json({
       success: true,
-      product,
+      product: enrichedProduct,
       ratingSummary,
     });
   } catch (error) {

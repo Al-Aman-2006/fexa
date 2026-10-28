@@ -20,6 +20,7 @@ import couponRoutes from "./routes/coupon.routes.js";
 import contactRoutes from "./routes/contact.routes.js";
 import reviewRoutes from "./routes/review.routes.js";
 import adminReviewRoutes from "./routes/adminReview.routes.js";
+import adminOfferRoutes from "./routes/adminOffer.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,6 +46,7 @@ app.use("/api/admin/users", adminUserRoutes);
 app.use("/api/admin/products", adminProductRoutes);
 app.use("/api/admin/categories", adminCategoryRoutes);
 app.use("/api/admin/coupons", adminCouponRoutes);
+app.use("/api/admin/offers", adminOfferRoutes);
 app.use("/api/admin/sales", adminSalesRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);

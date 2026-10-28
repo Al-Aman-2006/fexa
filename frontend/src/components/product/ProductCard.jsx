@@ -28,7 +28,7 @@ export default function ProductCard({ product }) {
 
   const isOutOfStock = !hasPurchasableStock || product.status === "Out of Stock";
 
-  // Calculate representative starting price
+  // Calculate representative starting price and applicable offers
   const formatPrice = (val) => {
     if (val === undefined || val === null) return "₹0";
     return `₹${Number(val).toLocaleString("en-IN")}`;
@@ -38,17 +38,57 @@ export default function ProductCard({ product }) {
   const candidateVariants = inStockVariants.length > 0 ? inStockVariants : purchasableVariants;
 
   let displayPriceText = formatPrice(
-    product.effectivePrice !== undefined ? product.effectivePrice : product.price
+    product.effectiveOfferPrice !== undefined
+      ? product.effectiveOfferPrice
+      : product.effectivePrice !== undefined
+      ? product.effectivePrice
+      : product.price
   );
 
+  let strikethroughPrice = null;
+  let offerDiscountPct = product.appliedOffer?.discountPercentage || null;
+
   if (candidateVariants.length > 0) {
-    const prices = candidateVariants.map((v) => Number(v.sellingPrice));
-    const minPrice = Math.min(...prices);
-    const maxPrice = Math.max(...prices);
-    if (minPrice !== maxPrice) {
-      displayPriceText = `From ${formatPrice(minPrice)}`;
+    const variantOfferPrices = candidateVariants.map((v) =>
+      v.offerPrice !== undefined && v.offerPrice !== null ? Number(v.offerPrice) : Number(v.sellingPrice)
+    );
+    const minOfferPrice = Math.min(...variantOfferPrices);
+    const maxOfferPrice = Math.max(...variantOfferPrices);
+
+    if (minOfferPrice !== maxOfferPrice) {
+      displayPriceText = `From ${formatPrice(minOfferPrice)}`;
     } else {
-      displayPriceText = formatPrice(minPrice);
+      displayPriceText = formatPrice(minOfferPrice);
+    }
+
+    const minVariant = candidateVariants.find(
+      (v) =>
+        (v.offerPrice !== undefined && v.offerPrice !== null
+          ? Number(v.offerPrice)
+          : Number(v.sellingPrice)) === minOfferPrice
+    );
+
+    if (minVariant) {
+      const origSelling = Number(minVariant.sellingPrice);
+      if (minOfferPrice < origSelling) {
+        strikethroughPrice = origSelling;
+        if (!offerDiscountPct) {
+          offerDiscountPct = Math.round(((origSelling - minOfferPrice) / origSelling) * 100);
+        }
+      } else if (Number(minVariant.originalPrice) > origSelling) {
+        strikethroughPrice = Number(minVariant.originalPrice);
+      }
+    }
+  } else {
+    const effectiveOffer =
+      product.effectiveOfferPrice !== undefined ? product.effectiveOfferPrice : product.offerPrice;
+    const baseSelling =
+      product.originalSellingPrice !== undefined ? product.originalSellingPrice : product.price;
+
+    if (effectiveOffer !== undefined && effectiveOffer < baseSelling) {
+      strikethroughPrice = baseSelling;
+    } else if (product.compareAtPrice > product.price) {
+      strikethroughPrice = product.compareAtPrice;
     }
   }
 
@@ -108,6 +148,9 @@ export default function ProductCard({ product }) {
           <span className={`category-tag ${product.category?.toLowerCase()}`}>
             {product.category?.toUpperCase()}
           </span>
+          {offerDiscountPct && offerDiscountPct > 0 && (
+            <span className="card-offer-tag">{offerDiscountPct}% OFF</span>
+          )}
           {isOutOfStock && <span className="card-stock-tag">OUT OF STOCK</span>}
         </div>
 
@@ -139,9 +182,9 @@ export default function ProductCard({ product }) {
         <div className="product-card-footer">
           <div className="card-price-group">
             <span className="card-current-price">{displayPriceText}</span>
-            {product.compareAtPrice > product.price && (
+            {strikethroughPrice && (
               <span className="card-original-price">
-                {formatPrice(product.compareAtPrice)}
+                {formatPrice(strikethroughPrice)}
               </span>
             )}
           </div>

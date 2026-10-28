@@ -672,6 +672,12 @@ function Checkout() {
                 <span>Subtotal</span>
                 <span>{formatPrice(completedOrder.subtotal)}</span>
               </div>
+              {completedOrder.totalOfferDiscount > 0 && (
+                <div className="conf-row" style={{ color: "#7c3aed", fontWeight: 700 }}>
+                  <span>Automatic Offer Savings</span>
+                  <span>-{formatPrice(completedOrder.totalOfferDiscount)}</span>
+                </div>
+              )}
               {completedOrder.discountAmount > 0 && (
                 <div className="conf-row" style={{ color: "#059669", fontWeight: 700 }}>
                   <span>Coupon Discount ({completedOrder.couponCode} • {completedOrder.discountPercentage}% OFF)</span>
@@ -1316,6 +1322,19 @@ function Checkout() {
                           <h4>{item.name}</h4>
                           <small>
                             {item.brand || "FEXA"} • Size: {item.volumeMl ? `${item.volumeMl} ml` : "100 ml"}
+                            {item.appliedOffer && (
+                              <span
+                                style={{
+                                  display: "block",
+                                  color: "#7c3aed",
+                                  fontWeight: 700,
+                                  fontSize: "0.75rem",
+                                  marginTop: "2px",
+                                }}
+                              >
+                                🏷️ {item.appliedOffer.name}
+                              </span>
+                            )}
                           </small>
                           <div className="chk-pricing-line">
                             <span className="chk-unit-sub">{formatPrice(item.price)} × {item.quantity}</span>
@@ -1345,6 +1364,22 @@ function Checkout() {
               </div>
 
               <div className="chk-totals-block">
+                {cart.totalOfferDiscount > 0 && (
+                  <>
+                    <div className="chk-row">
+                      <span>Original Subtotal</span>
+                      <span style={{ textDecoration: "line-through", color: "#9ca3af" }}>
+                        {formatPrice(cart.originalSubtotal)}
+                      </span>
+                    </div>
+                    <div className="chk-row" style={{ color: "#10b981", fontWeight: 600 }}>
+                      <span>Automatic Promotional Savings</span>
+                      <span style={{ color: "#10b981", fontWeight: 700 }}>
+                        -{formatPrice(cart.totalOfferDiscount)}
+                      </span>
+                    </div>
+                  </>
+                )}
                 <div className="chk-row">
                   <span>Subtotal</span>
                   <span>{formatPrice(subtotal)}</span>
