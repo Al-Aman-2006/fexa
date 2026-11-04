@@ -36,7 +36,12 @@ export const roundToPaise = (val) => {
  * @param {number} params.merchandiseSubtotal - Sum of original line amounts
  * @returns {Object} { allocatedItems, totalCouponDiscount, discountedMerchandiseTotal }
  */
-export const calculateItemCouponAllocations = ({ items, coupon, merchandiseSubtotal }) => {
+export const calculateItemCouponAllocations = ({
+  items,
+  coupon,
+  merchandiseSubtotal,
+  originalSubtotal,
+}) => {
   if (!Array.isArray(items) || items.length === 0) {
     return {
       allocatedItems: [],
@@ -47,23 +52,47 @@ export const calculateItemCouponAllocations = ({ items, coupon, merchandiseSubto
 
   // 1. Calculate baseline original line amounts for each item
   const preparedItems = items.map((item) => {
-    const unitPrice = roundToPaise(item.unitPrice || 0);
+    // Base unit price: original catalog selling price before automatic promotional product offer
+    const baseUnitPrice = roundToPaise(
+      item.originalPrice !== undefined && item.originalPrice !== null
+        ? item.originalPrice
+        : item.unitPrice || 0
+    );
+    // Effective unit price: price after automatic product/category offer
+    const effectiveUnitPrice = roundToPaise(
+      item.offerAdjustedUnitPrice !== undefined && item.offerAdjustedUnitPrice !== null
+        ? item.offerAdjustedUnitPrice
+        : item.unitPrice !== undefined && item.unitPrice !== null
+        ? item.unitPrice
+        : baseUnitPrice
+    );
     const quantity = Math.max(1, parseInt(item.quantity, 10) || 1);
-    const originalLineAmount = roundToPaise(unitPrice * quantity);
+    const originalLineAmount = roundToPaise(baseUnitPrice * quantity);
+    const effectiveLineAmount = roundToPaise(effectiveUnitPrice * quantity);
 
     return {
       ...item,
-      unitPrice,
+      baseUnitPrice,
+      effectiveUnitPrice,
+      unitPrice: effectiveUnitPrice,
+      originalPrice: baseUnitPrice,
       quantity,
-      originalLineAmount,
-      lineTotal: originalLineAmount,
+      originalLineAmount, // Original merchandise value before offers
+      effectiveLineAmount, // Merchandise value after promotional offers
+      lineTotal: effectiveLineAmount,
     };
   });
 
-  const subtotal = roundToPaise(
+  const computedOriginalSubtotal = roundToPaise(
+    originalSubtotal !== undefined && originalSubtotal !== null
+      ? originalSubtotal
+      : preparedItems.reduce((acc, it) => acc + it.originalLineAmount, 0)
+  );
+
+  const effectiveSubtotal = roundToPaise(
     merchandiseSubtotal !== undefined && merchandiseSubtotal !== null
       ? merchandiseSubtotal
-      : preparedItems.reduce((acc, it) => acc + it.originalLineAmount, 0)
+      : preparedItems.reduce((acc, it) => acc + it.effectiveLineAmount, 0)
   );
 
   // If no coupon applied, all allocations are 0
@@ -71,9 +100,9 @@ export const calculateItemCouponAllocations = ({ items, coupon, merchandiseSubto
     const allocatedItems = preparedItems.map((item) => ({
       ...item,
       allocatedCouponDiscount: 0,
-      discountedLineAmount: item.originalLineAmount,
+      discountedLineAmount: item.effectiveLineAmount,
       perUnitDiscount: 0,
-      discountedUnitAmount: item.unitPrice,
+      discountedUnitAmount: item.effectiveUnitPrice,
       returnedQuantity: item.returnedQuantity || 0,
       refundAmount: item.refundAmount || 0,
       itemStatus: item.itemStatus || "Active",
@@ -83,7 +112,7 @@ export const calculateItemCouponAllocations = ({ items, coupon, merchandiseSubto
     return {
       allocatedItems,
       totalCouponDiscount: 0,
-      discountedMerchandiseTotal: subtotal,
+      discountedMerchandiseTotal: effectiveSubtotal,
     };
   }
 
@@ -95,9 +124,9 @@ export const calculateItemCouponAllocations = ({ items, coupon, merchandiseSubto
       ? Number(coupon.maximumDiscount)
       : null;
 
-  // Step A: Calculate uncapped discount for each line
+  // Step A: Calculate uncapped discount for each line based on original merchandise amount
   const itemsWithUncapped = preparedItems.map((item) => {
-    // Uncapped discount = lineAmount * percentage / 100
+    // Uncapped discount = original line amount * percentage / 100
     const rawDiscount = (item.originalLineAmount * percentage) / 100;
     return {
       ...item,
@@ -116,9 +145,9 @@ export const calculateItemCouponAllocations = ({ items, coupon, merchandiseSubto
   const isCapped = Boolean(maxCap && maxCap > 0 && totalUncappedDiscount > maxCap);
 
   if (isCapped) {
-    actualOrderCouponDiscount = roundToPaise(Math.min(maxCap, subtotal));
+    actualOrderCouponDiscount = roundToPaise(Math.min(maxCap, computedOriginalSubtotal));
   } else {
-    actualOrderCouponDiscount = roundToPaise(Math.min(actualOrderCouponDiscount, subtotal));
+    actualOrderCouponDiscount = roundToPaise(Math.min(actualOrderCouponDiscount, computedOriginalSubtotal));
   }
 
   // Step C: Proportional allocation across items
@@ -136,8 +165,8 @@ export const calculateItemCouponAllocations = ({ items, coupon, merchandiseSubto
       lineDiscount = item.uncappedDiscount;
     }
 
-    // Never exceed the line's original amount
-    lineDiscount = Math.min(lineDiscount, item.originalLineAmount);
+    // Never exceed the line's effective merchandise amount
+    lineDiscount = Math.min(lineDiscount, item.effectiveLineAmount);
     runningAllocatedSum = roundToPaise(runningAllocatedSum + lineDiscount);
 
     return {
@@ -166,8 +195,8 @@ export const calculateItemCouponAllocations = ({ items, coupon, merchandiseSubto
     const targetItem = allocatedLines[maxIdx];
     const adjustedDiscount = roundToPaise(targetItem.allocatedCouponDiscount + roundingDifference);
 
-    // Safety: discount cannot exceed original line amount or fall below 0
-    if (adjustedDiscount >= 0 && adjustedDiscount <= targetItem.originalLineAmount) {
+    // Safety: discount cannot exceed effective line amount or fall below 0
+    if (adjustedDiscount >= 0 && adjustedDiscount <= targetItem.effectiveLineAmount) {
       targetItem.allocatedCouponDiscount = adjustedDiscount;
     }
   }
@@ -176,14 +205,14 @@ export const calculateItemCouponAllocations = ({ items, coupon, merchandiseSubto
   let finalTotalDiscount = 0;
   const allocatedItems = allocatedLines.map((item) => {
     const allocatedCouponDiscount = roundToPaise(item.allocatedCouponDiscount);
-    const discountedLineAmount = roundToPaise(item.originalLineAmount - allocatedCouponDiscount);
+    const discountedLineAmount = roundToPaise(item.effectiveLineAmount - allocatedCouponDiscount);
 
     const perUnitDiscount =
       item.quantity > 0
         ? roundToPaise(allocatedCouponDiscount / item.quantity)
         : 0;
 
-    const discountedUnitAmount = roundToPaise(item.unitPrice - perUnitDiscount);
+    const discountedUnitAmount = roundToPaise(item.effectiveUnitPrice - perUnitDiscount);
 
     finalTotalDiscount = roundToPaise(finalTotalDiscount + allocatedCouponDiscount);
 
@@ -200,7 +229,9 @@ export const calculateItemCouponAllocations = ({ items, coupon, merchandiseSubto
     };
   });
 
-  const discountedMerchandiseTotal = roundToPaise(subtotal - finalTotalDiscount);
+  const discountedMerchandiseTotal = roundToPaise(
+    allocatedItems.reduce((acc, it) => acc + it.discountedLineAmount, 0)
+  );
 
   return {
     allocatedItems,

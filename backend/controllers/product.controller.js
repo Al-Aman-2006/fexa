@@ -4,19 +4,19 @@ import Category from "../models/category.model.js";
 import Review from "../models/review.model.js";
 import { getActiveValidOffers, applyOffersToProduct } from "../utils/offerCalculator.js";
 
-// Normalizer for category matching (Men, Women, Unisex)
+// Normalizer for category matching (Men, Women, Unisex or dynamic)
 const normalizeCategory = (cat) => {
   if (!cat) return null;
   const lower = cat.toString().trim().toLowerCase();
   if (lower === "men") return "Men";
   if (lower === "women") return "Women";
   if (lower === "unisex") return "Unisex";
-  return null;
+  return cat.toString().trim();
 };
 
 // Helper to fetch active category map
 const getCategoryStatusMap = async () => {
-  const allCategories = await Category.find({});
+  const allCategories = await Category.find({ parentCategory: null });
   const statusMap = { Men: true, Women: true, Unisex: true };
   allCategories.forEach((c) => {
     statusMap[c.name] = c.isActive;
@@ -58,8 +58,19 @@ const getPublicProducts = async (req, res) => {
     if (rawCategory && rawCategory.toLowerCase() !== "all") {
       const canonicalCategory = normalizeCategory(rawCategory);
 
+      // Check if parent category exists in Category collection
+      const parentCatDoc = await Category.findOne({
+        parentCategory: null,
+        $or: [
+          { slug: rawCategory.toLowerCase() },
+          { name: new RegExp(`^${rawCategory.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+        ],
+      });
+
+      const isInactive = parentCatDoc ? !parentCatDoc.isActive : categoryStatusMap[canonicalCategory] === false;
+
       // If category is currently inactive, return 0 products immediately
-      if (canonicalCategory && categoryStatusMap[canonicalCategory] === false) {
+      if (isInactive) {
         const [rawMenCount, rawWomenCount, rawUnisexCount] = await Promise.all([
           Product.countDocuments({ status: { $in: ["Active", "Out of Stock"] }, category: "Men" }),
           Product.countDocuments({ status: { $in: ["Active", "Out of Stock"] }, category: "Women" }),
@@ -92,7 +103,12 @@ const getPublicProducts = async (req, res) => {
         });
       }
 
-      if (canonicalCategory && categoryStatusMap[canonicalCategory] !== false) {
+      if (parentCatDoc) {
+        queryFilter.$or = [
+          { category: parentCatDoc.name },
+          { parentCategory: parentCatDoc._id },
+        ];
+      } else if (canonicalCategory && categoryStatusMap[canonicalCategory] !== false) {
         queryFilter.category = canonicalCategory;
       } else {
         queryFilter.category = "__INVALID__";
@@ -100,6 +116,51 @@ const getPublicProducts = async (req, res) => {
     } else {
       // General or search catalogue: strictly exclude products from inactive categories
       queryFilter.category = { $in: activeCategories };
+    }
+
+    // Subcategory filter: Woody, Fresh, Floral, etc.
+    const rawSubCategory = req.query.subcategory ? req.query.subcategory.trim() : null;
+    if (rawSubCategory && rawSubCategory.toLowerCase() !== "all") {
+      let subDoc = null;
+      if (mongoose.Types.ObjectId.isValid(rawSubCategory)) {
+        subDoc = await Category.findById(rawSubCategory);
+      } else {
+        subDoc = await Category.findOne({
+          parentCategory: { $ne: null },
+          $or: [
+            { slug: rawSubCategory.toLowerCase() },
+            { name: new RegExp(`^${rawSubCategory.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+          ],
+        });
+      }
+
+      if (!subDoc || subDoc.isActive === false) {
+        return res.status(200).json({
+          success: true,
+          products: [],
+          pagination: { page, limit, totalProducts: 0, totalPages: 1 },
+          categoryCounts: { all: 0, men: 0, women: 0, unisex: 0 },
+          categoryStatuses: categoryStatusMap,
+        });
+      }
+
+      // Filter products by subCategory ID or subCategoryName
+      queryFilter.$and = queryFilter.$and || [];
+      queryFilter.$and.push({
+        $or: [
+          { subCategory: subDoc._id },
+          { subCategoryName: new RegExp(`^${subDoc.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+        ],
+      });
+    } else {
+      // Exclude products explicitly assigned to deactivated child categories
+      const inactiveSubcategories = await Category.find({
+        parentCategory: { $ne: null },
+        isActive: false,
+      }).distinct("_id");
+      if (inactiveSubcategories.length > 0) {
+        queryFilter.subCategory = { $nin: inactiveSubcategories };
+      }
     }
 
     // Search filter across name, brand, category, description (with regex escaping for safety)
@@ -190,6 +251,9 @@ const getPublicProducts = async (req, res) => {
                 description: 1,
                 brand: 1,
                 category: 1,
+                parentCategory: 1,
+                subCategory: 1,
+                subCategoryName: 1,
                 price: 1,
                 compareAtPrice: 1,
                 stock: 1,
@@ -420,14 +484,70 @@ const getPublicProductById = async (req, res) => {
   }
 };
 
+// ========================================
+// GET PUBLIC CATEGORIES WITH CHILD SUBCATEGORIES
+// ========================================
+const getPublicCategories = async (req, res) => {
+  try {
+    // Only return active parent categories
+    const parentCategories = await Category.find({ parentCategory: null, isActive: true })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const parentIds = parentCategories.map((p) => p._id);
+
+    // Fetch active child categories for active parents
+    const childCategories = await Category.find({
+      parentCategory: { $in: parentIds },
+      isActive: true,
+    })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const categoriesWithChildren = parentCategories.map((parent) => {
+      const children = childCategories.filter(
+        (c) => c.parentCategory.toString() === parent._id.toString()
+      );
+      return {
+        _id: parent._id,
+        name: parent.name,
+        slug: parent.slug,
+        description: parent.description || "",
+        image: parent.image || "",
+        isActive: parent.isActive,
+        children: children.map((c) => ({
+          _id: c._id,
+          name: c.name,
+          slug: c.slug,
+          description: c.description || "",
+          isActive: c.isActive,
+        })),
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      categories: categoriesWithChildren,
+    });
+  } catch (error) {
+    console.error("Get public categories error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to retrieve category taxonomy.",
+    });
+  }
+};
+
 export {
   getPublicProducts,
   getPublicProductCollections,
   getPublicProductById,
+  getPublicCategories,
 };
 
 export default {
   getPublicProducts,
   getPublicProductCollections,
   getPublicProductById,
+  getPublicCategories,
 };

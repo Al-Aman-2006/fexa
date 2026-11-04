@@ -3,7 +3,13 @@ import path from "path";
 import { fileURLToPath } from "url";
 import User from "../models/user.model.js";
 import { validateAddress } from "../validators/address.validator.js";
-import { validateName, normalizeName } from "../validators/user.validator.js";
+import {
+  validateName,
+  normalizeName,
+  validateEmail,
+  normalizeEmail,
+  validateProfilePhone,
+} from "../validators/user.validator.js";
 import { generateOtp, hashOtp } from "../utils/otp.js";
 import { sendEmailChangeOtpEmail } from "../services/email.service.js";
 
@@ -95,51 +101,74 @@ const updateProfile = async (req, res) => {
     }
 
     if (phone !== undefined) {
+      const phoneError = validateProfilePhone(phone, { isRequired: false });
+      if (phoneError) {
+        return res.status(400).json({
+          success: false,
+          message: phoneError,
+          errors: {
+            phone: phoneError,
+          },
+        });
+      }
       user.phone = phone.trim();
     }
 
     let emailChangeRequested = false;
 
-    if (email && email.trim().toLowerCase() !== user.email.toLowerCase()) {
-      if (user.authProvider === "google" || user.googleId) {
-        return res.status(400).json({
-          success: false,
-          message: "Email cannot be changed for accounts authenticated with Google.",
+    if (email !== undefined) {
+      const rawEmail = String(email).trim();
+
+      if (rawEmail && rawEmail.toLowerCase() !== user.email.toLowerCase()) {
+        if (user.authProvider === "google" || user.googleId) {
+          return res.status(400).json({
+            success: false,
+            message: "Email cannot be changed for accounts authenticated with Google.",
+            errors: {
+              email: "Email cannot be changed for accounts authenticated with Google.",
+            },
+          });
+        }
+
+        const emailError = validateEmail(rawEmail);
+        if (emailError) {
+          return res.status(400).json({
+            success: false,
+            message: emailError,
+            errors: {
+              email: emailError,
+            },
+          });
+        }
+
+        const targetEmail = normalizeEmail(rawEmail);
+
+        const existingUser = await User.findOne({
+          email: targetEmail,
+          _id: { $ne: userId },
         });
+
+        if (existingUser) {
+          return res.status(400).json({
+            success: false,
+            message: "This email address is already registered.",
+            errors: {
+              email: "This email address is already registered.",
+            },
+          });
+        }
+
+        const otp = generateOtp();
+        const otpHash = hashOtp(otp);
+        const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+        user.pendingEmail = targetEmail;
+        user.emailChangeOtpHash = otpHash;
+        user.emailChangeOtpExpiresAt = otpExpiresAt;
+
+        await sendEmailChangeOtpEmail(targetEmail, otp);
+        emailChangeRequested = true;
       }
-
-      const targetEmail = email.trim().toLowerCase();
-
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(targetEmail)) {
-        return res.status(400).json({
-          success: false,
-          message: "Please enter a valid email address.",
-        });
-      }
-
-      const existingUser = await User.findOne({
-        email: targetEmail,
-        _id: { $ne: userId },
-      });
-
-      if (existingUser) {
-        return res.status(400).json({
-          success: false,
-          message: "An account with this email already exists.",
-        });
-      }
-
-      const otp = generateOtp();
-      const otpHash = hashOtp(otp);
-      const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
-
-      user.pendingEmail = targetEmail;
-      user.emailChangeOtpHash = otpHash;
-      user.emailChangeOtpExpiresAt = otpExpiresAt;
-
-      await sendEmailChangeOtpEmail(targetEmail, otp);
-      emailChangeRequested = true;
     }
 
     await user.save();
@@ -165,6 +194,17 @@ const updateProfile = async (req, res) => {
     });
   } catch (error) {
     console.error("Update profile error:", error.message);
+
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "This email address is already registered.",
+        errors: {
+          email: "This email address is already registered.",
+        },
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Unable to update profile",

@@ -44,10 +44,24 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: [true, "Category is required."],
       trim: true,
-      enum: {
-        values: ["Men", "Women", "Unisex"],
-        message: "Please select a valid category (Men, Women, Unisex).",
-      },
+    },
+
+    parentCategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+      default: null,
+    },
+
+    subCategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+      default: null,
+    },
+
+    subCategoryName: {
+      type: String,
+      trim: true,
+      default: "",
     },
 
     price: {
@@ -171,6 +185,8 @@ productSchema.pre("validate", function () {
 // Indexes for fast searching, filtering, and sorting
 productSchema.index({ name: "text", brand: "text", category: "text" });
 productSchema.index({ category: 1 });
+productSchema.index({ parentCategory: 1 });
+productSchema.index({ subCategory: 1 });
 productSchema.index({ status: 1 });
 productSchema.index({ status: 1, name: 1, brand: 1 });
 productSchema.index({ createdAt: -1 });

@@ -3,6 +3,7 @@ import Coupon from "../models/coupon.model.js";
 import Cart from "../models/cart.model.js";
 import Product from "../models/product.model.js";
 import { calculateItemCouponAllocations } from "../utils/couponAllocation.js";
+import { getActiveValidOffers, findBestOfferForProduct, roundToPaise } from "../utils/offerCalculator.js";
 
 // ========================================================
 // HELPER: Calculate live cart merchandise subtotal from DB
@@ -10,10 +11,13 @@ import { calculateItemCouponAllocations } from "../utils/couponAllocation.js";
 const calculateLiveCartSubtotal = async (userId) => {
   const cart = await Cart.findOne({ user: userId });
   if (!cart || !cart.items || cart.items.length === 0) {
-    return { error: "Your shopping bag is empty.", subtotal: 0, items: [] };
+    return { error: "Your shopping bag is empty.", subtotal: 0, originalSubtotal: 0, totalOfferDiscount: 0, items: [] };
   }
 
+  const activeOffers = await getActiveValidOffers();
   let subtotal = 0;
+  let originalSubtotal = 0;
+  let totalOfferDiscount = 0;
   const verifiedItems = [];
 
   for (const item of cart.items) {
@@ -35,8 +39,17 @@ const calculateLiveCartSubtotal = async (userId) => {
     if (!variant || variant.isAvailable === false || variant.stock <= 0) continue;
 
     const qty = Math.min(Math.max(1, parseInt(item.quantity, 10) || 1), 5);
-    const price = Number(variant.sellingPrice) || Number(variant.price) || Number(item.unitPrice) || 0;
-    subtotal += price * qty;
+    const basePrice = roundToPaise(Number(variant.sellingPrice) || Number(variant.price) || Number(item.unitPrice) || 0);
+    const originalPrice = basePrice;
+    const bestOffer = findBestOfferForProduct(product, activeOffers, basePrice);
+    const unitPrice = bestOffer.offerPrice;
+    const unitOfferDiscount = bestOffer.discountAmount;
+    const lineOfferDiscount = roundToPaise(unitOfferDiscount * qty);
+    const lineTotal = roundToPaise(unitPrice * qty);
+
+    subtotal += lineTotal;
+    originalSubtotal += roundToPaise(originalPrice * qty);
+    totalOfferDiscount += lineOfferDiscount;
 
     verifiedItems.push({
       product: product._id,
@@ -44,16 +57,24 @@ const calculateLiveCartSubtotal = async (userId) => {
       name: product.name,
       volumeMl: variant.volumeMl,
       quantity: qty,
-      unitPrice: price,
-      lineTotal: price * qty,
+      unitPrice,
+      originalPrice,
+      offerDiscount: unitOfferDiscount,
+      offerAdjustedUnitPrice: unitPrice,
+      lineTotal,
     });
   }
 
   if (verifiedItems.length === 0) {
-    return { error: "No available in-stock fragrances in your shopping bag.", subtotal: 0, items: [] };
+    return { error: "No available in-stock fragrances in your shopping bag.", subtotal: 0, originalSubtotal: 0, totalOfferDiscount: 0, items: [] };
   }
 
-  return { subtotal, items: verifiedItems };
+  return {
+    subtotal: roundToPaise(subtotal),
+    originalSubtotal: roundToPaise(originalSubtotal),
+    totalOfferDiscount: roundToPaise(totalOfferDiscount),
+    items: verifiedItems,
+  };
 };
 
 // ========================================================
@@ -685,10 +706,11 @@ const applyCoupon = async (req, res) => {
       });
     }
 
-    const eligibleSubtotal = cartCalc.subtotal;
+    const originalSubtotal = cartCalc.originalSubtotal || cartCalc.subtotal;
+    const merchandiseSubtotal = cartCalc.subtotal;
 
     // 3. Validate coupon against subtotal and user limits
-    const check = coupon.validateForOrder(eligibleSubtotal, userId);
+    const check = coupon.validateForOrder(originalSubtotal, userId);
     if (!check.valid) {
       return res.status(400).json({
         success: false,
@@ -700,11 +722,12 @@ const applyCoupon = async (req, res) => {
     const allocation = calculateItemCouponAllocations({
       items: cartCalc.items,
       coupon,
-      merchandiseSubtotal: eligibleSubtotal,
+      merchandiseSubtotal,
+      originalSubtotal,
     });
 
     const discountAmount = allocation.totalCouponDiscount;
-    const shippingCost = eligibleSubtotal >= 5000 ? 0 : 250;
+    const shippingCost = merchandiseSubtotal >= 5000 ? 0 : 250;
     const totalAmount = Math.max(0, allocation.discountedMerchandiseTotal) + shippingCost;
 
     return res.status(200).json({
@@ -719,14 +742,16 @@ const applyCoupon = async (req, res) => {
         discountType: coupon.discountType,
         discountPercentage: coupon.discountPercentage,
         discountAmount,
-        eligibleSubtotal,
+        eligibleSubtotal: originalSubtotal,
         finalTotal: totalAmount,
         minOrderAmount: coupon.minOrderAmount,
         maxDiscount: coupon.maxDiscount,
         itemAllocations: allocation.allocatedItems,
       },
       calculation: {
-        subtotal: eligibleSubtotal,
+        subtotal: merchandiseSubtotal,
+        originalSubtotal,
+        totalOfferDiscount: cartCalc.totalOfferDiscount || 0,
         discountAmount,
         shippingCost,
         totalAmount,

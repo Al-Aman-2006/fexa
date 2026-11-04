@@ -1,29 +1,58 @@
+import "dotenv/config";
 import nodemailer from "nodemailer";
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
+let transporter = null;
 
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+export const getTransporter = () => {
+  const user = process.env.EMAIL_USER ? process.env.EMAIL_USER.trim() : "";
+  const pass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.trim() : "";
+
+  if (!user || !pass) {
+    console.error("❌ Email service configuration error: EMAIL_USER or EMAIL_PASS environment variable is missing.");
+    throw new Error("Email service is not configured properly");
+  }
+
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user,
+        pass,
+      },
+    });
+  }
+
+  return transporter;
+};
+
+export const verifyEmailConnection = async () => {
+  try {
+    const transport = getTransporter();
+    await transport.verify();
+    console.log("✅ Gmail SMTP connection verified successfully");
+    return true;
+  } catch (error) {
+    console.error("❌ Gmail SMTP verification failed - Code:", error.code, "Message:", error.message);
+    return false;
+  }
+};
 
 const sendOtpEmail = async (email, otp) => {
+  if (!email || !otp) {
+    throw new Error("Recipient email and OTP are required");
+  }
+
+  const transport = getTransporter();
   const mailOptions = {
-    from: `"FEXA" <${process.env.EMAIL_USER}>`,
-
+    from: `"FEXA" <${process.env.EMAIL_USER.trim()}>`,
     to: email,
-
     subject: "Your FEXA Email Verification Code",
-
     html: `
       <div style="
         font-family: Arial, sans-serif;
         background: #faf8fc;
         padding: 40px 20px;
       ">
-
         <div style="
           max-width: 500px;
           margin: auto;
@@ -32,7 +61,6 @@ const sendOtpEmail = async (email, otp) => {
           border-radius: 12px;
           text-align: center;
         ">
-
           <h1 style="
             color: #3b3047;
             letter-spacing: 5px;
@@ -40,7 +68,6 @@ const sendOtpEmail = async (email, otp) => {
           ">
             FEXA
           </h1>
-
           <p style="
             color: #a184bd;
             font-size: 10px;
@@ -48,28 +75,23 @@ const sendOtpEmail = async (email, otp) => {
           ">
             HAUTE PARFUMERIE
           </p>
-
           <hr style="
             border: none;
             border-top: 1px solid #eee7f3;
             margin: 30px 0;
           " />
-
           <h2 style="
             color: #332a3d;
             font-weight: 500;
           ">
             Verify Your Email
           </h2>
-
           <p style="
             color: #817789;
             line-height: 1.6;
           ">
-            Use the verification code below
-            to complete your FEXA registration.
+            Use the verification code below to complete your FEXA registration.
           </p>
-
           <div style="
             margin: 30px 0;
             padding: 18px;
@@ -82,14 +104,12 @@ const sendOtpEmail = async (email, otp) => {
           ">
             ${otp}
           </div>
-
           <p style="
             color: #9a8e9f;
             font-size: 12px;
           ">
             This code will expire in 1 minute.
           </p>
-
           <p style="
             margin-top: 35px;
             color: #b0a6b7;
@@ -98,46 +118,37 @@ const sendOtpEmail = async (email, otp) => {
           ">
             FEXA · CRAFTED FOR THE SENSES
           </p>
-
         </div>
-
       </div>
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    await transport.sendMail(mailOptions);
+  } catch (error) {
+    console.error("❌ Failed to send OTP email - Code:", error.code, "Message:", error.message);
+    throw error;
+  }
 };
 
+const sendPasswordResetEmail = async (email, resetToken) => {
+  if (!email || !resetToken) {
+    throw new Error("Recipient email and reset token are required");
+  }
 
-
-
-
-// ========================================
-// SEND PASSWORD RESET EMAIL
-// ========================================
-
-const sendPasswordResetEmail = async (
-  email,
-  resetToken
-) => {
-
-  const resetLink =
-    `http://localhost:5173/reset-password/${resetToken}`;
+  const transport = getTransporter();
+  const resetLink = `http://localhost:5173/reset-password/${resetToken}`;
 
   const mailOptions = {
-    from: `"FEXA" <${process.env.EMAIL_USER}>`,
-
+    from: `"FEXA" <${process.env.EMAIL_USER.trim()}>`,
     to: email,
-
     subject: "Reset Your FEXA Password",
-
     html: `
       <div style="
         font-family: Arial, sans-serif;
         background: #faf8fc;
         padding: 40px 20px;
       ">
-
         <div style="
           max-width: 500px;
           margin: auto;
@@ -146,7 +157,6 @@ const sendPasswordResetEmail = async (
           border-radius: 12px;
           text-align: center;
         ">
-
           <h1 style="
             color: #3b3047;
             letter-spacing: 5px;
@@ -154,7 +164,6 @@ const sendPasswordResetEmail = async (
           ">
             FEXA
           </h1>
-
           <p style="
             color: #a184bd;
             font-size: 10px;
@@ -162,28 +171,23 @@ const sendPasswordResetEmail = async (
           ">
             HAUTE PARFUMERIE
           </p>
-
           <hr style="
             border: none;
             border-top: 1px solid #eee7f3;
             margin: 30px 0;
           " />
-
           <h2 style="
             color: #332a3d;
             font-weight: 500;
           ">
             Reset Your Password
           </h2>
-
           <p style="
             color: #817789;
             line-height: 1.6;
           ">
-            We received a request to reset your
-            FEXA account password.
+            We received a request to reset your FEXA account password.
           </p>
-
           <a
             href="${resetLink}"
             style="
@@ -200,23 +204,19 @@ const sendPasswordResetEmail = async (
           >
             RESET PASSWORD
           </a>
-
           <p style="
             color: #9a8e9f;
             font-size: 12px;
           ">
             This link will expire in 15 minutes.
           </p>
-
           <p style="
             color: #b0a6b7;
             font-size: 11px;
             margin-top: 30px;
           ">
-            If you did not request a password reset,
-            you can safely ignore this email.
+            If you did not request a password reset, you can safely ignore this email.
           </p>
-
           <p style="
             margin-top: 35px;
             color: #b0a6b7;
@@ -225,19 +225,27 @@ const sendPasswordResetEmail = async (
           ">
             FEXA · CRAFTED FOR THE SENSES
           </p>
-
         </div>
-
       </div>
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    await transport.sendMail(mailOptions);
+  } catch (error) {
+    console.error("❌ Failed to send password reset email - Code:", error.code, "Message:", error.message);
+    throw error;
+  }
 };
 
 const sendEmailChangeOtpEmail = async (email, otp) => {
+  if (!email || !otp) {
+    throw new Error("Recipient email and OTP are required");
+  }
+
+  const transport = getTransporter();
   const mailOptions = {
-    from: `"FEXA" <${process.env.EMAIL_USER}>`,
+    from: `"FEXA" <${process.env.EMAIL_USER.trim()}>`,
     to: email,
     subject: "Verify Your New Email - FEXA",
     html: `
@@ -316,16 +324,24 @@ const sendEmailChangeOtpEmail = async (email, otp) => {
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    await transport.sendMail(mailOptions);
+  } catch (error) {
+    console.error("❌ Failed to send email change OTP - Code:", error.code, "Message:", error.message);
+    throw error;
+  }
 };
 
 const sendContactConfirmationEmail = async ({ name, email, reason, subject, message, orderNumber }) => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+  const user = process.env.EMAIL_USER ? process.env.EMAIL_USER.trim() : "";
+  const pass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.trim() : "";
+  if (!user || !pass) {
     return false;
   }
 
+  const transport = getTransporter();
   const mailOptions = {
-    from: `"FEXA Concierge" <${process.env.EMAIL_USER}>`,
+    from: `"FEXA Concierge" <${user}>`,
     to: email,
     subject: `We've Received Your Inquiry: ${subject} - FEXA`,
     html: `
@@ -360,8 +376,13 @@ const sendContactConfirmationEmail = async ({ name, email, reason, subject, mess
     `,
   };
 
-  await transporter.sendMail(mailOptions);
-  return true;
+  try {
+    await transport.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error("❌ Failed to send contact confirmation email - Code:", error.code, "Message:", error.message);
+    return false;
+  }
 };
 
 export {
@@ -372,6 +393,8 @@ export {
 };
 
 export default {
+  getTransporter,
+  verifyEmailConnection,
   sendOtpEmail,
   sendPasswordResetEmail,
   sendEmailChangeOtpEmail,

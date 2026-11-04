@@ -5,12 +5,9 @@ const categorySchema = new mongoose.Schema(
     name: {
       type: String,
       required: [true, "Category name is required."],
-      unique: true,
       trim: true,
-      enum: {
-        values: ["Men", "Women", "Unisex"],
-        message: "Category name must be Men, Women, or Unisex.",
-      },
+      minlength: [2, "Category name must be at least 2 characters."],
+      maxlength: [100, "Category name cannot exceed 100 characters."],
     },
 
     slug: {
@@ -19,16 +16,25 @@ const categorySchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      enum: {
-        values: ["men", "women", "unisex"],
-        message: "Category slug must be men, women, or unisex.",
-      },
     },
 
     description: {
       type: String,
       trim: true,
       default: "",
+    },
+
+    image: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    parentCategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+      default: null,
+      index: true,
     },
 
     isActive: {
@@ -41,6 +47,10 @@ const categorySchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// Compound index: Unique category name under the same parent category (or among parent categories where parentCategory is null)
+categorySchema.index({ parentCategory: 1, name: 1 }, { unique: true });
+categorySchema.index({ isActive: 1, parentCategory: 1 });
 
 const Category =
   mongoose.models.Category || mongoose.model("Category", categorySchema);

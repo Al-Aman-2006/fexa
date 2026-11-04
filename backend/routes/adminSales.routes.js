@@ -9,6 +9,8 @@ import {
   getCouponPerformance,
   getDetailedSalesReport,
   exportSalesReportCSV,
+  exportSalesReportPDF,
+  getDashboardRevenueAnalytics,
 } from "../controllers/sales.controller.js";
 import {
   getAdminOrderDetails,
@@ -22,6 +24,8 @@ const router = express.Router();
 router.use(adminMiddleware);
 
 // Analytics & KPI endpoints
+router.get("/dashboard-revenue", getDashboardRevenueAnalytics);
+router.get("/revenue-analytics", getDashboardRevenueAnalytics);
 router.get("/overview", getSalesOverview);
 router.get("/trends", getSalesTrends);
 router.get("/products", getProductPerformance);
@@ -30,6 +34,7 @@ router.get("/payments", getPaymentMethodBreakdown);
 router.get("/coupons", getCouponPerformance);
 router.get("/report", getDetailedSalesReport);
 router.get("/export", exportSalesReportCSV);
+router.get("/export-pdf", exportSalesReportPDF);
 
 // Order details inspection & return processing
 router.get("/orders/:orderId", getAdminOrderDetails);

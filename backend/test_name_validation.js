@@ -3,7 +3,7 @@
  * Tests all 23 requirements specified in the prompt.
  */
 
-const { validateName, normalizeName } = require("./validators/user.validator");
+import { validateName, normalizeName } from "./validators/user.validator.js";
 
 let passedCount = 0;
 let totalCount = 0;

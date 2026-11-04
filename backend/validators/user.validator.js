@@ -38,6 +38,11 @@ const validateName = (value) => {
     return "Please enter a valid name using letters.";
   }
 
+  // 3b. Reject consecutive whitespace
+  if (/\s{2,}/.test(trimmed)) {
+    return "Name cannot contain consecutive spaces.";
+  }
+
   // 4. Allowed characters check:
   // Must only contain letters (including international/accented Unicode letters),
   // spaces, hyphens, apostrophes (' and ’), and periods (.)
@@ -74,12 +79,128 @@ const validateName = (value) => {
   return null;
 };
 
+const normalizeEmail = (email) => {
+  if (typeof email !== "string") return "";
+  return email.trim().toLowerCase();
+};
+
+const validateEmail = (value) => {
+  if (value === undefined || value === null) {
+    return "Email address is required.";
+  }
+
+  if (typeof value !== "string") {
+    return "Please enter a valid email address.";
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "Email address is required.";
+  }
+
+  if (/\s/.test(trimmed)) {
+    return "Email address cannot contain spaces.";
+  }
+
+  if (trimmed.length > 254) {
+    return "Email address cannot exceed 254 characters.";
+  }
+
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+
+  if (!emailRegex.test(trimmed)) {
+    return "Please enter a valid email address.";
+  }
+
+  const parts = trimmed.split("@");
+  if (parts.length !== 2) return "Please enter a valid email address.";
+  const domain = parts[1];
+  const domainParts = domain.split(".");
+  const tld = domainParts[domainParts.length - 1];
+  if (!tld || tld.length < 2 || !/^[a-zA-Z]+$/.test(tld)) {
+    return "Please enter a valid email address.";
+  }
+
+  return null;
+};
+
+const validateProfilePhone = (value, { isRequired = false } = {}) => {
+  if (value === undefined || value === null) {
+    if (isRequired) return "Phone number is required.";
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    return "Please enter a valid phone number.";
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    if (isRequired) return "Phone number is required.";
+    return null;
+  }
+
+  if (/[a-zA-Z]/.test(trimmed)) {
+    return "Phone number cannot contain letters.";
+  }
+
+  const digitsOnly = trimmed.replace(/\D/g, "");
+  if (!digitsOnly || digitsOnly.length === 0) {
+    return "Please enter a valid phone number.";
+  }
+
+  if (!/^[\d\s+\-()]+$/.test(trimmed)) {
+    return "Phone number contains invalid characters.";
+  }
+
+  if (digitsOnly.length < 7) {
+    return "Phone number must have at least 7 digits.";
+  }
+  if (digitsOnly.length > 15) {
+    return "Phone number cannot exceed 15 digits.";
+  }
+
+  if (trimmed.startsWith("+91") || (trimmed.startsWith("91") && digitsOnly.length === 12)) {
+    const indianDigits = digitsOnly.startsWith("91") ? digitsOnly.slice(2) : digitsOnly;
+    if (indianDigits.length !== 10) {
+      return "Indian mobile numbers must be 10 digits.";
+    }
+    if (!/^[6-9]/.test(indianDigits)) {
+      return "Indian mobile numbers must start with 6, 7, 8, or 9.";
+    }
+    if (/^(\d)\1{9}$/.test(indianDigits)) {
+      return "Please enter a valid mobile number (repeated digits not allowed).";
+    }
+  } else if (digitsOnly.length === 10) {
+    if (/^(\d)\1{9}$/.test(digitsOnly)) {
+      return "Please enter a valid phone number (repeated digits not allowed).";
+    }
+    if (/^[0-5]/.test(digitsOnly)) {
+      return "10-digit mobile numbers must start with 6, 7, 8, or 9.";
+    }
+  } else {
+    if (/^(\d)\1{6,}$/.test(digitsOnly)) {
+      return "Please enter a valid phone number (repeated digits not allowed).";
+    }
+  }
+
+  return null;
+};
+
 export {
   normalizeName,
   validateName,
+  normalizeEmail,
+  validateEmail,
+  validateProfilePhone,
 };
 
 export default {
   normalizeName,
   validateName,
+  normalizeEmail,
+  validateEmail,
+  validateProfilePhone,
 };

@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Order from "../models/order.model.js";
 import { normalizeOrderWithAllocations } from "../utils/couponAllocation.js";
+import { streamSalesReportPDF } from "../services/pdf.service.js";
 
 // =========================================================================
 // HELPER: DATE RANGE PARSER
@@ -48,10 +49,11 @@ const parseDateRange = (period = "thisMonth", customStart, customEnd) => {
       periodLabel = "This Month";
       break;
     }
+    case "lastMonth":
     case "prevMonth": {
       start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
       end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-      periodLabel = "Previous Month";
+      periodLabel = "Last Month";
       break;
     }
     case "thisYear": {
@@ -1226,6 +1228,465 @@ const exportSalesReportCSV = async (req, res) => {
   }
 };
 
+// =========================================================================
+// 8.5 EXPORT SALES REPORT (PDF)
+// Generates luxury formatted PDF matching active date range and applied filters
+// =========================================================================
+const exportSalesReportPDF = async (req, res) => {
+  try {
+    const {
+      period,
+      startDate,
+      endDate,
+      orderStatus,
+      paymentStatus,
+      paymentMethod,
+      search,
+    } = req.query;
+
+    const { start, end, periodLabel } = parseDateRange(period, startDate, endDate);
+
+    const filter = {
+      createdAt: { $gte: start, $lte: end },
+    };
+
+    if (orderStatus && orderStatus !== "All") filter.orderStatus = orderStatus;
+    if (paymentStatus && paymentStatus !== "All") filter.paymentStatus = paymentStatus;
+    if (paymentMethod && paymentMethod !== "All") filter.paymentMethod = paymentMethod;
+
+    if (search && search.trim()) {
+      const term = search.trim();
+      filter.$or = [
+        { orderNumber: { $regex: term, $options: "i" } },
+        { couponCode: { $regex: term, $options: "i" } },
+        { "shippingAddress.fullName": { $regex: term, $options: "i" } },
+      ];
+    }
+
+    const orders = await Order.find(filter)
+      .populate("user", "name email phone")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Compile Financial Metrics
+    let grossSales = 0;
+    let netSales = 0;
+    let productDiscounts = 0;
+    let couponDiscounts = 0;
+    let totalRefunds = 0;
+    let completedOrders = 0;
+    let cancelledOrders = 0;
+    let returnedOrders = 0;
+
+    const pmMap = {};
+    const prodMap = {};
+
+    orders.forEach((o) => {
+      const isRecognizedPaid =
+        (o.paymentStatus === "Paid" && o.orderStatus !== "Cancelled") ||
+        (o.paymentMethod === "COD" && o.orderStatus === "Delivered");
+
+      if (o.orderStatus === "Cancelled") {
+        cancelledOrders++;
+      } else if (o.orderStatus === "Returned" || o.orderStatus === "Refunded") {
+        returnedOrders++;
+      }
+
+      if (isRecognizedPaid) {
+        completedOrders++;
+        const oGross = Number(o.originalSubtotal || o.subtotal || o.totalAmount || 0);
+        const oNet = Number(o.totalAmount || 0);
+        grossSales += oGross;
+        netSales += oNet;
+
+        productDiscounts += Number(o.totalOfferDiscount || 0);
+        couponDiscounts += Number(o.discountAmount || 0);
+        totalRefunds += Number(o.totalRefundedAmount || 0);
+
+        // Payment Method breakdown
+        const pmKey = o.paymentMethod || "Other";
+        if (!pmMap[pmKey]) pmMap[pmKey] = { method: pmKey, orders: 0, amount: 0 };
+        pmMap[pmKey].orders++;
+        pmMap[pmKey].amount += oNet;
+
+        // Product Breakdown
+        (o.items || []).forEach((it) => {
+          if (it.itemStatus !== "Cancelled") {
+            const pName = it.name || "Fragrance Item";
+            if (!prodMap[pName]) {
+              prodMap[pName] = {
+                name: pName,
+                category: it.category || "Atelier",
+                quantity: 0,
+                revenue: 0,
+              };
+            }
+            prodMap[pName].quantity += (it.quantity || 1);
+            prodMap[pName].revenue += (it.discountedLineAmount || it.lineTotal || (it.unitPrice * (it.quantity || 1)));
+          }
+        });
+      }
+    });
+
+    const paymentMethods = Object.values(pmMap).sort((a, b) => b.amount - a.amount);
+    const productSales = Object.values(prodMap).sort((a, b) => b.revenue - a.revenue);
+
+    const reportData = {
+      periodLabel,
+      startDate: start.toISOString().split("T")[0],
+      endDate: end.toISOString().split("T")[0],
+      metrics: {
+        totalOrders: orders.length,
+        completedOrders,
+        cancelledOrders,
+        returnedOrders,
+        grossSales: Math.round(grossSales * 100) / 100,
+        netSales: Math.round(Math.max(0, netSales - totalRefunds) * 100) / 100,
+        productDiscounts: Math.round(productDiscounts * 100) / 100,
+        couponDiscounts: Math.round(couponDiscounts * 100) / 100,
+        totalRefunds: Math.round(totalRefunds * 100) / 100,
+      },
+      paymentMethods,
+      productSales,
+      orders,
+      generatedAt: new Date(),
+      adminName: req.admin?.name || req.user?.name || "FEXA Administrator",
+    };
+
+    streamSalesReportPDF(reportData, res);
+  } catch (error) {
+    console.error("Export sales report PDF error:", error);
+    if (!res.headersSent) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to generate sales report PDF.",
+        error: error.message,
+      });
+    }
+  }
+};
+
+// =========================================================================
+// GET DASHBOARD REVENUE ANALYTICS (GRAPH & SUMMARY METRICS)
+// =========================================================================
+const getDashboardRevenueAnalytics = async (req, res) => {
+  try {
+    const { period = "last7days", startDate, endDate } = req.query;
+    const { start, end, prevStart, prevEnd, periodLabel } = parseDateRange(period, startDate, endDate);
+
+    // Condition for recognized order:
+    // Recognized when (orderStatus !== "Cancelled" && (paymentStatus === "Paid" || (paymentMethod === "COD" && orderStatus === "Delivered")))
+    const isRecognizedOrderCond = {
+      $and: [
+        { $ne: ["$orderStatus", "Cancelled"] },
+        {
+          $or: [
+            { $eq: ["$paymentStatus", "Paid"] },
+            {
+              $and: [
+                { $eq: ["$paymentMethod", "COD"] },
+                { $eq: ["$orderStatus", "Delivered"] },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    // Gross Product Amount (Catalogue value before discounts)
+    const grossAmountExpr = {
+      $cond: [
+        isRecognizedOrderCond,
+        {
+          $ifNull: [
+            "$originalSubtotal",
+            { $add: ["$subtotal", { $ifNull: ["$totalOfferDiscount", 0] }] },
+          ],
+        },
+        0,
+      ],
+    };
+
+    // Product Offer Discounts
+    const productDiscountsExpr = {
+      $cond: [
+        isRecognizedOrderCond,
+        { $ifNull: ["$totalOfferDiscount", 0] },
+        0,
+      ],
+    };
+
+    // Coupon Discounts
+    const couponDiscountsExpr = {
+      $cond: [
+        isRecognizedOrderCond,
+        { $ifNull: ["$discountAmount", 0] },
+        0,
+      ],
+    };
+
+    // Total Combined Discounts (Product Offers + Coupon Discounts)
+    const totalDiscountsExpr = {
+      $cond: [
+        isRecognizedOrderCond,
+        {
+          $add: [
+            { $ifNull: ["$totalOfferDiscount", 0] },
+            { $ifNull: ["$discountAmount", 0] },
+          ],
+        },
+        0,
+      ],
+    };
+
+    // Shipping Charges
+    const shippingExpr = {
+      $cond: [
+        isRecognizedOrderCond,
+        { $ifNull: ["$shippingCost", 0] },
+        0,
+      ],
+    };
+
+    // Refund Amount
+    const refundsExpr = {
+      $cond: [
+        isRecognizedOrderCond,
+        { $ifNull: ["$totalRefundedAmount", 0] },
+        0,
+      ],
+    };
+
+    // Expression for net recognized revenue per order:
+    // Uses actual final paid amount (totalAmount) after discounts and coupons, minus refunds/returns
+    const recognizedRevenueExpr = {
+      $cond: [
+        isRecognizedOrderCond,
+        {
+          $max: [
+            0,
+            { $subtract: ["$totalAmount", { $ifNull: ["$totalRefundedAmount", 0] }] },
+          ],
+        },
+        0,
+      ],
+    };
+
+    // Expression for counting successful recognized orders
+    const isSuccessfulOrderExpr = {
+      $cond: [
+        {
+          $and: [
+            isRecognizedOrderCond,
+            {
+              $gt: [
+                {
+                  $max: [
+                    0,
+                    { $subtract: ["$totalAmount", { $ifNull: ["$totalRefundedAmount", 0] }] },
+                  ],
+                },
+                0,
+              ],
+            },
+          ],
+        },
+        1,
+        0,
+      ],
+    };
+
+    // 1. Current Period Overview Aggregation
+    const [currentPeriodStats] = await Order.aggregate([
+      { $match: { createdAt: { $gte: start, $lte: end } } },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: recognizedRevenueExpr },
+          successfulOrders: { $sum: isSuccessfulOrderExpr },
+          totalGrossAmount: { $sum: grossAmountExpr },
+          totalProductDiscounts: { $sum: productDiscountsExpr },
+          totalCouponDiscounts: { $sum: couponDiscountsExpr },
+          totalDiscounts: { $sum: totalDiscountsExpr },
+          totalShipping: { $sum: shippingExpr },
+          totalRefunds: { $sum: refundsExpr },
+        },
+      },
+    ]);
+
+    // 2. Previous Equivalent Period Aggregation (for growth comparison)
+    const [prevPeriodStats] = await Order.aggregate([
+      { $match: { createdAt: { $gte: prevStart, $lte: prevEnd } } },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: recognizedRevenueExpr },
+          successfulOrders: { $sum: isSuccessfulOrderExpr },
+        },
+      },
+    ]);
+
+    const totalRevenue = Math.round((currentPeriodStats?.totalRevenue || 0) * 100) / 100;
+    const successfulOrders = currentPeriodStats?.successfulOrders || 0;
+    const averageOrderValue = successfulOrders > 0 ? Math.round((totalRevenue / successfulOrders) * 100) / 100 : 0;
+
+    const prevRevenue = Math.round((prevPeriodStats?.totalRevenue || 0) * 100) / 100;
+    const prevOrders = prevPeriodStats?.successfulOrders || 0;
+
+    let revenueGrowth = 0;
+    if (prevRevenue > 0) {
+      revenueGrowth = Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 1000) / 10;
+    } else if (totalRevenue > 0) {
+      revenueGrowth = 100;
+    }
+
+    // 3. Time-Series Trend for Graph
+    const diffDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+    const isYearlyOrLong = diffDays > 90;
+    const dateFormat = isYearlyOrLong ? "%Y-%m" : "%Y-%m-%d";
+
+    const trendsData = await Order.aggregate([
+      { $match: { createdAt: { $gte: start, $lte: end } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: dateFormat, date: "$createdAt" } },
+          revenue: { $sum: recognizedRevenueExpr },
+          orderCount: { $sum: isSuccessfulOrderExpr },
+          grossAmount: { $sum: grossAmountExpr },
+          productDiscounts: { $sum: productDiscountsExpr },
+          couponDiscounts: { $sum: couponDiscountsExpr },
+          totalDiscounts: { $sum: totalDiscountsExpr },
+          shipping: { $sum: shippingExpr },
+          refunds: { $sum: refundsExpr },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const dateMap = new Map();
+    trendsData.forEach((row) => {
+      dateMap.set(row._id, {
+        revenue: Math.round(row.revenue * 100) / 100,
+        orderCount: row.orderCount,
+        grossAmount: Math.round(row.grossAmount * 100) / 100,
+        productDiscounts: Math.round(row.productDiscounts * 100) / 100,
+        couponDiscounts: Math.round(row.couponDiscounts * 100) / 100,
+        discounts: Math.round(row.totalDiscounts * 100) / 100,
+        shipping: Math.round(row.shipping * 100) / 100,
+        refunds: Math.round(row.refunds * 100) / 100,
+      });
+    });
+
+    const series = [];
+    if (isYearlyOrLong) {
+      const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+      while (cursor <= end) {
+        const year = cursor.getFullYear();
+        const month = String(cursor.getMonth() + 1).padStart(2, "0");
+        const key = `${year}-${month}`;
+        const data = dateMap.get(key) || {
+          revenue: 0,
+          orderCount: 0,
+          grossAmount: 0,
+          productDiscounts: 0,
+          couponDiscounts: 0,
+          discounts: 0,
+          shipping: 0,
+          refunds: 0,
+        };
+        const label = cursor.toLocaleString("en-US", { month: "short", year: "numeric" });
+        series.push({
+          key,
+          date: key,
+          label,
+          revenue: data.revenue,
+          netRevenue: data.revenue,
+          orderCount: data.orderCount,
+          successfulOrders: data.orderCount,
+          grossAmount: data.grossAmount,
+          productDiscounts: data.productDiscounts,
+          couponDiscounts: data.couponDiscounts,
+          discounts: data.discounts,
+          shipping: data.shipping,
+          refunds: data.refunds,
+        });
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+    } else {
+      const cursor = new Date(start);
+      cursor.setHours(0, 0, 0, 0);
+      while (cursor <= end) {
+        const year = cursor.getFullYear();
+        const month = String(cursor.getMonth() + 1).padStart(2, "0");
+        const day = String(cursor.getDate()).padStart(2, "0");
+        const key = `${year}-${month}-${day}`;
+        const data = dateMap.get(key) || {
+          revenue: 0,
+          orderCount: 0,
+          grossAmount: 0,
+          productDiscounts: 0,
+          couponDiscounts: 0,
+          discounts: 0,
+          shipping: 0,
+          refunds: 0,
+        };
+        const label = cursor.toLocaleString("en-US", { month: "short", day: "numeric" });
+        series.push({
+          key,
+          date: key,
+          label,
+          revenue: data.revenue,
+          netRevenue: data.revenue,
+          orderCount: data.orderCount,
+          successfulOrders: data.orderCount,
+          grossAmount: data.grossAmount,
+          productDiscounts: data.productDiscounts,
+          couponDiscounts: data.couponDiscounts,
+          discounts: data.discounts,
+          shipping: data.shipping,
+          refunds: data.refunds,
+        });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalRevenue,
+        successfulOrders,
+        averageOrderValue,
+        revenueGrowth,
+        totalGrossAmount: Math.round((currentPeriodStats?.totalGrossAmount || 0) * 100) / 100,
+        totalProductDiscounts: Math.round((currentPeriodStats?.totalProductDiscounts || 0) * 100) / 100,
+        totalCouponDiscounts: Math.round((currentPeriodStats?.totalCouponDiscounts || 0) * 100) / 100,
+        totalDiscounts: Math.round((currentPeriodStats?.totalDiscounts || 0) * 100) / 100,
+        totalShipping: Math.round((currentPeriodStats?.totalShipping || 0) * 100) / 100,
+        totalRefunds: Math.round((currentPeriodStats?.totalRefunds || 0) * 100) / 100,
+        previousRevenue: prevRevenue,
+        previousOrders: prevOrders,
+        period,
+        periodLabel,
+        dateRange: {
+          start: start.toISOString(),
+          end: end.toISOString(),
+          prevStart: prevStart.toISOString(),
+          prevEnd: prevEnd.toISOString(),
+        },
+        interval: isYearlyOrLong ? "monthly" : "daily",
+        series,
+      },
+    });
+  } catch (error) {
+    console.error("Dashboard revenue analytics error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to generate dashboard revenue analytics.",
+      error: error.message,
+    });
+  }
+};
+
 export {
   getSalesOverview,
   getSalesTrends,
@@ -1235,6 +1696,8 @@ export {
   getCouponPerformance,
   getDetailedSalesReport,
   exportSalesReportCSV,
+  exportSalesReportPDF,
+  getDashboardRevenueAnalytics,
 };
 
 export default {
@@ -1246,4 +1709,6 @@ export default {
   getCouponPerformance,
   getDetailedSalesReport,
   exportSalesReportCSV,
+  exportSalesReportPDF,
+  getDashboardRevenueAnalytics,
 };

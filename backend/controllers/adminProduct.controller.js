@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import Product from "../models/product.model.js";
+import Category from "../models/category.model.js";
 import { validateProduct, normalizeCategory } from "../validators/product.validator.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -75,6 +76,8 @@ const getProducts = async (req, res) => {
 
     // Sorting: Latest first (-createdAt)
     const products = await Product.find(queryFilter)
+      .populate("parentCategory", "name slug isActive")
+      .populate("subCategory", "name slug isActive")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit);
@@ -126,7 +129,9 @@ const getProductById = async (req, res) => {
       });
     }
 
-    const product = await Product.findById(id);
+    const product = await Product.findById(id)
+      .populate("parentCategory", "name slug isActive")
+      .populate("subCategory", "name slug isActive");
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -255,11 +260,45 @@ const createProduct = async (req, res) => {
     const minSellingPrice = Math.min(...finalVariants.map((v) => Number(v.sellingPrice)));
     const totalStock = finalVariants.reduce((sum, v) => sum + Number(v.stock), 0);
 
+    // Resolve Parent Category and Subcategory
+    let resolvedParentCategory = null;
+    let resolvedCategoryName = sanitized.category;
+    let resolvedSubCategory = null;
+    let resolvedSubCategoryName = "";
+
+    if (req.body.parentCategory && mongoose.Types.ObjectId.isValid(req.body.parentCategory)) {
+      const pDoc = await Category.findById(req.body.parentCategory);
+      if (pDoc) {
+        resolvedParentCategory = pDoc._id;
+        resolvedCategoryName = pDoc.name;
+      }
+    } else if (sanitized.category) {
+      const pDoc = await Category.findOne({ name: sanitized.category, parentCategory: null });
+      if (pDoc) {
+        resolvedParentCategory = pDoc._id;
+        resolvedCategoryName = pDoc.name;
+      }
+    }
+
+    if (req.body.subCategory && mongoose.Types.ObjectId.isValid(req.body.subCategory)) {
+      const sDoc = await Category.findById(req.body.subCategory);
+      if (sDoc) {
+        resolvedSubCategory = sDoc._id;
+        resolvedSubCategoryName = sDoc.name;
+        if (!resolvedParentCategory && sDoc.parentCategory) {
+          resolvedParentCategory = sDoc.parentCategory;
+        }
+      }
+    }
+
     const product = new Product({
       name: sanitized.name,
       slug: generatedSlug,
       brand: sanitized.brand,
-      category: sanitized.category,
+      category: resolvedCategoryName,
+      parentCategory: resolvedParentCategory,
+      subCategory: resolvedSubCategory,
+      subCategoryName: resolvedSubCategoryName,
       price: minSellingPrice,
       compareAtPrice: sanitized.compareAtPrice || null,
       stock: totalStock,
@@ -301,7 +340,9 @@ const updateProduct = async (req, res) => {
       });
     }
 
-    const product = await Product.findById(id);
+    const product = await Product.findById(id)
+      .populate("parentCategory", "name slug isActive")
+      .populate("subCategory", "name slug isActive");
     if (!product) {
       cleanupUploadedFiles(req.files);
       return res.status(404).json({
@@ -419,11 +460,50 @@ const updateProduct = async (req, res) => {
     const minSellingPrice = Math.min(...finalVariants.map((v) => Number(v.sellingPrice)));
     const totalStock = finalVariants.reduce((sum, v) => sum + Number(v.stock), 0);
 
+    // Resolve Parent Category and Subcategory
+    let resolvedParentCategory = product.parentCategory || null;
+    let resolvedCategoryName = sanitized.category || product.category;
+    let resolvedSubCategory = product.subCategory || null;
+    let resolvedSubCategoryName = product.subCategoryName || "";
+
+    if (req.body.parentCategory && mongoose.Types.ObjectId.isValid(req.body.parentCategory)) {
+      const pDoc = await Category.findById(req.body.parentCategory);
+      if (pDoc) {
+        resolvedParentCategory = pDoc._id;
+        resolvedCategoryName = pDoc.name;
+      }
+    } else if (sanitized.category) {
+      const pDoc = await Category.findOne({ name: sanitized.category, parentCategory: null });
+      if (pDoc) {
+        resolvedParentCategory = pDoc._id;
+        resolvedCategoryName = pDoc.name;
+      }
+    }
+
+    if (req.body.subCategory !== undefined) {
+      if (req.body.subCategory && mongoose.Types.ObjectId.isValid(req.body.subCategory)) {
+        const sDoc = await Category.findById(req.body.subCategory);
+        if (sDoc) {
+          resolvedSubCategory = sDoc._id;
+          resolvedSubCategoryName = sDoc.name;
+          if (!resolvedParentCategory && sDoc.parentCategory) {
+            resolvedParentCategory = sDoc.parentCategory;
+          }
+        }
+      } else {
+        resolvedSubCategory = null;
+        resolvedSubCategoryName = "";
+      }
+    }
+
     // Apply updates
     product.name = sanitized.name;
     product.slug = newSlug;
     product.brand = sanitized.brand;
-    product.category = sanitized.category;
+    product.category = resolvedCategoryName;
+    product.parentCategory = resolvedParentCategory;
+    product.subCategory = resolvedSubCategory;
+    product.subCategoryName = resolvedSubCategoryName;
     product.price = minSellingPrice;
     product.compareAtPrice = sanitized.compareAtPrice || null;
     product.stock = totalStock;
@@ -463,7 +543,9 @@ const deleteProduct = async (req, res) => {
       });
     }
 
-    const product = await Product.findById(id);
+    const product = await Product.findById(id)
+      .populate("parentCategory", "name slug isActive")
+      .populate("subCategory", "name slug isActive");
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -514,7 +596,9 @@ const toggleProductStatus = async (req, res) => {
       });
     }
 
-    const product = await Product.findById(id);
+    const product = await Product.findById(id)
+      .populate("parentCategory", "name slug isActive")
+      .populate("subCategory", "name slug isActive");
     if (!product) {
       return res.status(404).json({
         success: false,

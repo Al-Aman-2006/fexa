@@ -10,9 +10,11 @@ import {
   recordPaymentFailure,
   checkOrderStatus,
   handleRazorpayWebhook,
+  cancelOrderItem,
   requestItemReturn,
   approveItemReturn,
   rejectItemReturn,
+  downloadOrderInvoicePDF,
 } from "../controllers/order.controller.js";
 
 const router = express.Router();
@@ -36,10 +38,16 @@ router.post("/", createOrder);
 // GET /api/orders - Get user's order history
 router.get("/", getMyOrders);
 
+// Product Cancellation (Individual Item)
+router.post("/:orderId/items/:itemId/cancel", cancelOrderItem);
+
 // Returns & Refunds
 router.post("/:orderId/items/:itemId/return", requestItemReturn);
 router.post("/:orderId/items/:itemId/approve-return", approveItemReturn);
 router.post("/:orderId/items/:itemId/reject-return", rejectItemReturn);
+
+// GET /api/orders/:orderId/invoice - Secure PDF invoice download for patron
+router.get("/:orderId/invoice", downloadOrderInvoicePDF);
 
 // GET /api/orders/:id - Get specific order details
 router.get("/:id", getOrderById);

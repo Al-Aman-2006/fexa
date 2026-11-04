@@ -13,12 +13,12 @@ const normalizeCategory = (category) => {
 };
 
 const validateCategory = (value) => {
-  if (!value || typeof value !== "string") {
-    return "Please select a valid category (Men, Women, or Unisex).";
+  if (!value || typeof value !== "string" || !value.trim()) {
+    return "Category is required.";
   }
-  const normalized = normalizeCategory(value);
-  if (!["Men", "Women", "Unisex"].includes(normalized)) {
-    return "Please select a valid category (Men, Women, or Unisex).";
+  const trimmed = value.trim();
+  if (trimmed.length < 2) {
+    return "Category name must be at least 2 characters.";
   }
   return null;
 };

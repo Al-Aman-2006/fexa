@@ -3,6 +3,7 @@ import {
   getPublicProducts,
   getPublicProductCollections,
   getPublicProductById,
+  getPublicCategories,
 } from "../controllers/product.controller.js";
 
 const router = express.Router();
@@ -10,6 +11,9 @@ const router = express.Router();
 // ========================================
 // PUBLIC READ-ONLY PRODUCT ROUTES
 // ========================================
+
+// GET /api/products/categories - Active categories and child subcategories
+router.get("/categories", getPublicCategories);
 
 // GET /api/products/collections - Category overview / grouped summary
 router.get("/collections", getPublicProductCollections);

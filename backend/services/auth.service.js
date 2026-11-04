@@ -109,10 +109,37 @@ const registerUser = async (userData) => {
 
 
   if (existingUser) {
+    if (existingUser.emailVerified) {
+      throw new Error("An account with this email already exists.");
+    }
 
-    throw new Error(
-      "User already exists"
-    );
+    console.log("ℹ️ Existing unverified account found for:", normalizedEmail, "- updating and resending OTP");
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const otp = generateOtp();
+    const otpHash = hashOtp(otp);
+    const otpExpiresAt = new Date(Date.now() + 60 * 1000);
+
+    existingUser.name = name;
+    existingUser.password = hashedPassword;
+    if (phone) existingUser.phone = phone;
+    existingUser.otpHash = otpHash;
+    existingUser.otpExpiresAt = otpExpiresAt;
+
+    try {
+      await sendOtpEmail(normalizedEmail, otp);
+      await existingUser.save();
+      console.log("✅ OTP email sent successfully for unverified account retry");
+    } catch (error) {
+      console.error("❌ OTP email failed for unverified account retry - Code:", error.code, "Message:", error.message);
+      throw new Error("Unable to send verification email");
+    }
+
+    return {
+      id: existingUser._id,
+      name: existingUser.name,
+      email: existingUser.email,
+    };
   }
 
 
@@ -193,23 +220,17 @@ const registerUser = async (userData) => {
     );
 
   } catch (error) {
+    console.error("❌ OTP email failed - Code:", error.code, "Message:", error.message);
+    try {
+      await User.deleteOne({
+        _id: user._id,
+      });
+      console.log("ℹ️ Cleaned up unverified user record after email delivery failure");
+    } catch (cleanupErr) {
+      console.error("❌ Failed to clean up user record:", cleanupErr.message);
+    }
 
-    console.error(
-      "❌ OTP email failed:",
-      error
-    );
-
-
-    // Remove user if email failed
-
-    await User.deleteOne({
-      _id: user._id,
-    });
-
-
-    throw new Error(
-      "Unable to send verification email"
-    );
+    throw new Error("Unable to send verification email");
   }
 
 
@@ -565,40 +586,31 @@ const resendOtp = async (
   // UPDATE USER
   // ========================================
 
-  user.otpHash =
-    otpHash;
-
-  user.otpExpiresAt =
-    otpExpiresAt;
-
-
-  await user.save();
-
-
   // ========================================
   // SEND NEW OTP
   // ========================================
 
   try {
-
     await sendOtpEmail(
       normalizedEmail,
       otp
     );
 
+    user.otpHash = otpHash;
+    user.otpExpiresAt = otpExpiresAt;
+    await user.save();
 
     console.log(
       "✅ New OTP sent successfully:",
       normalizedEmail
     );
-
   } catch (error) {
-
     console.error(
-      "❌ Resend OTP email failed:",
-      error
+      "❌ Resend OTP email failed - Code:",
+      error.code,
+      "Message:",
+      error.message
     );
-
 
     throw new Error(
       "Unable to send verification email"

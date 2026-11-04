@@ -86,10 +86,10 @@ const register = async (req, res) => {
     console.error("Registration error:", error);
     
     // Check if it's the "email exists" error from the service
-    if (error.message && error.message.toLowerCase().includes("email already exists")) {
+    if (error.message && error.message.toLowerCase().includes("already exists")) {
       return res.status(400).json({
         success: false,
-        message: "Validation failed",
+        message: "An account with this email already exists.",
         errors: {
           email: "An account with this email already exists."
         }

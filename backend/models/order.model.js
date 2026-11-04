@@ -134,6 +134,18 @@ const orderItemSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
+    cancellationReason: {
+      type: String,
+      default: null,
+    },
+    cancellationNote: {
+      type: String,
+      default: null,
+    },
     image: {
       type: String,
       default: null,
@@ -237,12 +249,53 @@ const orderSchema = new mongoose.Schema(
       type: String,
       enum: ["Pending", "Paid", "Failed"],
       default: "Pending",
+      index: true,
     },
     orderStatus: {
       type: String,
-      enum: ["Processing", "Dispatched", "Delivered", "Cancelled"],
+      enum: [
+        "Pending",
+        "Confirmed",
+        "Processing",
+        "Dispatched",
+        "Shipped",
+        "Out for Delivery",
+        "Delivered",
+        "Cancelled",
+        "Return Requested",
+        "Return Approved",
+        "Return Rejected",
+        "Returned",
+        "Refunded",
+      ],
       default: "Processing",
+      index: true,
     },
+    trackingInfo: {
+      courierProvider: { type: String, default: null },
+      trackingNumber: { type: String, default: null },
+      trackingUrl: { type: String, default: null },
+      dispatchedAt: { type: Date, default: null },
+      estimatedDeliveryAt: { type: Date, default: null },
+      statusUpdates: [
+        {
+          status: { type: String },
+          location: { type: String, default: "" },
+          message: { type: String, default: "" },
+          timestamp: { type: Date, default: Date.now },
+        },
+      ],
+    },
+    statusHistory: [
+      {
+        previousStatus: { type: String, default: null },
+        newStatus: { type: String, required: true },
+        changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+        adminEmail: { type: String, default: null },
+        timestamp: { type: Date, default: Date.now },
+        note: { type: String, default: null },
+      },
+    ],
     razorpayOrderId: {
       type: String,
       default: null,
@@ -282,6 +335,9 @@ const orderSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+orderSchema.index({ createdAt: -1, orderStatus: 1 });
+orderSchema.index({ "items.name": "text", orderNumber: "text" });
 
 const Order = mongoose.models.Order || mongoose.model("Order", orderSchema);
 
