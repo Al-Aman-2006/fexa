@@ -59,6 +59,7 @@ function AdminSales() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
 
   // Format currency in INR
   const formatINR = (val) => {
@@ -265,6 +266,40 @@ function AdminSales() {
     }
   };
 
+  // Handle PDF Export
+  const handleExportPDF = async () => {
+    try {
+      setExportingPDF(true);
+      const params = getPeriodParams();
+      if (orderStatusFilter !== "All") params.set("orderStatus", orderStatusFilter);
+      if (paymentStatusFilter !== "All") params.set("paymentStatus", paymentStatusFilter);
+      if (paymentMethodFilter !== "All") params.set("paymentMethod", paymentMethodFilter);
+      if (appliedOrderSearch.trim()) params.set("search", appliedOrderSearch.trim());
+
+      const url = `http://localhost:5000/api/admin/sales/export-pdf?${params.toString()}`;
+      const response = await fetch(url, { credentials: "include" });
+
+      if (!response.ok) {
+        throw new Error("Export PDF failed on server.");
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `FEXA_Sales_Report_${new Date().toISOString().split("T")[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error("Export PDF error:", err);
+      alert("Failed to export sales report as PDF. Please try again.");
+    } finally {
+      setExportingPDF(false);
+    }
+  };
+
   // Order Details Modal & Return Processing Handlers
   const handleOpenOrderModal = async (order) => {
     setSelectedOrder(order);
@@ -462,6 +497,14 @@ function AdminSales() {
             <button className="command-btn batch-btn" onClick={handleExportCSV} disabled={exporting}>
               <span>⬇</span> {exporting ? "EXPORTING..." : "EXPORT CSV REPORT"}
             </button>
+            <button
+              className="command-btn batch-btn"
+              onClick={handleExportPDF}
+              disabled={exportingPDF}
+              style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)", color: "#fff" }}
+            >
+              <span>📄</span> {exportingPDF ? "EXPORTING PDF..." : "EXPORT PDF REPORT"}
+            </button>
 
             <div className="admin-user-pill">
               <div className="admin-user-avatar">
@@ -534,6 +577,15 @@ function AdminSales() {
               <button className="export-csv-btn" onClick={handleExportCSV} disabled={exporting}>
                 <span>📥</span>
                 <span>{exporting ? "GENERATING..." : "EXPORT CSV"}</span>
+              </button>
+              <button
+                className="export-csv-btn"
+                onClick={handleExportPDF}
+                disabled={exportingPDF}
+                style={{ background: "rgba(161, 132, 189, 0.2)", borderColor: "#a184bd", color: "#e8ddf5" }}
+              >
+                <span>📄</span>
+                <span>{exportingPDF ? "GENERATING PDF..." : "EXPORT PDF"}</span>
               </button>
             </div>
 

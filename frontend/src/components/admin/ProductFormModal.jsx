@@ -22,9 +22,26 @@ function ProductFormModal({
     name: "",
     brand: "FEXA",
     category: initialCategory || "Men",
+    parentCategory: "",
+    subCategory: "",
     status: "Active",
     description: "",
   });
+
+  const [categoriesList, setCategoriesList] = useState([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch("http://localhost:5000/api/admin/categories", { credentials: "include" })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.categories) {
+            setCategoriesList(data.categories);
+          }
+        })
+        .catch((err) => console.error("Failed to load categories:", err));
+    }
+  }, [isOpen]);
 
   const [variants, setVariants] = useState([
     {
@@ -59,10 +76,14 @@ function ProductFormModal({
   useEffect(() => {
     if (isOpen) {
       if (isEdit && product) {
+        const parentId = product.parentCategory?._id || product.parentCategory || "";
+        const subId = product.subCategory?._id || product.subCategory || "";
         setFormData({
           name: product.name || "",
           brand: product.brand || "FEXA",
-          category: product.category || initialCategory || "Men",
+          category: product.category || (product.parentCategory?.name) || initialCategory || "Men",
+          parentCategory: parentId,
+          subCategory: subId,
           status: product.status || "Active",
           description: product.description || "",
         });
@@ -102,6 +123,8 @@ function ProductFormModal({
           name: "",
           brand: "FEXA",
           category: initialCategory || "Men",
+          parentCategory: "",
+          subCategory: "",
           status: "Active",
           description: "",
         });
@@ -134,6 +157,15 @@ function ProductFormModal({
   }, [isOpen, isEdit, product, initialCategory]);
 
   if (!isOpen) return null;
+
+  const selectedParentDoc = categoriesList.find(
+    (c) =>
+      c.name.toLowerCase() === (formData.category || "").toLowerCase() ||
+      (formData.parentCategory && c._id === formData.parentCategory)
+  );
+  const availableSubcategories = (selectedParentDoc?.children || []).filter(
+    (child) => child.isActive
+  );
 
   // Real-time Field Change Handler for top-level product fields
   const handleFieldChange = (name, value) => {
@@ -560,6 +592,19 @@ function ProductFormModal({
       dataPayload.append("name", formData.name.trim());
       dataPayload.append("brand", formData.brand.trim() || "FEXA");
       dataPayload.append("category", formData.category);
+      if (formData.parentCategory) {
+        dataPayload.append("parentCategory", formData.parentCategory);
+      } else {
+        const matchingParent = categoriesList.find(
+          (c) => c.name.toLowerCase() === (formData.category || "").toLowerCase()
+        );
+        if (matchingParent) {
+          dataPayload.append("parentCategory", matchingParent._id);
+        }
+      }
+      if (formData.subCategory) {
+        dataPayload.append("subCategory", formData.subCategory);
+      }
       dataPayload.append("status", formData.status);
       dataPayload.append("description", formData.description.trim());
 
@@ -708,30 +753,71 @@ function ProductFormModal({
                 )}
               </div>
 
-              {/* Category */}
+              {/* Parent Category */}
               <div className="admin-modal-field">
-                <label>CATEGORY *</label>
-                {isEdit ? (
-                  <select
-                    name="category"
-                    value={formData.category}
-                    onChange={(e) => handleFieldChange("category", e.target.value)}
-                    onBlur={() => handleFieldBlur("category")}
-                    className={`admin-modal-select ${modalTouched.category && modalErrors.category ? "input-error" : ""}`}
-                  >
-                    <option value="Men">Men</option>
-                    <option value="Women">Women</option>
-                    <option value="Unisex">Unisex</option>
-                  </select>
-                ) : (
-                  <div className="category-readonly-display" id="product-category-readonly-display">
-                    <span className="readonly-category-label">CATEGORY:</span>
-                    <span className="readonly-category-badge">{formData.category.toUpperCase()}</span>
-                    <span className="readonly-category-lock" title="Derived from Category Management route">🔒</span>
-                  </div>
-                )}
+                <label>PARENT CATEGORY *</label>
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={(e) => {
+                    const selectedName = e.target.value;
+                    const pDoc = categoriesList.find((c) => c.name === selectedName);
+                    setFormData((prev) => ({
+                      ...prev,
+                      category: selectedName,
+                      parentCategory: pDoc ? pDoc._id : "",
+                      subCategory: "",
+                    }));
+                    handleFieldBlur("category");
+                  }}
+                  onBlur={() => handleFieldBlur("category")}
+                  className={`admin-modal-select ${modalTouched.category && modalErrors.category ? "input-error" : ""}`}
+                >
+                  {categoriesList.length > 0 ? (
+                    categoriesList.map((cat) => (
+                      <option key={cat._id} value={cat.name}>
+                        {cat.name} {!cat.isActive ? "(Inactive)" : ""}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="Men">Men</option>
+                      <option value="Women">Women</option>
+                      <option value="Unisex">Unisex</option>
+                    </>
+                  )}
+                </select>
                 {modalTouched.category && modalErrors.category && (
                   <span className="modal-field-error">{modalErrors.category}</span>
+                )}
+              </div>
+
+              {/* Subcategory */}
+              <div className="admin-modal-field">
+                <label>SUBCATEGORY (OPTIONAL)</label>
+                <select
+                  name="subCategory"
+                  value={formData.subCategory || ""}
+                  onChange={(e) => {
+                    const subId = e.target.value;
+                    setFormData((prev) => ({
+                      ...prev,
+                      subCategory: subId,
+                    }));
+                  }}
+                  className="admin-modal-select"
+                >
+                  <option value="">None / All Olfactory Notes</option>
+                  {availableSubcategories.map((sub) => (
+                    <option key={sub._id} value={sub._id}>
+                      {sub.name}
+                    </option>
+                  ))}
+                </select>
+                {availableSubcategories.length === 0 && (
+                  <small style={{ color: "#88789c", fontSize: "11px", marginTop: "3px", display: "block" }}>
+                    No active subcategories defined under {formData.category}.
+                  </small>
                 )}
               </div>
 

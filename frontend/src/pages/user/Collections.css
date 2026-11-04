@@ -2627,3 +2627,58 @@
 
 
 
+
+
+/* ========================================================
+   COLLECTION SUBCATEGORY / OLFACTORY PILLS
+   ======================================================== */
+.category-subcategories-bar {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed rgba(161, 132, 189, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.subcategories-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #8c7f99;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.subcategories-pills-list {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.subcategory-filter-pill {
+  background: rgba(161, 132, 189, 0.08);
+  border: 1px solid rgba(161, 132, 189, 0.25);
+  color: #7c5c99;
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.subcategory-filter-pill:hover {
+  background: rgba(161, 132, 189, 0.2);
+  color: #2b2138;
+  border-color: rgba(161, 132, 189, 0.5);
+}
+
+.subcategory-filter-pill.active {
+  background: linear-gradient(135deg, #a184bd 0%, #7c5c99 100%);
+  color: #ffffff;
+  border-color: #7c5c99;
+  box-shadow: 0 2px 8px rgba(124, 92, 153, 0.35);
+}

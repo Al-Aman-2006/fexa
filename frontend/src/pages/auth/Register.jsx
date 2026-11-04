@@ -50,6 +50,7 @@ const navigate = useNavigate();
   const [touched, setTouched] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   const validateEmail = (email) => {
     return /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/.test(email);
@@ -98,6 +99,7 @@ const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isLoading) return;
     
     // Validate all
     const newErrors = {
@@ -117,6 +119,8 @@ const navigate = useNavigate();
       }
       return;
     }
+
+    setIsLoading(true);
 
     try {
       const response = await fetch("http://localhost:5000/api/auth/register", {
@@ -138,18 +142,22 @@ const navigate = useNavigate();
             mappedErrors.fullName = data.errors.name;
           }
           setErrors(prev => ({ ...prev, ...mappedErrors }));
-        } else if (data.message && data.message.toLowerCase().includes("email already exists")) {
+        } else if (data.message && data.message.toLowerCase().includes("already exists")) {
           setErrors(prev => ({ ...prev, email: "An account with this email already exists." }));
+        } else if (data.message && data.message.toLowerCase().includes("unable to send verification email")) {
+          setErrors(prev => ({ ...prev, email: "Unable to send verification email. Please check your email address or try again later." }));
         } else {
-          setErrors(prev => ({ ...prev, email: data.message || "Registration failed." }));
+          setErrors(prev => ({ ...prev, general: data.message || "Registration failed. Please try again." }));
         }
         return;
       }
 
-      navigate("/verify-otp", { state: { email: formData.email } });
+      navigate("/verify-otp", { state: { email: formData.email.trim() } });
     } catch (error) {
       console.error("Registration error:", error);
-      setErrors(prev => ({ ...prev, email: "Unable to connect to the server." }));
+      setErrors(prev => ({ ...prev, general: "Unable to connect to the server. Please try again." }));
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -184,7 +192,7 @@ const navigate = useNavigate();
           </div>
 
           {/* GOOGLE */}
-          <button type="button" className="google-btn" onClick={() => handleGoogleLogin()}>
+          <button type="button" className="google-btn" onClick={() => handleGoogleLogin()} disabled={isLoading}>
             <strong>G</strong>
             Continue with Google
           </button>
@@ -231,6 +239,7 @@ const navigate = useNavigate();
                 value={formData.email}
                 onChange={handleChange}
                 onBlur={handleBlur}
+                className={touched.email && errors.email ? "input-error" : ""}
                 required
               />
               {touched.email && errors.email && <span className="field-error">{errors.email}</span>}
@@ -249,7 +258,8 @@ const navigate = useNavigate();
                   placeholder="Create a password"
                   value={formData.password}
                   onChange={handleChange}
-                onBlur={handleBlur}
+                  onBlur={handleBlur}
+                  className={touched.password && errors.password ? "input-error" : ""}
                   minLength={8}
                   required
                 />
@@ -293,7 +303,8 @@ const navigate = useNavigate();
                   placeholder="Confirm your password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                onBlur={handleBlur}
+                  onBlur={handleBlur}
+                  className={touched.confirmPassword && errors.confirmPassword ? "input-error" : ""}
                   required
                 />
 
@@ -326,12 +337,24 @@ const navigate = useNavigate();
               </label>
             </div>
 
+            {errors.general && (
+              <div className="field-error" style={{ marginBottom: "16px", textAlign: "center" }}>
+                {errors.general}
+              </div>
+            )}
+
             <button
               type="submit"
               className="create-btn"
+              disabled={isLoading}
+              style={isLoading ? { opacity: 0.7, cursor: "not-allowed" } : {}}
             >
-              CREATE ACCOUNT
-              <span>→</span>
+              {isLoading ? "CREATING ACCOUNT..." : (
+                <>
+                  CREATE ACCOUNT
+                  <span>→</span>
+                </>
+              )}
             </button>
 
           </form>

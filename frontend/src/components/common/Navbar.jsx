@@ -5,7 +5,12 @@ import { useCart } from "../../context/CartContext";
 import { useWishlist } from "../../context/WishlistContext";
 import "./Navbar.css";
 
-function Navbar({ activePage, onMobileMenuToggle }) {
+function Navbar({
+  activePage,
+  onMobileMenuToggle,
+  isSticky = true,
+  className = ""
+}) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
@@ -32,11 +37,114 @@ function Navbar({ activePage, onMobileMenuToggle }) {
   const searchInputRef = useRef(null);
   const requestIdRef = useRef(0);
 
-  // Close menus on route navigation
+  // Smart Auto-Hide Navbar state & refs
+  const [isVisible, setIsVisible] = useState(true);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  const isVisibleRef = useRef(true);
+  const isHoveredRef = useRef(false);
+  const lastScrollYRef = useRef(0);
+  const scrollTickingRef = useRef(false);
+  const mouseLeaveTimerRef = useRef(null);
+  const navbarRef = useRef(null);
+
+  const setNavbarVisibility = (visible) => {
+    if (isVisibleRef.current === visible) return;
+    isVisibleRef.current = visible;
+    setIsVisible(visible);
+  };
+
+  // Close menus & restore visibility on route navigation
   useEffect(() => {
     setIsCollectionsOpen(false);
     setIsMobileNavOpen(false);
+    setNavbarVisibility(true);
+    if (mouseLeaveTimerRef.current) {
+      clearTimeout(mouseLeaveTimerRef.current);
+      mouseLeaveTimerRef.current = null;
+    }
   }, [location.pathname]);
+
+  // Smart Auto-Hide scroll & mouse detection effect
+  useEffect(() => {
+    // Top-edge pointer detection (10-20px zone)
+    const handleMouseMove = (e) => {
+      // Ignore touch events
+      if (e.pointerType === "touch") return;
+
+      const inTopZone = e.clientY <= 18;
+
+      if (inTopZone) {
+        if (!isVisibleRef.current) {
+          setNavbarVisibility(true);
+        }
+        if (mouseLeaveTimerRef.current) {
+          clearTimeout(mouseLeaveTimerRef.current);
+          mouseLeaveTimerRef.current = null;
+        }
+      }
+    };
+
+    // Scroll listener with RAF throttling and direction awareness
+    const handleScroll = () => {
+      if (!scrollTickingRef.current) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY;
+          const lastScrollY = lastScrollYRef.current;
+          const delta = currentScrollY - lastScrollY;
+
+          // Scrolled elevation shadow
+          setIsScrolled(currentScrollY > 10);
+
+          // 1. Always visible at the top of the page
+          if (currentScrollY <= 15) {
+            setNavbarVisibility(true);
+            if (mouseLeaveTimerRef.current) {
+              clearTimeout(mouseLeaveTimerRef.current);
+              mouseLeaveTimerRef.current = null;
+            }
+          }
+          // 2. Keep visible while interacting (dropdown, search, mobile menu, or mouse hover)
+          else if (
+            isCollectionsOpen ||
+            isSearchOpen ||
+            isMobileNavOpen ||
+            isHoveredRef.current
+          ) {
+            setNavbarVisibility(true);
+          }
+          // 3. Scrolling down -> hide navbar smoothly
+          else if (delta > 6 && currentScrollY > 76) {
+            setNavbarVisibility(false);
+            if (mouseLeaveTimerRef.current) {
+              clearTimeout(mouseLeaveTimerRef.current);
+              mouseLeaveTimerRef.current = null;
+            }
+          }
+          // 4. Scrolling upward (mobile & desktop) -> reveal smoothly
+          else if (delta < -8) {
+            setNavbarVisibility(true);
+          }
+
+          lastScrollYRef.current = currentScrollY;
+          scrollTickingRef.current = false;
+        });
+        scrollTickingRef.current = true;
+      }
+    };
+
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("scroll", handleScroll);
+      if (mouseLeaveTimerRef.current) {
+        clearTimeout(mouseLeaveTimerRef.current);
+        mouseLeaveTimerRef.current = null;
+      }
+    };
+  }, [isCollectionsOpen, isSearchOpen, isMobileNavOpen]);
 
   // Global Escape key handler
   useEffect(() => {
@@ -256,8 +364,55 @@ function Navbar({ activePage, onMobileMenuToggle }) {
   };
 
   return (
-    <header className="fexa-global-navbar">
-      <div className="global-navbar-container">
+    <>
+      <header
+        ref={navbarRef}
+        className={`fexa-global-navbar ${
+          isVisible ? "navbar--visible" : "navbar--hidden"
+        } ${isScrolled ? "navbar--scrolled" : ""} ${className}`.trim()}
+        onMouseEnter={() => {
+          isHoveredRef.current = true;
+          if (mouseLeaveTimerRef.current) {
+            clearTimeout(mouseLeaveTimerRef.current);
+            mouseLeaveTimerRef.current = null;
+          }
+        }}
+        onMouseLeave={() => {
+          isHoveredRef.current = false;
+          // If scrolled down and no menus open, auto-hide after 1.8s grace period
+          if (
+            window.scrollY > 76 &&
+            !isCollectionsOpen &&
+            !isSearchOpen &&
+            !isMobileNavOpen
+          ) {
+            if (mouseLeaveTimerRef.current) {
+              clearTimeout(mouseLeaveTimerRef.current);
+            }
+            mouseLeaveTimerRef.current = setTimeout(() => {
+              if (
+                !isHoveredRef.current &&
+                window.scrollY > 76 &&
+                !isCollectionsOpen &&
+                !isSearchOpen &&
+                !isMobileNavOpen
+              ) {
+                setNavbarVisibility(false);
+              }
+              mouseLeaveTimerRef.current = null;
+            }, 1800);
+          }
+        }}
+        onFocusCapture={() => {
+          setNavbarVisibility(true);
+          if (mouseLeaveTimerRef.current) {
+            clearTimeout(mouseLeaveTimerRef.current);
+            mouseLeaveTimerRef.current = null;
+          }
+        }}
+        aria-hidden={!isVisible}
+      >
+        <div className="global-navbar-container">
         {/* Brand Logo */}
         <div className="global-navbar-brand" onClick={() => handleNavClick("home")}>
           <h1 className="global-brand-title">FEXA</h1>
@@ -558,7 +713,9 @@ function Navbar({ activePage, onMobileMenuToggle }) {
         </div>
       </div>
     </header>
-  );
+    <div className="navbar-fixed-spacer" aria-hidden="true" />
+  </>
+);
 }
 
 export default Navbar;

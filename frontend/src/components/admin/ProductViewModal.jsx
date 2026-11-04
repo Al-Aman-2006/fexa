@@ -111,8 +111,13 @@ function ProductViewModal({ isOpen, product, onClose, onEdit }) {
           {/* Details Column */}
           <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
                 <span className="category-pill">{product.category}</span>
+                {(product.subCategory?.name || product.subCategoryName) && (
+                  <span className="category-pill" style={{ background: "rgba(161, 132, 189, 0.2)", color: "#e2daf0" }}>
+                    ↳ {product.subCategory?.name || product.subCategoryName}
+                  </span>
+                )}
                 <span style={{ fontSize: "12px", color: "#88789c", textTransform: "uppercase", letterSpacing: "1px" }}>
                   {product.brand || "FEXA"}
                 </span>

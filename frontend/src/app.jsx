@@ -33,8 +33,12 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
 import AdminCoupons from "./pages/admin/AdminCoupons";
 import AdminOffers from "./pages/admin/AdminOffers";
+import AdminOrders from "./pages/admin/AdminOrders";
+import AdminReturns from "./pages/admin/AdminReturns";
+import AdminWalletRefunds from "./pages/admin/AdminWalletRefunds";
 import AdminSales from "./pages/admin/AdminSales";
 import AdminCategoryPage from "./pages/admin/AdminCategoryPage";
+import AdminCategories from "./pages/admin/AdminCategories";
 import AdminReviews from "./pages/admin/AdminReviews";
 import ScrollToTop from "./components/common/ScrollToTop";
 import ErrorBoundary from "./components/common/ErrorBoundary";
@@ -164,6 +168,33 @@ function App() {
               />
 
               <Route
+                path="/admin/orders"
+                element={
+                  <AdminProtectedRoute>
+                    <AdminOrders />
+                  </AdminProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/admin/returns"
+                element={
+                  <AdminProtectedRoute>
+                    <AdminReturns />
+                  </AdminProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/admin/wallet-refunds"
+                element={
+                  <AdminProtectedRoute>
+                    <AdminWalletRefunds />
+                  </AdminProtectedRoute>
+                }
+              />
+
+              <Route
                 path="/admin/sales"
                 element={
                   <AdminProtectedRoute>
@@ -220,6 +251,15 @@ function App() {
               <Route
                 path="/admin/categories"
                 element={<Navigate to="/admin/categories/all" replace />}
+              />
+
+              <Route
+                path="/admin/category-management"
+                element={
+                  <AdminProtectedRoute>
+                    <AdminCategories />
+                  </AdminProtectedRoute>
+                }
               />
 
               <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />

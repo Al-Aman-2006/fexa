@@ -28,6 +28,7 @@ function UserSidebar({ user, activeTab, setActiveTab, onLogout, isMobileOpen, se
   const navItems = [
     { id: "profile", label: "PROFILE", icon: "👤", badge: null },
     { id: "orders", label: "MY ORDERS", icon: "📦", badge: ordersCount > 0 ? String(ordersCount) : null },
+    { id: "returns", label: "MY RETURNS", icon: "🔄", badge: null },
     { id: "addresses", label: "MY ADDRESSES", icon: "📍", badge: addressCount > 0 ? addressCount : null },
     { id: "wishlist", label: "WISHLIST", icon: "♡", badge: wishlistCount > 0 ? String(wishlistCount) : "0" },
     { id: "wallet", label: "MY WALLET", icon: "👛", badge: null },

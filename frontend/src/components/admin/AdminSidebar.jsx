@@ -25,9 +25,9 @@ function AdminSidebar({ activeTab, setActiveTab, onLogout, isMobileOpen, setIsMo
     { id: "sales", label: "Sales", path: "/admin/sales", icon: "📈" },
     { id: "users", label: "Users", path: "/admin/users", icon: "👥" },
     {
-      id: "category-management",
-      label: "Category Management",
-      icon: "🗂️",
+      id: "product-management",
+      label: "Product Management",
+      icon: "📦",
       isParent: true,
       subItems: [
         { id: "category-all", label: "All Products", path: "/admin/categories/all", icon: "📦" },
@@ -36,12 +36,19 @@ function AdminSidebar({ activeTab, setActiveTab, onLogout, isMobileOpen, setIsMo
         { id: "category-unisex", label: "Unisex", path: "/admin/categories/unisex", icon: "✨" },
       ],
     },
-    { id: "orders", label: "Orders", path: "/admin/dashboard", icon: "📦", badge: "LIVE" },
+    {
+      id: "category-management",
+      label: "Category Management",
+      path: "/admin/category-management",
+      icon: "🏷️",
+    },
+    { id: "orders", label: "Orders", path: "/admin/orders", icon: "📦", badge: "LIVE" },
     { id: "reviews", label: "Reviews", path: "/admin/reviews", icon: "⭐" },
     { id: "offers", label: "Offers", path: "/admin/offers", icon: "🏷️" },
     { id: "collections", label: "Collections", path: "/admin/dashboard", icon: "🗃️" },
     { id: "coupons", label: "Coupons", path: "/admin/coupons", icon: "🎟️" },
-    { id: "returns", label: "Returns", path: "/admin/dashboard", icon: "🔄" },
+    { id: "returns", label: "Returns", path: "/admin/returns", icon: "🔄" },
+    { id: "wallet-refunds", label: "Wallet / Refunds", path: "/admin/wallet-refunds", icon: "👛" },
     { id: "settings", label: "Profile / Settings", path: "/admin/dashboard", icon: "⚙️" },
   ];
 
@@ -185,7 +192,15 @@ function AdminSidebar({ activeTab, setActiveTab, onLogout, isMobileOpen, setIsMo
             isActive = true;
           } else if (item.id === "coupons" && (currentPath === "/admin/coupons" || activeTab === "coupons")) {
             isActive = true;
+          } else if (item.id === "offers" && (currentPath === "/admin/offers" || activeTab === "offers")) {
+            isActive = true;
+          } else if (item.id === "orders" && (currentPath === "/admin/orders" || activeTab === "orders")) {
+            isActive = true;
+          } else if (item.id === "returns" && (currentPath === "/admin/returns" || activeTab === "returns")) {
+            isActive = true;
           } else if (item.id === "reviews" && (currentPath === "/admin/reviews" || activeTab === "reviews")) {
+            isActive = true;
+          } else if (item.id === "category-management" && (currentPath === "/admin/category-management" || activeTab === "category-management")) {
             isActive = true;
           } else if (activeTab === item.id) {
             isActive = true;

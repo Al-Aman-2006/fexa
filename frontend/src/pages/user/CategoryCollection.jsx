@@ -40,6 +40,10 @@ export default function CategoryCollection({ category }) {
   const appliedSearch = searchParams.get("search")?.trim() || "";
   const [search, setSearch] = useState(appliedSearch);
 
+  // Subcategory (Olfactory note)
+  const appliedSubCategory = searchParams.get("subcategory")?.trim() || "";
+  const [subCategories, setSubCategories] = useState([]);
+
   // Pagination
   const pageParam = parseInt(searchParams.get("page"), 10);
   const page = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
@@ -60,12 +64,27 @@ export default function CategoryCollection({ category }) {
     setSearch(appliedSearch);
   }, [appliedSearch]);
 
+  // Load active subcategories for current category from backend
+  useEffect(() => {
+    fetch("http://localhost:5000/api/products/categories")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.categories) {
+          const matched = data.categories.find(
+            (c) => c.name.toLowerCase() === normalizedCategory.toLowerCase()
+          );
+          setSubCategories(matched?.children || []);
+        }
+      })
+      .catch((err) => console.error("Failed to load subcategories:", err));
+  }, [normalizedCategory]);
+
   // Request ID ref for stale network response protection
   const requestIdRef = useRef(0);
 
   // Fetch category products from backend
   const fetchCategoryProducts = useCallback(
-    async (targetCat, targetSearch, targetSort, targetPage) => {
+    async (targetCat, targetSearch, targetSort, targetPage, targetSubCat) => {
       const currentReqId = ++requestIdRef.current;
       try {
         setLoading(true);
@@ -80,6 +99,10 @@ export default function CategoryCollection({ category }) {
 
         if (targetSearch.trim()) {
           params.set("search", targetSearch.trim());
+        }
+
+        if (targetSubCat && targetSubCat.trim()) {
+          params.set("subcategory", targetSubCat.trim());
         }
 
         const res = await fetch(`http://localhost:5000/api/products?${params.toString()}`);
@@ -114,10 +137,10 @@ export default function CategoryCollection({ category }) {
     []
   );
 
-  // Master fetch effect on filter/sort/page changes
+  // Master fetch effect on filter/sort/page/subcategory changes
   useEffect(() => {
-    fetchCategoryProducts(normalizedCategory, appliedSearch, sortBy, page);
-  }, [normalizedCategory, appliedSearch, sortBy, page, fetchCategoryProducts]);
+    fetchCategoryProducts(normalizedCategory, appliedSearch, sortBy, page, appliedSubCategory);
+  }, [normalizedCategory, appliedSearch, sortBy, page, appliedSubCategory, fetchCategoryProducts]);
 
   // Handle Sort Change
   const handleSortChange = (newSort) => {
@@ -126,6 +149,18 @@ export default function CategoryCollection({ category }) {
       newParams.delete("sort");
     } else {
       newParams.set("sort", newSort);
+    }
+    newParams.delete("page");
+    setSearchParams(newParams);
+  };
+
+  // Handle SubCategory Selection
+  const handleSubCategorySelect = (subSlug) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (subSlug) {
+      newParams.set("subcategory", subSlug);
+    } else {
+      newParams.delete("subcategory");
     }
     newParams.delete("page");
     setSearchParams(newParams);
@@ -367,6 +402,37 @@ export default function CategoryCollection({ category }) {
               </div>
             </div>
           </div>
+
+          {/* Subcategory / Olfactory Notes Filter Pills */}
+          {subCategories && subCategories.length > 0 && (
+            <div className="category-subcategories-bar">
+              <span className="subcategories-label">OLFACTORY NOTES:</span>
+              <div className="subcategories-pills-list">
+                <button
+                  type="button"
+                  className={`subcategory-filter-pill ${!appliedSubCategory ? "active" : ""}`}
+                  onClick={() => handleSubCategorySelect("")}
+                >
+                  ALL NOTES
+                </button>
+                {subCategories.map((sub) => {
+                  const isSelected =
+                    appliedSubCategory.toLowerCase() === sub.slug.toLowerCase() ||
+                    appliedSubCategory.toLowerCase() === sub.name.toLowerCase();
+                  return (
+                    <button
+                      key={sub._id}
+                      type="button"
+                      className={`subcategory-filter-pill ${isSelected ? "active" : ""}`}
+                      onClick={() => handleSubCategorySelect(sub.slug)}
+                    >
+                      {sub.name.toUpperCase()}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

@@ -7,10 +7,53 @@
 .fexa-global-navbar {
   background: #ffffff;
   border-bottom: 1px solid #eee7f2;
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
   z-index: 1000;
   backdrop-filter: blur(12px);
+  transform: translateY(0);
+  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.25s ease,
+              visibility 0.32s ease;
+  will-change: transform;
+}
+
+/* Scrolled elevation shadow */
+.fexa-global-navbar.navbar--scrolled {
+  box-shadow: 0 4px 24px rgba(43, 33, 56, 0.08);
+}
+
+/* Visible state */
+.fexa-global-navbar.navbar--visible {
+  transform: translateY(0);
+  pointer-events: auto;
+  visibility: visible;
+}
+
+/* Hidden state — slides up cleanly */
+.fexa-global-navbar.navbar--hidden {
+  transform: translateY(-100%);
+  pointer-events: none;
+  visibility: hidden;
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.25s ease,
+              visibility 0.28s step-end;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fexa-global-navbar {
+    transition: none !important;
+  }
+}
+
+/* Document flow spacer behind fixed navbar to prevent content clipping */
+.navbar-fixed-spacer {
+  height: 76px;
+  width: 100%;
+  flex-shrink: 0;
 }
 
 .global-navbar-container {
@@ -22,6 +65,7 @@
   align-items: center;
   justify-content: space-between;
   position: relative;
+  z-index: 1000;
 }
 
 /* BRAND LOGO */
@@ -558,6 +602,10 @@
 }
 
 @media (max-width: 768px) {
+  .navbar-fixed-spacer {
+    height: 68px;
+  }
+
   .global-navbar-container {
     padding: 0 16px;
     height: 68px;

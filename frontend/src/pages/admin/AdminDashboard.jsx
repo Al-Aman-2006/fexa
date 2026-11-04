@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { useAdminAuth } from "../../context/AdminAuthContext";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminPagination from "../../components/admin/AdminPagination";
+import RevenueAnalyticsGraph from "../../components/admin/RevenueAnalyticsGraph";
 import "./AdminDashboard.css";
 
 function AdminDashboard() {
@@ -398,6 +399,9 @@ function AdminDashboard() {
               {toast.text}
             </div>
           )}
+
+          {/* REVENUE ANALYTICS GRAPH (FEATURE 1) */}
+          <RevenueAnalyticsGraph />
 
           {/* QUICK STATS */}
           <section className="admin-stats-grid">

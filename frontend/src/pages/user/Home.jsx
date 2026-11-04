@@ -132,7 +132,7 @@ function Home() {
 
   return (
     <div className="home-page">
-      {/* ── Navbar ── */}
+      {/* ── Fixed Navbar ── */}
       <Navbar activePage={activeSection} />
 
       {/* ── 1. Hero ── */}

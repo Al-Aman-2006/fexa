@@ -612,6 +612,19 @@ function AdminProducts() {
                         <td>{prod.brand || "FEXA"}</td>
                         <td>
                           <span className="category-pill">{prod.category}</span>
+                          {(prod.subCategory?.name || prod.subCategoryName) && (
+                            <span
+                              style={{
+                                display: "block",
+                                fontSize: "0.72rem",
+                                color: "#cbb8de",
+                                marginTop: "4px",
+                                fontWeight: 500,
+                              }}
+                            >
+                              ↳ {prod.subCategory?.name || prod.subCategoryName}
+                            </span>
+                          )}
                         </td>
                         <td className="product-price-cell">
                           {prod.variants && prod.variants.length > 1 ? (

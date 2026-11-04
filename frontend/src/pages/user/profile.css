@@ -1225,13 +1225,17 @@
   text-transform: uppercase;
 }
 
-.status-processing {
+.status-processing,
+.status-pending,
+.status-confirmed {
   background: #fff8e8;
   color: #9c6e00;
   border: 1px solid #fae4a8;
 }
 
-.status-dispatched {
+.status-dispatched,
+.status-shipped,
+.status-out-for-delivery {
   background: #f4edf9;
   color: #6d4292;
   border: 1px solid #e1d0ed;
@@ -1243,15 +1247,68 @@
   border: 1px solid #c4ebcb;
 }
 
-.status-cancelled {
+.status-cancelled,
+.status-return-rejected {
   background: #fdf0f0;
   color: #9e2a2b;
   border: 1px solid #f8d0d0;
 }
 
+.status-return-requested,
+.status-return-approved,
+.status-returned,
+.status-refunded {
+  background: #eef2ff;
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
+}
+
 .status-dot {
   font-size: 12px;
   line-height: 1;
+}
+
+.order-carrier-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #fbf9fd;
+  border: 1px solid #eadaf0;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #4e3a5f;
+  margin: 10px 0 14px 0;
+  flex-wrap: wrap;
+}
+
+.order-carrier-strip .carrier-name {
+  font-weight: 600;
+  color: #765493;
+}
+
+.order-carrier-strip .tracking-code {
+  font-family: monospace;
+  font-size: 12px;
+  color: #2b1c38;
+  background: #ffffff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2d5ea;
+}
+
+.order-carrier-strip .track-live-link {
+  margin-left: auto;
+  color: #765493;
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.order-carrier-strip .track-live-link:hover {
+  text-decoration: underline;
 }
 
 .order-amount-pill {
@@ -1262,6 +1319,52 @@
   font-weight: 700;
   padding: 6px 14px;
   border-radius: 20px;
+}
+
+.order-download-invoice-btn {
+  background: #ffffff;
+  border: 1px solid #765493;
+  color: #765493;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.order-download-invoice-btn:hover {
+  background: #765493;
+  color: #ffffff;
+}
+
+.order-download-invoice-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.order-footer-invoice-link {
+  background: transparent;
+  border: none;
+  color: #765493;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0;
+  margin-top: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.order-footer-invoice-link:hover {
+  color: #4a2866;
 }
 
 /* TRACKING PROGRESS STEPPER */
@@ -1841,3 +1944,1004 @@
   background: #5e3f79;
 }
 
+/* ========================================================
+   FEXA REWORKED WALLET TAB — LAVENDER & WHITE LUXURY THEME
+   ======================================================== */
+
+.wallet-section-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* TOP BALANCE HERO CARD */
+.wallet-hero-card {
+  background: linear-gradient(135deg, #765493 0%, #4a2866 100%);
+  border-radius: 16px;
+  padding: 30px 32px;
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(118, 84, 147, 0.28);
+}
+
+.wallet-hero-card::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  right: -10%;
+  width: 280px;
+  height: 280px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.wallet-hero-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.wallet-badge-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+
+.wallet-refresh-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wallet-refresh-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.wallet-balance-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wallet-balance-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  color: rgba(255, 255, 255, 0.78);
+  text-transform: uppercase;
+}
+
+.wallet-balance-amount {
+  font-size: 2.8rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  line-height: 1.1;
+}
+
+.wallet-balance-subtext {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.82);
+  margin-top: 6px;
+}
+
+.wallet-summary-metrics-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.wallet-metric-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wallet-metric-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: rgba(255, 255, 255, 0.72);
+  text-transform: uppercase;
+}
+
+.wallet-metric-val {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.wallet-metric-val.credited {
+  color: #bbf7d0;
+}
+
+.wallet-metric-val.debited {
+  color: #fecaca;
+}
+
+.wallet-metric-divider {
+  width: 1px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* TOP-UP CARD */
+.wallet-topup-card {
+  background: #ffffff;
+  border: 1px solid #e5d8ee;
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 4px 16px rgba(118, 84, 147, 0.05);
+}
+
+.wallet-topup-card h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #2e2535;
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wallet-topup-card p {
+  font-size: 13px;
+  color: #6f6475;
+  margin: 0 0 16px;
+}
+
+.wallet-quick-chips {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.wallet-chip-btn {
+  background: #faf8fc;
+  border: 1px solid #d4c1e6;
+  color: #5b3e74;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wallet-chip-btn:hover {
+  background: #ede4f5;
+  border-color: #765493;
+}
+
+.wallet-chip-btn.active {
+  background: #765493;
+  color: #ffffff;
+  border-color: #765493;
+}
+
+.wallet-input-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.wallet-amount-input-wrap {
+  flex: 1;
+  min-width: 220px;
+  position: relative;
+}
+
+.wallet-currency-symbol {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #765493;
+}
+
+.wallet-amount-input {
+  width: 100%;
+  border: 1.5px solid #d4c1e6;
+  border-radius: 10px;
+  padding: 12px 14px 12px 34px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #2e2535;
+  outline: none;
+  background: #faf8fc;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.wallet-amount-input:focus {
+  border-color: #765493;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(118, 84, 147, 0.12);
+}
+
+.wallet-submit-topup-btn {
+  background: #765493;
+  border: none;
+  color: #ffffff;
+  padding: 13px 26px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wallet-submit-topup-btn:hover:not(:disabled) {
+  background: #5e3f79;
+  box-shadow: 0 4px 12px rgba(118, 84, 147, 0.25);
+}
+
+.wallet-submit-topup-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.wallet-validation-error {
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 6px;
+  display: block;
+}
+
+/* TRANSACTIONS SECTION */
+.wallet-transactions-card {
+  background: #ffffff;
+  border: 1px solid #e5d8ee;
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 4px 16px rgba(118, 84, 147, 0.05);
+}
+
+.wallet-tx-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.wallet-tx-header h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #2e2535;
+  margin: 0;
+}
+
+.wallet-tx-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tx-filter-pill {
+  background: #f4eef9;
+  border: 1px solid #d4c1e6;
+  color: #5b3e74;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tx-filter-pill.active {
+  background: #765493;
+  color: #ffffff;
+  border-color: #765493;
+}
+
+/* TRANSACTIONS TABLE */
+.wallet-table-wrap {
+  overflow-x: auto;
+}
+
+.wallet-tx-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+
+.wallet-tx-table thead tr {
+  background: #faf8fc;
+  border-bottom: 1.5px solid #e5d8ee;
+}
+
+.wallet-tx-table th {
+  padding: 12px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #6f6475;
+}
+
+.wallet-tx-table tbody tr {
+  border-bottom: 1px solid #f0eaf5;
+  transition: background 0.15s ease;
+}
+
+.wallet-tx-table tbody tr:hover {
+  background: #faf8fc;
+}
+
+.wallet-tx-table td {
+  padding: 14px;
+  vertical-align: middle;
+  color: #3b3047;
+}
+
+.tx-badge-direction {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.tx-badge-direction.credit {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.tx-badge-direction.debit {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.tx-amount-text {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.tx-amount-text.credit {
+  color: #059669;
+}
+
+.tx-amount-text.debit {
+  color: #dc2626;
+}
+
+.tx-meta-sub {
+  font-size: 11px;
+  color: #8c8096;
+  margin-top: 2px;
+}
+
+.tx-id-tag {
+  font-family: monospace;
+  font-size: 11px;
+  color: #765493;
+}
+
+/* ========================================================
+   FEXA RETURNS TAB — CUSTOMER PORTAL
+   ======================================================== */
+
+.returns-portal-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.returns-portal-banner {
+  background: linear-gradient(135deg, #fbf9fd 0%, #f4eef9 100%);
+  border: 1px solid #d4c1e6;
+  border-radius: 14px;
+  padding: 22px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.returns-banner-info h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #2e2535;
+  margin: 0 0 4px;
+}
+
+.returns-banner-info p {
+  font-size: 13px;
+  color: #6f6475;
+  margin: 0;
+}
+
+.request-new-return-btn {
+  background: #765493;
+  color: #ffffff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.request-new-return-btn:hover {
+  background: #5e3f79;
+}
+
+/* RETURN REQUESTS LIST */
+.user-returns-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.user-return-request-card {
+  background: #ffffff;
+  border: 1px solid #e5d8ee;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(118, 84, 147, 0.04);
+}
+
+.user-return-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  border-bottom: 1px solid #f4eef9;
+  padding-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.user-return-id-tag {
+  font-family: monospace;
+  font-weight: 700;
+  color: #765493;
+  font-size: 13px;
+}
+
+.user-return-card-body {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.user-return-prod-img {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid #e5d8ee;
+  background: #faf8fc;
+}
+
+.user-return-prod-meta {
+  flex: 1;
+  min-width: 220px;
+}
+
+.user-return-prod-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2e2535;
+  margin: 0 0 4px;
+}
+
+.user-return-prod-sub {
+  font-size: 12px;
+  color: #7a6b85;
+  margin: 0 0 6px;
+}
+
+.user-return-reason-box {
+  background: #faf8fc;
+  border: 1px solid #eee8f1;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #4b3f54;
+  margin-top: 8px;
+}
+
+.user-return-refund-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  text-align: right;
+  min-width: 160px;
+}
+
+.user-return-refund-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #166534;
+}
+
+.user-return-refund-val {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #15803d;
+  margin: 2px 0;
+}
+
+.user-return-refund-dest {
+  font-size: 11px;
+  color: #166534;
+}
+
+/* SUCCESS MODAL POPUP */
+.user-success-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(46, 37, 53, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.user-success-dialog {
+  background: #ffffff;
+  border: 1px solid #d4c1e6;
+  border-radius: 16px;
+  padding: 30px;
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 16px 40px rgba(118, 84, 147, 0.25);
+  animation: modalPop 0.25s ease;
+}
+
+@keyframes modalPop {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.user-success-icon {
+  font-size: 3rem;
+  margin-bottom: 12px;
+}
+
+.user-success-dialog h3 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #2e2535;
+  margin: 0 0 8px;
+}
+
+.user-success-dialog p {
+  font-size: 14px;
+  color: #6f6475;
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+
+.user-success-close-btn {
+  background: #765493;
+  color: #ffffff;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.user-success-close-btn:hover {
+  background: #5e3f79;
+}
+
+
+
+
+/* ========================================================
+   INDIVIDUAL PRODUCT CANCELLATION STYLES (USER SIDE)
+   ======================================================== */
+
+.order-item-cancelled-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  color: #dc2626;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  letter-spacing: 0.3px;
+}
+
+.cancelled-refund-tag {
+  color: #059669;
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+.order-item-live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.22);
+  color: #7c3aed;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 6px;
+}
+
+.order-item-cancel-btn {
+  background: #ffffff;
+  border: 1px solid #d8b4fe;
+  color: #7c3aed;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.order-item-cancel-btn:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: #ef4444;
+  color: #dc2626;
+  transform: translateY(-1px);
+}
+
+/* CANCELLATION CONFIRMATION MODAL */
+.user-cancel-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 20, 36, 0.7);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.5rem;
+}
+
+.user-cancel-modal-card {
+  background: #ffffff;
+  border: 1px solid #e2d6ed;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 20px 48px rgba(45, 33, 56, 0.22);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: couponModalFadeIn 0.22s ease-out;
+}
+
+.user-cancel-modal-header {
+  padding: 18px 22px;
+  background: #faf8fc;
+  border-bottom: 1px solid #eee8f1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.cancel-modal-eyebrow {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #9333ea;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.user-cancel-modal-header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-family: "Playfair Display", serif;
+  color: #2e2638;
+}
+
+.user-cancel-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  color: #7b6f8a;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.user-cancel-modal-close:hover {
+  background: #ede9fe;
+  color: #581c87;
+}
+
+.user-cancel-modal-body {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Item Preview */
+.cancel-item-preview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #faf8fc;
+  border: 1px solid #eee8f1;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.cancel-item-preview-img {
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e5d8ee;
+  background: #ffffff;
+}
+
+.cancel-item-preview-placeholder {
+  width: 54px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  background: #f3e8ff;
+  border-radius: 8px;
+  border: 1px solid #e5d8ee;
+}
+
+.cancel-item-preview-meta {
+  flex: 1;
+}
+
+.cancel-item-preview-meta h4 {
+  margin: 0 0 3px 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #2e2638;
+}
+
+.cancel-preview-sub {
+  margin: 0 0 3px 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.cancel-preview-qty {
+  margin: 0;
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.cancel-preview-qty strong {
+  color: #dc2626;
+}
+
+/* Financial Callout */
+.cancel-financial-callout {
+  background: #fdfaf6;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cancel-financial-callout .callout-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.cancel-financial-callout .callout-row strong {
+  font-size: 14px;
+  color: #1f2937;
+  font-family: monospace;
+}
+
+.refund-mode-tag {
+  font-weight: 700;
+  color: #7c3aed;
+  font-size: 12px;
+}
+
+.callout-explanation {
+  margin: 4px 0 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(217, 119, 6, 0.25);
+  font-size: 11.5px;
+  color: #92400e;
+  line-height: 1.45;
+}
+
+/* Form Fields */
+.user-cancel-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.user-cancel-field label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: #6f6475;
+  text-transform: uppercase;
+}
+
+.user-cancel-field select,
+.user-cancel-field textarea {
+  border: 1px solid #d4c1e6;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #2e2638;
+  outline: none;
+  background: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.user-cancel-field select:focus,
+.user-cancel-field textarea:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15);
+}
+
+/* Alerts */
+.cancel-modal-error-alert {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cancel-modal-success-alert {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Modal Footer */
+.user-cancel-modal-footer {
+  padding: 16px 22px;
+  background: #faf8fc;
+  border-top: 1px solid #eee8f1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.cancel-modal-dismiss-btn {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #4b5563;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cancel-modal-dismiss-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.cancel-modal-confirm-btn {
+  background: #dc2626;
+  border: none;
+  color: #ffffff;
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
+}
+
+.cancel-modal-confirm-btn:hover:not(:disabled) {
+  background: #b91c1c;
+  transform: translateY(-1px);
+}
+
+.cancel-modal-confirm-btn:disabled,
+.cancel-modal-dismiss-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .user-cancel-modal-card {
+    max-width: 100%;
+  }
+  .user-cancel-modal-footer {
+    flex-direction: column-reverse;
+  }
+  .cancel-modal-confirm-btn,
+  .cancel-modal-dismiss-btn {
+    width: 100%;
+    text-align: center;
+  }
+}

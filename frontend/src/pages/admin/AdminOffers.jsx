@@ -45,6 +45,7 @@ function AdminOffers() {
   const [activeModal, setActiveModal] = useState(null);
   const [modalOffer, setModalOffer] = useState(null);
   const [actionProcessing, setActionProcessing] = useState(false);
+  const [togglingOfferId, setTogglingOfferId] = useState(null);
   const [formErrors, setFormErrors] = useState({});
   const [touched, setTouched] = useState({});
 
@@ -596,9 +597,12 @@ function AdminOffers() {
     }
   };
 
-  // Handle Quick Toggle Status
+  // Handle Quick Toggle Status (with duplicate request prevention)
   const handleToggleStatus = async (off) => {
+    if (!off || !off._id) return;
+    if (togglingOfferId === off._id) return; // Prevent duplicate rapid requests
     try {
+      setTogglingOfferId(off._id);
       const res = await fetch(`http://localhost:5000/api/admin/offers/${off._id}/status`, {
         method: "PATCH",
         credentials: "include",
@@ -629,6 +633,8 @@ function AdminOffers() {
         type: "error",
         text: "Unable to update offer status.",
       });
+    } finally {
+      setTogglingOfferId(null);
     }
   };
 
@@ -996,13 +1002,13 @@ function AdminOffers() {
               <table className="fexa-admin-table offers-table">
                 <thead>
                   <tr>
-                    <th>Offer Name & Details</th>
-                    <th>Scope & Targets</th>
-                    <th>Discount</th>
-                    <th>Validity Window</th>
-                    <th>Live Status</th>
-                    <th>Active</th>
-                    <th className="text-right">Actions</th>
+                    <th className="col-offer-name">Offer Name & Details</th>
+                    <th className="col-scope">Scope & Targets</th>
+                    <th className="col-discount">Discount</th>
+                    <th className="col-validity">Validity Window</th>
+                    <th className="text-center col-live-status">Live Status</th>
+                    <th className="text-center col-active-toggle">Active</th>
+                    <th className="text-right col-actions">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1018,7 +1024,7 @@ function AdminOffers() {
                       </td>
 
                       {/* Scope & Targets */}
-                      <td>
+                      <td className="col-scope">
                         <div className="scope-cell-content">
                           {renderScopeBadge(off)}
                           {off.scope === "product" && off.productId && (
@@ -1028,7 +1034,7 @@ function AdminOffers() {
                       </td>
 
                       {/* Discount */}
-                      <td>
+                      <td className="col-discount">
                         <div className="discount-cell-content">
                           <span className="discount-pill">
                             {off.discountType === "Percentage"
@@ -1042,7 +1048,7 @@ function AdminOffers() {
                       </td>
 
                       {/* Validity Dates */}
-                      <td>
+                      <td className="col-validity">
                         <div className="dates-cell-content">
                           <span className="date-start">
                             <strong>From:</strong> {formatDateDisplay(off.startDate)}
@@ -1054,26 +1060,32 @@ function AdminOffers() {
                       </td>
 
                       {/* Live Status Badge */}
-                      <td>{getOfferStatusTag(off)}</td>
+                      <td className="text-center cell-live-status">{getOfferStatusTag(off)}</td>
 
                       {/* Quick Status Toggle Switch */}
-                      <td>
-                        <label className="fexa-switch" title="Toggle active status">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(off.isActive)}
-                            onChange={() => handleToggleStatus(off)}
-                          />
-                          <span className="fexa-slider round"></span>
-                        </label>
+                      <td className="text-center cell-active-toggle">
+                        <div className="toggle-cell-wrapper">
+                          <label
+                            className="fexa-switch"
+                            title={`Toggle status (currently ${off.isActive ? "Active" : "Inactive"})`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={Boolean(off.isActive)}
+                              disabled={togglingOfferId === off._id}
+                              onChange={() => handleToggleStatus(off)}
+                            />
+                            <span className="fexa-slider round"></span>
+                          </label>
+                        </div>
                       </td>
 
                       {/* Action Buttons */}
-                      <td className="text-right">
-                        <div className="action-buttons-group">
+                      <td className="text-right cell-actions">
+                        <div className="offer-actions action-buttons-group">
                           <button
                             type="button"
-                            className="table-action-btn edit-btn"
+                            className="offer-edit-btn table-action-btn edit-btn"
                             onClick={() => handleOpenEditModal(off)}
                             title="Edit Offer"
                           >
@@ -1081,7 +1093,7 @@ function AdminOffers() {
                           </button>
                           <button
                             type="button"
-                            className="table-action-btn delete-btn"
+                            className="offer-delete-btn table-action-btn delete-btn"
                             onClick={() => handleOpenDeleteModal(off)}
                             title="Safe Archive Offer"
                           >
