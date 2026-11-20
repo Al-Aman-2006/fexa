@@ -1,4 +1,9 @@
 import { createContext, useState, useEffect, useContext } from "react";
+import {
+  checkAdminSession,
+  adminLogin,
+  adminLogout,
+} from "../services/admin.service.js";
 
 const AdminAuthContext = createContext();
 
@@ -12,18 +17,13 @@ export const AdminAuthProvider = ({ children }) => {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/admin/auth/session", {
-          credentials: "include",
-        });
-
-        if (response.ok) {
-          const data = await response.json();
+        const data = await checkAdminSession();
+        if (data && data.success && data.admin) {
           setAdmin(data.admin);
         } else {
           setAdmin(null);
         }
       } catch (error) {
-        console.error("Admin session check error:", error);
         setAdmin(null);
       } finally {
         setLoading(false);
@@ -35,38 +35,26 @@ export const AdminAuthProvider = ({ children }) => {
 
   const loginAdmin = async (email, password) => {
     try {
-      const response = await fetch("http://localhost:5000/api/admin/auth/login", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      const data = await adminLogin({ email, password });
+      if (data && data.success) {
         setAdmin(data.admin);
       }
-
-      return { ok: response.ok, data };
+      return { ok: true, data };
     } catch (error) {
       console.error("Login admin error:", error);
-      return { ok: false, data: { message: "Unable to connect to server." } };
+      const data = error.response?.data || { message: "Unable to connect to server." };
+      return { ok: false, data };
     }
   };
 
   const logoutAdmin = async () => {
     try {
-      await fetch("http://localhost:5000/api/admin/auth/logout", {
-        method: "POST",
-        credentials: "include",
-      });
+      await adminLogout();
     } catch (error) {
       console.error("Admin logout error:", error);
     } finally {
       setAdmin(null);
+      localStorage.removeItem("adminToken");
     }
   };
 

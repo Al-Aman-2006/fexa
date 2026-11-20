@@ -6,6 +6,7 @@ import ProductCard from "../../components/product/ProductCard";
 import menPortfolioImg from "../../assets/images/men_portfolio.jpg";
 import womenPortfolioImg from "../../assets/images/women_portfolio.jpg";
 import unisexPortfolioImg from "../../assets/images/unisex_portfolio.jpg";
+import { getCategories, getProducts } from "../../services/product.service.js";
 import "./Collections.css";
 
 /**
@@ -66,10 +67,9 @@ export default function CategoryCollection({ category }) {
 
   // Load active subcategories for current category from backend
   useEffect(() => {
-    fetch("http://localhost:5000/api/products/categories")
-      .then((res) => res.json())
+    getCategories()
       .then((data) => {
-        if (data.success && data.categories) {
+        if (data && data.success && data.categories) {
           const matched = data.categories.find(
             (c) => c.name.toLowerCase() === normalizedCategory.toLowerCase()
           );
@@ -90,28 +90,27 @@ export default function CategoryCollection({ category }) {
         setLoading(true);
         setError(null);
 
-        const params = new URLSearchParams({
+        const queryParams = {
           category: targetCat.toLowerCase(),
           page: targetPage,
           limit: 12,
           sort: targetSort,
-        });
+        };
 
         if (targetSearch.trim()) {
-          params.set("search", targetSearch.trim());
+          queryParams.search = targetSearch.trim();
         }
 
         if (targetSubCat && targetSubCat.trim()) {
-          params.set("subcategory", targetSubCat.trim());
+          queryParams.subcategory = targetSubCat.trim();
         }
 
-        const res = await fetch(`http://localhost:5000/api/products?${params.toString()}`);
-        const data = await res.json();
+        const data = await getProducts(queryParams);
 
         // Stale network response protection
         if (currentReqId !== requestIdRef.current) return;
 
-        if (res.ok && data.success) {
+        if (data && data.success) {
           setProducts(data.products || []);
           setPagination(data.pagination || { page: targetPage, limit: 12, totalProducts: 0, totalPages: 1 });
           if (data.categoryCounts) {
@@ -122,12 +121,14 @@ export default function CategoryCollection({ category }) {
           }
           setIsCategoryInactive(Boolean(data.isCategoryInactive));
         } else {
-          setError(data.message || "Unable to load collection fragrances.");
+          setError(data?.message || "Unable to load collection fragrances.");
         }
       } catch (err) {
         if (currentReqId !== requestIdRef.current) return;
         console.error(`Category ${targetCat} fetch error:`, err);
-        setError("Unable to connect to the FEXA atelier service. Please try again.");
+        setError(
+          err.response?.data?.message || "Unable to connect to the FEXA atelier service. Please try again."
+        );
       } finally {
         if (currentReqId === requestIdRef.current) {
           setLoading(false);

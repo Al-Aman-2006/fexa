@@ -3,6 +3,12 @@ import { useLocation } from "react-router-dom";
 import { useAdminAuth } from "../../context/AdminAuthContext";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminPagination from "../../components/admin/AdminPagination";
+import { getImageUrl } from "../../utils/imageUrl.js";
+import {
+  getAdminReviews,
+  updateAdminReviewStatus,
+  deleteAdminReview,
+} from "../../services/admin.service.js";
 import "./AdminDashboard.css";
 import "./AdminReviews.css";
 
@@ -57,12 +63,7 @@ function AdminReviews() {
     if (!product || !product.images || product.images.length === 0) {
       return null;
     }
-    const raw = product.images[0];
-    if (raw.startsWith("http://") || raw.startsWith("https://")) {
-      return raw;
-    }
-    const clean = raw.startsWith("/") ? raw : `/${raw}`;
-    return `http://localhost:5000${clean}`;
+    return getImageUrl(product.images[0]);
   };
 
   // Helper date formatter
@@ -90,35 +91,27 @@ function AdminReviews() {
     ) => {
       try {
         setLoading(true);
-        const queryParams = new URLSearchParams({
+        const params = {
           page: targetPage,
           limit: 10,
           sort: targetSort,
-        });
+        };
 
         if (targetSearch.trim()) {
-          queryParams.set("search", targetSearch.trim());
+          params.search = targetSearch.trim();
         }
 
         if (targetStatus && targetStatus !== "All") {
-          queryParams.set("status", targetStatus.toLowerCase());
+          params.status = targetStatus.toLowerCase();
         }
 
         if (targetRating && targetRating !== "All") {
-          queryParams.set("rating", targetRating);
+          params.rating = targetRating;
         }
 
-        const response = await fetch(
-          `http://localhost:5000/api/admin/reviews?${queryParams.toString()}`,
-          {
-            method: "GET",
-            credentials: "include",
-          }
-        );
+        const data = await getAdminReviews(params);
 
-        const data = await response.json();
-
-        if (response.ok && data.success) {
+        if (data && data.success) {
           setReviews(data.reviews || []);
           if (data.kpis) {
             setKpis(data.kpis);
@@ -130,7 +123,7 @@ function AdminReviews() {
           showToast(
             "error",
             "Error",
-            data.message || "Failed to load reviews."
+            data?.message || "Failed to load reviews."
           );
         }
       } catch (err) {
@@ -138,7 +131,7 @@ function AdminReviews() {
         showToast(
           "error",
           "Network Error",
-          "Unable to connect to the FEXA review service."
+          err.response?.data?.message || "Unable to reach reviews service."
         );
       } finally {
         setLoading(false);
@@ -160,18 +153,9 @@ function AdminReviews() {
   const handleUpdateStatus = async (reviewId, newStatus) => {
     try {
       setActionProcessing(true);
-      const res = await fetch(
-        `http://localhost:5000/api/admin/reviews/${reviewId}/status`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ status: newStatus }),
-        }
-      );
+      const data = await updateAdminReviewStatus(reviewId, { status: newStatus });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      if (data && data.success) {
         showToast(
           "success",
           "Status Updated",
@@ -182,11 +166,11 @@ function AdminReviews() {
         }
         fetchReviews(page, search, statusFilter, ratingFilter, sortOption);
       } else {
-        showToast("error", "Action Failed", data.message || "Unable to update status.");
+        showToast("error", "Action Failed", data?.message || "Unable to update status.");
       }
     } catch (err) {
       console.error("Update status error:", err);
-      showToast("error", "Error", "Failed to update review status.");
+      showToast("error", "Error", err.response?.data?.message || "Failed to update review status.");
     } finally {
       setActionProcessing(false);
     }
@@ -197,26 +181,19 @@ function AdminReviews() {
     if (!selectedReview) return;
     try {
       setActionProcessing(true);
-      const res = await fetch(
-        `http://localhost:5000/api/admin/reviews/${selectedReview._id}`,
-        {
-          method: "DELETE",
-          credentials: "include",
-        }
-      );
+      const data = await deleteAdminReview(selectedReview._id);
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      if (data && data.success) {
         showToast("success", "Deleted", "Review permanently removed.");
         setActiveModal(null);
         setSelectedReview(null);
         fetchReviews(page, search, statusFilter, ratingFilter, sortOption);
       } else {
-        showToast("error", "Error", data.message || "Failed to delete review.");
+        showToast("error", "Error", data?.message || "Failed to delete review.");
       }
     } catch (err) {
       console.error("Delete review error:", err);
-      showToast("error", "Error", "Failed to communicate with server.");
+      showToast("error", "Error", err.response?.data?.message || "Failed to communicate with server.");
     } finally {
       setActionProcessing(false);
     }

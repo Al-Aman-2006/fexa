@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useGoogleLogin } from "@react-oauth/google";
+import { login as loginApi, googleLogin as googleLoginApi } from "../../services/auth.service.js";
 
 import "./login.css";
 
@@ -49,31 +50,7 @@ function Login() {
   const handleGoogleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       try {
-        const response = await fetch(
-          "http://localhost:5000/api/auth/google",
-          {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              credential: tokenResponse.access_token,
-            }),
-          }
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          setErrors((prev) => ({
-            ...prev,
-            email:
-              data.message ||
-              "Google authentication failed.",
-          }));
-          return;
-        }
+        const data = await googleLoginApi(tokenResponse.access_token);
 
         login(data.user);
 
@@ -86,6 +63,7 @@ function Login() {
         setErrors((prev) => ({
           ...prev,
           email:
+            err.response?.data?.message ||
             "Unable to connect to Google auth server.",
         }));
       }
@@ -219,40 +197,10 @@ function Login() {
     }
 
     try {
-      const response = await fetch(
-        "http://localhost:5000/api/auth/login",
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: formData.email,
-            password: formData.password,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (data.errors) {
-          setErrors((prev) => ({
-            ...prev,
-            ...data.errors,
-          }));
-        } else {
-          setErrors((prev) => ({
-            ...prev,
-            password:
-              data.message ||
-              "Login failed.",
-          }));
-        }
-
-        return;
-      }
+      const data = await loginApi({
+        email: formData.email,
+        password: formData.password,
+      });
 
       console.log(
         "Login successful:",
@@ -284,11 +232,28 @@ function Login() {
         error
       );
 
-      setErrors((prev) => ({
-        ...prev,
-        email:
-          "Unable to connect to the server.",
-      }));
+      const data = error.response?.data;
+      if (data) {
+        if (data.errors) {
+          setErrors((prev) => ({
+            ...prev,
+            ...data.errors,
+          }));
+        } else {
+          setErrors((prev) => ({
+            ...prev,
+            password:
+              data.message ||
+              "Login failed.",
+          }));
+        }
+      } else {
+        setErrors((prev) => ({
+          ...prev,
+          email:
+            "Unable to connect to the server.",
+        }));
+      }
     }
   };
 

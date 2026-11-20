@@ -6,6 +6,7 @@ import collectionBannerImg from "../../assets/images/collection_banner.jpg";
 import menPortfolioImg from "../../assets/images/men_portfolio.jpg";
 import womenPortfolioImg from "../../assets/images/women_portfolio.jpg";
 import unisexPortfolioImg from "../../assets/images/unisex_portfolio.jpg";
+import { getProductCollections } from "../../services/product.service.js";
 import "./Collections.css";
 
 /**
@@ -48,9 +49,8 @@ export default function Collections() {
     async function loadCollectionsSummary() {
       try {
         setLoadingStats(true);
-        const res = await fetch("http://localhost:5000/api/products/collections");
-        const data = await res.json();
-        if (isMounted && res.ok && data.success) {
+        const data = await getProductCollections();
+        if (isMounted && data && data.success) {
           if (data.counts) {
             setCategoryCounts(data.counts);
           }

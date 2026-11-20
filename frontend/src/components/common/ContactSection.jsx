@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { validateName } from "../../utils/validation";
+import { getMyOrders } from "../../services/order.service.js";
+import { submitContact } from "../../services/user.service.js";
 import "./ContactSection.css";
 
 const CONTACT_REASONS = [
@@ -59,11 +61,8 @@ export default function ContactSection({ id = "contact-section" }) {
       const fetchOrders = async () => {
         try {
           setLoadingOrders(true);
-          const res = await fetch("http://localhost:5000/api/orders", {
-            credentials: "include",
-          });
-          if (res.ok) {
-            const data = await res.json();
+          const data = await getMyOrders();
+          if (data && data.success) {
             const orders = data.orders || [];
             setUserOrders(orders);
             if (orders.length > 0) {
@@ -194,36 +193,28 @@ export default function ContactSection({ id = "contact-section" }) {
 
     try {
       setSubmitting(true);
-      const res = await fetch("http://localhost:5000/api/contact", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          fullName: formData.fullName.trim(),
-          email: formData.email.trim().toLowerCase(),
-          reason: formData.reason,
-          orderNumber: formData.orderNumber.trim() || null,
-          subject: formData.subject.trim(),
-          message: formData.message.trim(),
-        }),
+      const data = await submitContact({
+        fullName: formData.fullName.trim(),
+        email: formData.email.trim().toLowerCase(),
+        reason: formData.reason,
+        orderNumber: formData.orderNumber.trim() || null,
+        subject: formData.subject.trim(),
+        message: formData.message.trim(),
       });
 
-      const data = await res.json();
-
-      if (res.ok && data.success) {
+      if (data && data.success) {
         setSubmissionSuccess({
           message: data.message,
           inquiryId: data.inquiry?.id,
           email: formData.email.trim(),
         });
       } else {
-        setSubmissionError(data.message || "Unable to send your inquiry. Please try again.");
+        setSubmissionError(data?.message || "Unable to send your inquiry. Please try again.");
       }
     } catch (err) {
       console.error("Contact submission network error:", err);
       setSubmissionError(
+        err.response?.data?.message ||
         "Unable to connect to the atelier service. Please verify your internet connection or email us directly at concierge@fexa.com."
       );
     } finally {

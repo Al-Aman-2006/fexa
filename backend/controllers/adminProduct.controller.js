@@ -5,6 +5,10 @@ import { fileURLToPath } from "url";
 import Product from "../models/product.model.js";
 import Category from "../models/category.model.js";
 import { validateProduct, normalizeCategory } from "../validators/product.validator.js";
+import {
+  uploadMultipleToCloudinary,
+  deleteFromCloudinary,
+} from "../services/cloudinary.service.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -156,6 +160,7 @@ const getProductById = async (req, res) => {
 // CREATE NEW PRODUCT (With Variant Support)
 // ========================================
 const createProduct = async (req, res) => {
+  let uploadedCloudinaryResults = [];
   try {
     let variants = [];
     if (req.body.variants) {
@@ -232,8 +237,24 @@ const createProduct = async (req, res) => {
       });
     }
 
-    // Construct image URLs
-    const imageUrls = uploadedFiles.map((file) => `/uploads/products/${file.filename}`);
+    // Construct image URLs: upload memory buffers directly to Cloudinary
+    let imageUrls = [];
+    if (uploadedFiles && uploadedFiles.length > 0) {
+      try {
+        uploadedCloudinaryResults = await uploadMultipleToCloudinary(uploadedFiles, {
+          folder: "fexa/products",
+          resource_type: "image",
+        });
+        imageUrls = uploadedCloudinaryResults.map((r) => r.secure_url);
+      } catch (uploadErr) {
+        console.error("Cloudinary product upload error:", uploadErr.message);
+        return res.status(500).json({
+          success: false,
+          message: uploadErr.message || "Failed to upload product images to cloud storage.",
+          errors: { images: uploadErr.message || "Failed to upload images." },
+        });
+      }
+    }
 
     // If variants were provided and sanitized, use them
     let finalVariants = [];
@@ -317,6 +338,11 @@ const createProduct = async (req, res) => {
     });
   } catch (error) {
     cleanupUploadedFiles(req.files);
+    if (uploadedCloudinaryResults && uploadedCloudinaryResults.length > 0) {
+      await Promise.allSettled(
+        uploadedCloudinaryResults.map((r) => deleteFromCloudinary(r.public_id))
+      );
+    }
     console.error("Create product error:", error);
     return res.status(500).json({
       success: false,
@@ -329,6 +355,7 @@ const createProduct = async (req, res) => {
 // UPDATE PRODUCT (With Variant Support)
 // ========================================
 const updateProduct = async (req, res) => {
+  let uploadedCloudinaryResults = [];
   try {
     const { id } = req.params;
 
@@ -425,22 +452,29 @@ const updateProduct = async (req, res) => {
       });
     }
 
-    // Build final images list
-    const newImageUrls = newFiles.map((file) => `/uploads/products/${file.filename}`);
-    const finalImages = [...existingImages, ...newImageUrls];
+    // Record previous images for deferred cleanup
+    const previousImages = [...(product.images || [])];
 
-    // Clean up unlinked removed images from disk
-    const removedImages = (product.images || []).filter((img) => !existingImages.includes(img));
-    removedImages.forEach((imgUrl) => {
+    // Upload new image buffers to Cloudinary if new files provided
+    let newImageUrls = [];
+    if (newFiles && newFiles.length > 0) {
       try {
-        const fullDiskPath = path.join(__dirname, "..", imgUrl);
-        if (fs.existsSync(fullDiskPath)) {
-          fs.unlinkSync(fullDiskPath);
-        }
-      } catch (err) {
-        console.error("Failed to remove old image file:", err.message);
+        uploadedCloudinaryResults = await uploadMultipleToCloudinary(newFiles, {
+          folder: "fexa/products",
+          resource_type: "image",
+        });
+        newImageUrls = uploadedCloudinaryResults.map((r) => r.secure_url);
+      } catch (uploadErr) {
+        console.error("Cloudinary product update upload error:", uploadErr.message);
+        return res.status(500).json({
+          success: false,
+          message: uploadErr.message || "Failed to upload new product images to cloud storage.",
+          errors: { images: uploadErr.message || "Failed to upload images." },
+        });
       }
-    });
+    }
+
+    const finalImages = [...existingImages, ...newImageUrls];
 
     // Process variants updates
     let finalVariants = [];
@@ -514,6 +548,29 @@ const updateProduct = async (req, res) => {
 
     await product.save();
 
+    // Clean up unlinked removed images ONLY AFTER product.save() succeeds
+    const removedImages = previousImages.filter((img) => !existingImages.includes(img));
+    for (const imgUrl of removedImages) {
+      try {
+        const isShared = await Product.exists({
+          _id: { $ne: product._id },
+          images: imgUrl,
+        });
+        if (!isShared) {
+          if (imgUrl.includes("res.cloudinary.com")) {
+            await deleteFromCloudinary(imgUrl);
+          } else if (imgUrl.startsWith("/uploads/")) {
+            const fullDiskPath = path.join(__dirname, "..", imgUrl);
+            if (fs.existsSync(fullDiskPath)) {
+              fs.unlinkSync(fullDiskPath);
+            }
+          }
+        }
+      } catch (delErr) {
+        console.warn("Failed to remove old product image:", delErr.message);
+      }
+    }
+
     return res.status(200).json({
       success: true,
       message: `Perfume "${product.name}" updated successfully.`,
@@ -521,6 +578,11 @@ const updateProduct = async (req, res) => {
     });
   } catch (error) {
     cleanupUploadedFiles(req.files);
+    if (uploadedCloudinaryResults && uploadedCloudinaryResults.length > 0) {
+      await Promise.allSettled(
+        uploadedCloudinaryResults.map((r) => deleteFromCloudinary(r.public_id))
+      );
+    }
     console.error("Update product error:", error);
     return res.status(500).json({
       success: false,
@@ -530,56 +592,14 @@ const updateProduct = async (req, res) => {
 };
 
 // ========================================
-// DELETE PRODUCT
+// DELETE PRODUCT (Permanent Deletion Disabled)
 // ========================================
 const deleteProduct = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(404).json({
-        success: false,
-        message: "Invalid product identifier.",
-      });
-    }
-
-    const product = await Product.findById(id)
-      .populate("parentCategory", "name slug isActive")
-      .populate("subCategory", "name slug isActive");
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: "Product not found.",
-      });
-    }
-
-    // Delete image files from disk
-    if (product.images && product.images.length > 0) {
-      product.images.forEach((imgUrl) => {
-        try {
-          const fullDiskPath = path.join(__dirname, "..", imgUrl);
-          if (fs.existsSync(fullDiskPath)) {
-            fs.unlinkSync(fullDiskPath);
-          }
-        } catch (e) {
-          console.error("Error deleting image file:", e.message);
-        }
-      });
-    }
-
-    await Product.findByIdAndDelete(id);
-
-    return res.status(200).json({
-      success: true,
-      message: `Perfume "${product.name}" deleted successfully.`,
-    });
-  } catch (error) {
-    console.error("Delete product error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Something went wrong while deleting the product.",
-    });
-  }
+  return res.status(400).json({
+    success: false,
+    message:
+      "Permanent product deletion has been disabled to preserve historical order records and catalogue integrity. Please use the Deactivate action instead.",
+  });
 };
 
 // ========================================
@@ -606,8 +626,13 @@ const toggleProductStatus = async (req, res) => {
       });
     }
 
-    // Toggle Active <-> Inactive
-    const newStatus = product.status === "Active" ? "Inactive" : "Active";
+    // Toggle Active <-> Inactive (preserving Out of Stock if stock is 0 upon activation)
+    const newStatus =
+      product.status === "Inactive"
+        ? product.stock > 0
+          ? "Active"
+          : "Out of Stock"
+        : "Inactive";
     product.status = newStatus;
     await product.save();
 

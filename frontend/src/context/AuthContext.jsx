@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
+import { checkSession as checkSessionApi, logout as logoutApi } from "../services/auth.service.js";
 
 const AuthContext = createContext();
 
@@ -13,12 +14,8 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/auth/session", {
-          credentials: "include", // Important for sending/receiving cookies
-        });
-
-        if (response.ok) {
-          const data = await response.json();
+        const data = await checkSessionApi();
+        if (data?.user) {
           setUser(data.user);
         } else {
           setUser(null);
@@ -40,10 +37,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await fetch("http://localhost:5000/api/auth/logout", {
-        method: "POST",
-        credentials: "include",
-      });
+      await logoutApi();
     } catch (error) {
       console.error("Logout error:", error);
     } finally {

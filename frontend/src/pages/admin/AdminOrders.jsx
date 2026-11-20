@@ -2,6 +2,17 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAdminAuth } from "../../context/AdminAuthContext";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminPagination from "../../components/admin/AdminPagination";
+import {
+  getAdminOrders,
+  getAdminOrderById,
+  updateOrderStatus,
+  updateOrderTracking,
+  updateOrderPaymentStatus,
+  approveItemReturn,
+  rejectItemReturn,
+  downloadAdminInvoice,
+} from "../../services/admin.service.js";
+import { getImageUrl } from "../../utils/imageUrl.js";
 import "./AdminDashboard.css";
 import "./AdminOrders.css";
 
@@ -22,7 +33,7 @@ const STATUS_OPTIONS = [
 ];
 
 const PAYMENT_STATUS_OPTIONS = ["All", "Pending", "Paid", "Failed"];
-const PAYMENT_METHOD_OPTIONS = ["All", "COD", "Razorpay", "UPI", "Card", "NetBanking"];
+const PAYMENT_METHOD_OPTIONS = ["All", "COD", "Razorpay", "Wallet", "UPI", "Card", "NetBanking"];
 
 const COURIER_PROVIDERS = [
   "Blue Dart",
@@ -35,6 +46,18 @@ const COURIER_PROVIDERS = [
   "Shiprocket",
   "Bespoke Atelier Courier",
 ];
+
+// Safe thumbnail resolver
+const getItemImageUrl = (it) => {
+  if (!it) return null;
+  if (it.image) {
+    return getImageUrl(it.image);
+  }
+  if (it.product && Array.isArray(it.product.images) && it.product.images.length > 0) {
+    return getImageUrl(it.product.images[0]);
+  }
+  return null;
+};
 
 export default function AdminOrders() {
   const { admin, logoutAdmin } = useAdminAuth();
@@ -106,16 +129,8 @@ export default function AdminOrders() {
   const handleAdminDownloadPDF = async (orderId, orderNumber) => {
     try {
       setDownloadingPdfId(orderId);
-      const res = await fetch(`http://localhost:5000/api/admin/orders/${orderId}/invoice`, {
-        credentials: "include",
-      });
+      const blob = await downloadAdminInvoice(orderId);
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to download invoice.");
-      }
-
-      const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -126,7 +141,7 @@ export default function AdminOrders() {
       document.body.removeChild(a);
     } catch (err) {
       console.error("Admin order PDF download error:", err);
-      alert(err.message || "Failed to download order PDF invoice.");
+      alert(err.response?.data?.message || err.message || "Failed to download order PDF invoice.");
     } finally {
       setDownloadingPdfId(null);
     }
@@ -137,6 +152,7 @@ export default function AdminOrders() {
     if (val === undefined || val === null) return "₹0";
     return `₹${Number(val).toLocaleString("en-IN")}`;
   };
+  const formatPrice = formatINR;
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "N/A";
@@ -196,31 +212,23 @@ export default function AdminOrders() {
     async (targetPage = 1) => {
       try {
         setLoading(true);
-        const params = new URLSearchParams({
+        const params = {
           page: targetPage,
           limit: 10,
           sortBy,
           sortOrder,
-        });
+        };
 
-        if (appliedSearch) params.set("search", appliedSearch);
-        if (orderStatusFilter !== "All") params.set("orderStatus", orderStatusFilter);
-        if (paymentStatusFilter !== "All") params.set("paymentStatus", paymentStatusFilter);
-        if (paymentMethodFilter !== "All") params.set("paymentMethod", paymentMethodFilter);
-        if (computedDateRange.startDate) params.set("startDate", computedDateRange.startDate);
-        if (computedDateRange.endDate) params.set("endDate", computedDateRange.endDate);
+        if (appliedSearch) params.search = appliedSearch;
+        if (orderStatusFilter !== "All") params.orderStatus = orderStatusFilter;
+        if (paymentStatusFilter !== "All") params.paymentStatus = paymentStatusFilter;
+        if (paymentMethodFilter !== "All") params.paymentMethod = paymentMethodFilter;
+        if (computedDateRange.startDate) params.startDate = computedDateRange.startDate;
+        if (computedDateRange.endDate) params.endDate = computedDateRange.endDate;
 
-        const response = await fetch(
-          `http://localhost:5000/api/admin/orders?${params.toString()}`,
-          {
-            method: "GET",
-            credentials: "include",
-          }
-        );
+        const data = await getAdminOrders(params);
 
-        const data = await response.json();
-
-        if (response.ok && data.success) {
+        if (data && data.success) {
           setOrders(data.orders || []);
           setPagination(
             data.pagination || { page: 1, limit: 10, totalOrders: 0, totalPages: 1 }
@@ -231,14 +239,14 @@ export default function AdminOrders() {
         } else {
           setToast({
             type: "error",
-            text: data.message || "Failed to load orders.",
+            text: data?.message || "Failed to load orders.",
           });
         }
       } catch (err) {
         console.error("Fetch admin orders error:", err);
         setToast({
           type: "error",
-          text: "Unable to connect to the atelier server.",
+          text: err.response?.data?.message || "Unable to connect to the atelier server.",
         });
       } finally {
         setLoading(false);
@@ -257,6 +265,20 @@ export default function AdminOrders() {
 
   useEffect(() => {
     fetchOrders(page);
+  }, [fetchOrders, page]);
+
+  // Synchronize order state on window focus or custom events
+  useEffect(() => {
+    const handleSync = () => {
+      fetchOrders(page);
+    };
+
+    window.addEventListener("focus", handleSync);
+    window.addEventListener("fexa:orders-updated", handleSync);
+    return () => {
+      window.removeEventListener("focus", handleSync);
+      window.removeEventListener("fexa:orders-updated", handleSync);
+    };
   }, [fetchOrders, page]);
 
   // Handle Search Submission
@@ -280,27 +302,30 @@ export default function AdminOrders() {
 
   // Open Order Details Modal
   const handleOpenOrderModal = async (orderItem) => {
+    if (!orderItem) return;
     try {
       setIsDetailModalOpen(true);
+      // Immediately seed modal with available row data to prevent blank screen / reload flicker
+      setSelectedOrder(orderItem);
       setDetailLoading(true);
       setModalAlert(null);
-      setSelectedOrder(null);
       setAdminStatusNote("");
-
-      const response = await fetch(
-        `http://localhost:5000/api/admin/orders/${orderItem._id}`,
-        {
-          method: "GET",
-          credentials: "include",
-        }
+      setTargetStatus(
+        orderItem.allowedNextStatuses?.filter((st) => st !== "Return Requested")?.[0] || ""
       );
+      setTrackingCourier(orderItem.trackingInfo?.courierProvider || "");
+      setTrackingNumber(orderItem.trackingInfo?.trackingNumber || "");
+      setTrackingUrl(orderItem.trackingInfo?.trackingUrl || "");
+      setTargetPaymentStatus(orderItem.paymentStatus || "Pending");
 
-      const data = await response.json();
+      const data = await getAdminOrderById(orderItem._id);
 
-      if (response.ok && data.success) {
+      if (data && data.success) {
         const ord = data.order;
         setSelectedOrder(ord);
-        setTargetStatus(ord.allowedNextStatuses?.[0] || "");
+        setTargetStatus(
+          ord.allowedNextStatuses?.filter((st) => st !== "Return Requested")?.[0] || ""
+        );
         setTrackingCourier(ord.trackingInfo?.courierProvider || "");
         setTrackingNumber(ord.trackingInfo?.trackingNumber || "");
         setTrackingUrl(ord.trackingInfo?.trackingUrl || "");
@@ -308,14 +333,14 @@ export default function AdminOrders() {
       } else {
         setModalAlert({
           type: "error",
-          message: data.message || "Unable to fetch complete order snapshot.",
+          message: data?.message || "Unable to fetch complete order snapshot.",
         });
       }
     } catch (err) {
       console.error("Open order details error:", err);
       setModalAlert({
         type: "error",
-        message: "Network communication failure.",
+        message: err.response?.data?.message || "Network communication failure. Showing saved snapshot.",
       });
     } finally {
       setDetailLoading(false);
@@ -356,22 +381,12 @@ export default function AdminOrders() {
       setStatusUpdating(true);
       setModalAlert(null);
 
-      const response = await fetch(
-        `http://localhost:5000/api/admin/orders/${selectedOrder._id}/status`,
-        {
-          method: "PATCH",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            status: targetStatus,
-            note: adminStatusNote.trim(),
-          }),
-        }
-      );
+      const data = await updateOrderStatus(selectedOrder._id, {
+        status: targetStatus,
+        note: adminStatusNote.trim(),
+      });
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setModalAlert({
           type: "success",
           message: data.message || "Order status successfully updated.",
@@ -380,20 +395,20 @@ export default function AdminOrders() {
           ...prev,
           ...data.order,
         }));
-        setTargetStatus(data.order.allowedNextStatuses?.[0] || "");
+        setTargetStatus(data.order?.allowedNextStatuses?.[0] || "");
         setAdminStatusNote("");
         fetchOrders(page);
       } else {
         setModalAlert({
           type: "error",
-          message: data.message || "Failed to update status transition.",
+          message: data?.message || "Failed to update status transition.",
         });
       }
     } catch (err) {
       console.error("Update status error:", err);
       setModalAlert({
         type: "error",
-        message: "Failed to connect to the atelier server.",
+        message: err.response?.data?.message || "Failed to connect to the atelier server.",
       });
     } finally {
       setStatusUpdating(false);
@@ -425,23 +440,13 @@ export default function AdminOrders() {
       setTrackingUpdating(true);
       setModalAlert(null);
 
-      const response = await fetch(
-        `http://localhost:5000/api/admin/orders/${selectedOrder._id}/tracking`,
-        {
-          method: "PATCH",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            courierProvider: trackingCourier.trim(),
-            trackingNumber: trackingNumber.trim(),
-            trackingUrl: trackingUrl.trim(),
-          }),
-        }
-      );
+      const data = await updateOrderTracking(selectedOrder._id, {
+        courierProvider: trackingCourier.trim(),
+        trackingNumber: trackingNumber.trim(),
+        trackingUrl: trackingUrl.trim(),
+      });
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setModalAlert({
           type: "success",
           message: "Shipment tracking details saved and published.",
@@ -454,14 +459,14 @@ export default function AdminOrders() {
       } else {
         setModalAlert({
           type: "error",
-          message: data.message || "Failed to save tracking details.",
+          message: data?.message || "Failed to save tracking details.",
         });
       }
     } catch (err) {
       console.error("Update tracking error:", err);
       setModalAlert({
         type: "error",
-        message: "Failed to connect to the atelier server.",
+        message: err.response?.data?.message || "Failed to connect to the atelier server.",
       });
     } finally {
       setTrackingUpdating(false);
@@ -477,22 +482,12 @@ export default function AdminOrders() {
       setPaymentUpdating(true);
       setModalAlert(null);
 
-      const response = await fetch(
-        `http://localhost:5000/api/admin/orders/${selectedOrder._id}/payment-status`,
-        {
-          method: "PATCH",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            paymentStatus: targetPaymentStatus,
-            note: "Payment status reconciled by admin console.",
-          }),
-        }
-      );
+      const data = await updateOrderPaymentStatus(selectedOrder._id, {
+        paymentStatus: targetPaymentStatus,
+        note: "Payment status reconciled by admin console.",
+      });
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setModalAlert({
           type: "success",
           message: data.message || "Payment status reconciled.",
@@ -505,14 +500,14 @@ export default function AdminOrders() {
       } else {
         setModalAlert({
           type: "error",
-          message: data.message || "Failed to update payment status.",
+          message: data?.message || "Failed to update payment status.",
         });
       }
     } catch (err) {
       console.error("Update payment status error:", err);
       setModalAlert({
         type: "error",
-        message: "Failed to connect to the server.",
+        message: err.response?.data?.message || "Failed to connect to the server.",
       });
     } finally {
       setPaymentUpdating(false);
@@ -526,18 +521,9 @@ export default function AdminOrders() {
       setReturnProcessingId(itemId);
       setModalAlert(null);
 
-      const response = await fetch(
-        `http://localhost:5000/api/admin/orders/${selectedOrder._id}/items/${itemId}/approve-return`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+      const data = await approveItemReturn(selectedOrder._id, itemId);
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setModalAlert({
           type: "success",
           message: data.message || "Return approved and inventory restocked.",
@@ -550,14 +536,14 @@ export default function AdminOrders() {
       } else {
         setModalAlert({
           type: "error",
-          message: data.message || "Failed to approve return request.",
+          message: data?.message || "Failed to approve return request.",
         });
       }
     } catch (err) {
       console.error("Approve return error:", err);
       setModalAlert({
         type: "error",
-        message: "Failed to connect to the server.",
+        message: err.response?.data?.message || "Failed to connect to the server.",
       });
     } finally {
       setReturnProcessingId(null);
@@ -571,19 +557,11 @@ export default function AdminOrders() {
       setReturnProcessingId(itemId);
       setModalAlert(null);
 
-      const response = await fetch(
-        `http://localhost:5000/api/admin/orders/${selectedOrder._id}/items/${itemId}/reject-return`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason: "Declined after atelier quality inspection." }),
-        }
-      );
+      const data = await rejectItemReturn(selectedOrder._id, itemId, {
+        reason: "Declined after atelier quality inspection.",
+      });
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setModalAlert({
           type: "success",
           message: data.message || "Return request rejected.",
@@ -596,14 +574,14 @@ export default function AdminOrders() {
       } else {
         setModalAlert({
           type: "error",
-          message: data.message || "Failed to reject return request.",
+          message: data?.message || "Failed to reject return request.",
         });
       }
     } catch (err) {
       console.error("Reject return error:", err);
       setModalAlert({
         type: "error",
-        message: "Failed to connect to the server.",
+        message: err.response?.data?.message || "Failed to connect to the server.",
       });
     } finally {
       setReturnProcessingId(null);
@@ -675,7 +653,7 @@ export default function AdminOrders() {
             >
               ☰
             </button>
-            <div className="admin-quick-search-wrapper">
+            <div className="command-search-box">
               <span className="search-icon">🔍</span>
               <input
                 type="text"
@@ -1080,7 +1058,9 @@ export default function AdminOrders() {
                               <span className="payment-method-tag">
                                 {order.paymentMethod === "COD"
                                   ? "Cash on Delivery"
-                                  : order.paymentMethod}
+                                  : order.paymentMethod === "Wallet" || order.paymentMethod === "wallet"
+                                    ? "FEXA Wallet"
+                                    : order.paymentMethod}
                               </span>
                               <span
                                 className={`payment-status-badge ${getPaymentBadgeClass(
@@ -1117,7 +1097,11 @@ export default function AdminOrders() {
                               <button
                                 type="button"
                                 className="order-inspect-btn"
-                                onClick={() => handleOpenOrderModal(order)}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleOpenOrderModal(order);
+                                }}
                                 title="Inspect order snapshot and manage status"
                               >
                                 <span>🔍</span>
@@ -1127,7 +1111,11 @@ export default function AdminOrders() {
                                 type="button"
                                 className="order-inspect-btn"
                                 style={{ borderColor: "rgba(192, 132, 252, 0.4)", color: "#c084fc" }}
-                                onClick={() => handleAdminDownloadPDF(order._id, order.orderNumber)}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleAdminDownloadPDF(order._id, order.orderNumber);
+                                }}
                                 disabled={downloadingPdfId === order._id}
                                 title="Download PDF Tax Invoice"
                               >
@@ -1162,7 +1150,7 @@ export default function AdminOrders() {
       {isDetailModalOpen && (
         <div className="order-modal-backdrop" onClick={handleCloseOrderModal}>
           <div className="order-modal-container" onClick={(e) => e.stopPropagation()}>
-            {detailLoading ? (
+            {detailLoading && !selectedOrder ? (
               <div className="modal-loading-box">
                 <div className="loading-spinner" />
                 <p>Retrieving authentic order manifest snapshot from database...</p>
@@ -1177,12 +1165,24 @@ export default function AdminOrders() {
                     <span className="modal-date">
                       Placed on {formatDateTime(selectedOrder.createdAt)}
                     </span>
+                    <span style={{ fontSize: "11px", color: "#a594b8", marginTop: "2px", display: "block" }}>
+                      Order ID: {selectedOrder._id}
+                    </span>
                   </div>
                   <div className="modal-header-right">
+                    {detailLoading && (
+                      <span style={{ fontSize: "11px", color: "#c084fc", background: "rgba(192, 132, 252, 0.1)", padding: "4px 8px", borderRadius: "4px" }}>
+                        ⚡ Syncing...
+                      </span>
+                    )}
                     <button
                       type="button"
                       className="order-download-pdf-modal-btn"
-                      onClick={() => handleAdminDownloadPDF(selectedOrder._id, selectedOrder.orderNumber)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleAdminDownloadPDF(selectedOrder._id, selectedOrder.orderNumber);
+                      }}
                       disabled={downloadingPdfId === selectedOrder._id}
                       title="Download Official Tax Invoice PDF"
                     >
@@ -1248,7 +1248,7 @@ export default function AdminOrders() {
                             {[
                               selectedOrder.shippingAddress?.house,
                               selectedOrder.shippingAddress?.street ||
-                                selectedOrder.shippingAddress?.addressLine,
+                              selectedOrder.shippingAddress?.addressLine,
                               selectedOrder.shippingAddress?.city,
                               selectedOrder.shippingAddress?.state,
                               selectedOrder.shippingAddress?.pincode,
@@ -1282,6 +1282,28 @@ export default function AdminOrders() {
                             ● {selectedOrder.paymentStatus}
                           </span>
                         </div>
+                        {(selectedOrder.paymentMethod === "Wallet" || selectedOrder.paymentMethod === "wallet") && (
+                          <>
+                            <div className="info-row">
+                              <span className="info-label">Wallet Transaction ID:</span>
+                              <span className="monospace-code" style={{ color: "#a855f7", fontWeight: 700 }}>
+                                {selectedOrder.walletTransactionId || `TXN-WLT-${selectedOrder.orderNumber}`}
+                              </span>
+                            </div>
+                            <div className="info-row">
+                              <span className="info-label">Amount Deducted:</span>
+                              <strong style={{ color: "#10b981" }}>
+                                {formatINR(selectedOrder.totalAmount)}
+                              </strong>
+                            </div>
+                            <div className="info-row">
+                              <span className="info-label">Payment Date:</span>
+                              <span>
+                                {formatDateTime(selectedOrder.paidAt || selectedOrder.createdAt)}
+                              </span>
+                            </div>
+                          </>
+                        )}
                         {selectedOrder.razorpayPaymentId && (
                           <div className="info-row">
                             <span className="info-label">Razorpay Payment ID:</span>
@@ -1295,6 +1317,14 @@ export default function AdminOrders() {
                             <span className="info-label">Razorpay Order ID:</span>
                             <span className="monospace-code">
                               {selectedOrder.razorpayOrderId}
+                            </span>
+                          </div>
+                        )}
+                        {selectedOrder.razorpaySignature && (
+                          <div className="info-row">
+                            <span className="info-label">Gateway Signature:</span>
+                            <span className="monospace-code" style={{ fontSize: "10px", wordBreak: "break-all" }}>
+                              {selectedOrder.razorpaySignature}
                             </span>
                           </div>
                         )}
@@ -1375,7 +1405,7 @@ export default function AdminOrders() {
                         )}
 
                         {selectedOrder.allowedNextStatuses &&
-                        selectedOrder.allowedNextStatuses.length > 0 ? (
+                          selectedOrder.allowedNextStatuses.filter((st) => st !== "Return Requested").length > 0 ? (
                           <form className="status-transition-form" onSubmit={handleStatusUpdate}>
                             <label>Next Permitted Status:</label>
                             <select
@@ -1383,11 +1413,13 @@ export default function AdminOrders() {
                               onChange={(e) => setTargetStatus(e.target.value)}
                               required
                             >
-                              {selectedOrder.allowedNextStatuses.map((st) => (
-                                <option key={st} value={st}>
-                                  Transition to: {st}
-                                </option>
-                              ))}
+                              {selectedOrder.allowedNextStatuses
+                                .filter((st) => st !== "Return Requested")
+                                .map((st) => (
+                                  <option key={st} value={st}>
+                                    Transition to: {st}
+                                  </option>
+                                ))}
                             </select>
 
                             <input
@@ -1415,8 +1447,8 @@ export default function AdminOrders() {
                             <p>
                               {selectedOrder.isFulfillmentBlocked
                                 ? (selectedOrder.paymentStatus === "Failed"
-                                    ? "Cannot ship this order because payment has failed. Resolve the payment issue before proceeding."
-                                    : "Cannot ship this order while online payment is pending verification.")
+                                  ? "Cannot ship this order because payment has failed. Resolve the payment issue before proceeding."
+                                  : "Cannot ship this order while online payment is pending verification.")
                                 : `This order has reached its final lifecycle state (${selectedOrder.orderStatus}). No further forward transitions are permitted.`}
                             </p>
                           </div>
@@ -1536,6 +1568,7 @@ export default function AdminOrders() {
                       <table className="modal-items-table">
                         <thead>
                           <tr>
+                            <th style={{ width: "56px" }}>IMAGE</th>
                             <th>PRODUCT</th>
                             <th>VOLUME</th>
                             <th style={{ textAlign: "center" }}>QTY</th>
@@ -1554,6 +1587,29 @@ export default function AdminOrders() {
 
                               return (
                                 <tr key={it._id || it.variantId}>
+                                  <td>
+                                    <div className="order-modal-thumb-wrapper">
+                                      {getItemImageUrl(it) ? (
+                                        <img
+                                          src={getItemImageUrl(it)}
+                                          alt={it.name}
+                                          className="order-modal-thumb-img"
+                                          onError={(e) => {
+                                            e.target.style.display = "none";
+                                            if (e.target.nextSibling) {
+                                              e.target.nextSibling.style.display = "flex";
+                                            }
+                                          }}
+                                        />
+                                      ) : null}
+                                      <div
+                                        className="order-modal-thumb-fallback"
+                                        style={{ display: getItemImageUrl(it) ? "none" : "flex" }}
+                                      >
+                                        🧴
+                                      </div>
+                                    </div>
+                                  </td>
                                   <td>
                                     <div className="item-name-cell">
                                       <strong className="item-name">{it.name}</strong>
@@ -1630,7 +1686,7 @@ export default function AdminOrders() {
                             })
                           ) : (
                             <tr>
-                              <td colSpan="9" style={{ textAlign: "center", padding: "20px" }}>
+                              <td colSpan="10" style={{ textAlign: "center", padding: "20px" }}>
                                 No items recorded in this snapshot.
                               </td>
                             </tr>
@@ -1670,7 +1726,22 @@ export default function AdminOrders() {
                   )}
                 </div>
               </>
-            ) : null}
+            ) : (
+              <div className="modal-loading-box" style={{ padding: "40px 20px", textAlign: "center" }}>
+                <span style={{ fontSize: "36px", display: "block", marginBottom: "12px" }}>⚠️</span>
+                <p style={{ color: "#f87171", fontSize: "14px", marginBottom: "16px" }}>
+                  {modalAlert?.message || "Unable to display authentic order manifest snapshot."}
+                </p>
+                <button
+                  type="button"
+                  className="orders-reset-filters-btn"
+                  onClick={handleCloseOrderModal}
+                  style={{ margin: "0 auto" }}
+                >
+                  Close
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

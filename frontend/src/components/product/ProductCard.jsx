@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useWishlist } from "../../context/WishlistContext";
+import { getImageUrl } from "../../utils/imageUrl";
 import "./ProductCard.css";
 
 /**
@@ -94,9 +95,7 @@ export default function ProductCard({ product }) {
 
   const primaryImage =
     product.images && product.images.length > 0
-      ? product.images[0].startsWith("http")
-        ? product.images[0]
-        : `http://localhost:5000${product.images[0]}`
+      ? getImageUrl(product.images[0])
       : null;
 
   const isSaved = isWishlisted(product._id);

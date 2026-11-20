@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getImageUrl } from "../../utils/imageUrl.js";
 
 function ProductViewModal({ isOpen, product, onClose, onEdit }) {
   const [selectedImgIndex, setSelectedImgIndex] = useState(0);
@@ -7,11 +8,7 @@ function ProductViewModal({ isOpen, product, onClose, onEdit }) {
 
   const images = product.images && product.images.length > 0 ? product.images : [];
   const primaryImg = images[selectedImgIndex] || images[0];
-  const primaryImgUrl = primaryImg
-    ? primaryImg.startsWith("http")
-      ? primaryImg
-      : `http://localhost:5000${primaryImg}`
-    : null;
+  const primaryImgUrl = primaryImg ? getImageUrl(primaryImg) : null;
 
   const formatCurrency = (val) => {
     return new Intl.NumberFormat("en-IN", {
@@ -98,7 +95,7 @@ function ProductViewModal({ isOpen, product, onClose, onEdit }) {
                     }}
                   >
                     <img
-                      src={img.startsWith("http") ? img : `http://localhost:5000${img}`}
+                      src={getImageUrl(img)}
                       alt="Thumbnail"
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
                     />

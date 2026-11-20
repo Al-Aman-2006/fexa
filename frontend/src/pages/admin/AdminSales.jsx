@@ -2,6 +2,21 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAdminAuth } from "../../context/AdminAuthContext";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminPagination from "../../components/admin/AdminPagination";
+import {
+  getSalesOverview,
+  getSalesTrends,
+  getSalesCategories,
+  getSalesPayments,
+  getSalesCoupons,
+  getProductPerformance,
+  getSalesReport,
+  exportSalesCSV,
+  exportSalesPDF,
+  getAdminSalesOrderDetails,
+  approveSalesItemReturn,
+  rejectSalesItemReturn,
+} from "../../services/admin.service.js";
+import { getImageUrl } from "../../utils/imageUrl.js";
 import "./AdminDashboard.css";
 import "./AdminSales.css";
 
@@ -104,35 +119,27 @@ function AdminSales() {
       setLoading(true);
       setError(null);
 
-      const params = getPeriodParams().toString();
-
-      const [resOverview, resTrends, resCats, resPays, resCoupons] = await Promise.all([
-        fetch(`http://localhost:5000/api/admin/sales/overview?${params}`, { credentials: "include" }),
-        fetch(`http://localhost:5000/api/admin/sales/trends?${params}`, { credentials: "include" }),
-        fetch(`http://localhost:5000/api/admin/sales/categories?${params}`, { credentials: "include" }),
-        fetch(`http://localhost:5000/api/admin/sales/payments?${params}`, { credentials: "include" }),
-        fetch(`http://localhost:5000/api/admin/sales/coupons?${params}`, { credentials: "include" }),
-      ]);
+      const params = getPeriodParams();
 
       const [dataOverview, dataTrends, dataCats, dataPays, dataCoupons] = await Promise.all([
-        resOverview.json(),
-        resTrends.json(),
-        resCats.json(),
-        resPays.json(),
-        resCoupons.json(),
+        getSalesOverview(params),
+        getSalesTrends(params),
+        getSalesCategories(params),
+        getSalesPayments(params),
+        getSalesCoupons(params),
       ]);
 
-      if (dataOverview.success) setOverview(dataOverview.data);
-      if (dataTrends.success) {
-        setTrends(dataTrends.data.series || []);
-        setTrendsInterval(dataTrends.data.interval);
+      if (dataOverview?.success) setOverview(dataOverview.data);
+      if (dataTrends?.success) {
+        setTrends(dataTrends.data?.series || []);
+        setTrendsInterval(dataTrends.data?.interval);
       }
-      if (dataCats.success) setCategories(dataCats.data.categories || []);
-      if (dataPays.success) setPayments(dataPays.data.methods || null);
-      if (dataCoupons.success) setCoupons(dataCoupons.data.coupons || []);
+      if (dataCats?.success) setCategories(dataCats.data?.categories || []);
+      if (dataPays?.success) setPayments(dataPays.data?.methods || null);
+      if (dataCoupons?.success) setCoupons(dataCoupons.data?.coupons || []);
     } catch (err) {
       console.error("Fetch sales analytics error:", err);
-      setError("Unable to load sales analytics. Please check server connection.");
+      setError(err.response?.data?.message || "Unable to load sales analytics. Please check server connection.");
     } finally {
       setLoading(false);
     }
@@ -147,13 +154,10 @@ function AdminSales() {
       params.set("sortBy", productSortBy);
       params.set("sortOrder", productSortOrder);
 
-      const res = await fetch(`http://localhost:5000/api/admin/sales/products?${params.toString()}`, {
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (data.success) {
-        setProducts(data.data.products || []);
-        setProductPagination(data.data.pagination);
+      const data = await getProductPerformance(params);
+      if (data?.success) {
+        setProducts(data.data?.products || []);
+        setProductPagination(data.data?.pagination);
       }
     } catch (err) {
       console.error("Fetch product performance error:", err);
@@ -174,13 +178,10 @@ function AdminSales() {
       if (paymentStatusFilter !== "All") params.set("paymentStatus", paymentStatusFilter);
       if (paymentMethodFilter !== "All") params.set("paymentMethod", paymentMethodFilter);
 
-      const res = await fetch(`http://localhost:5000/api/admin/sales/report?${params.toString()}`, {
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (data.success) {
-        setOrders(data.data.orders || []);
-        setOrderPagination(data.data.pagination);
+      const data = await getSalesReport(params);
+      if (data?.success) {
+        setOrders(data.data?.orders || []);
+        setOrderPagination(data.data?.pagination);
       }
     } catch (err) {
       console.error("Fetch detailed orders error:", err);
@@ -204,6 +205,26 @@ function AdminSales() {
   useEffect(() => {
     fetchProductData();
   }, [fetchProductData]);
+
+  useEffect(() => {
+    fetchOrdersData();
+  }, [fetchOrdersData]);
+
+  // Synchronize on window focus or when orders are updated
+  useEffect(() => {
+    const handleSync = () => {
+      fetchAnalyticsData();
+      fetchProductData();
+      fetchOrdersData();
+    };
+
+    window.addEventListener("focus", handleSync);
+    window.addEventListener("fexa:orders-updated", handleSync);
+    return () => {
+      window.removeEventListener("focus", handleSync);
+      window.removeEventListener("fexa:orders-updated", handleSync);
+    };
+  }, [fetchAnalyticsData, fetchProductData, fetchOrdersData]);
 
   useEffect(() => {
     fetchOrdersData();
@@ -242,14 +263,8 @@ function AdminSales() {
       if (paymentMethodFilter !== "All") params.set("paymentMethod", paymentMethodFilter);
       if (appliedOrderSearch.trim()) params.set("search", appliedOrderSearch.trim());
 
-      const url = `http://localhost:5000/api/admin/sales/export?${params.toString()}`;
-      const response = await fetch(url, { credentials: "include" });
+      const blob = await exportSalesCSV(params);
 
-      if (!response.ok) {
-        throw new Error("Export failed on server.");
-      }
-
-      const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = downloadUrl;
@@ -260,7 +275,7 @@ function AdminSales() {
       window.URL.revokeObjectURL(downloadUrl);
     } catch (err) {
       console.error("Export error:", err);
-      alert("Failed to export sales report. Please try again.");
+      alert(err.response?.data?.message || "Failed to export sales report. Please try again.");
     } finally {
       setExporting(false);
     }
@@ -276,14 +291,8 @@ function AdminSales() {
       if (paymentMethodFilter !== "All") params.set("paymentMethod", paymentMethodFilter);
       if (appliedOrderSearch.trim()) params.set("search", appliedOrderSearch.trim());
 
-      const url = `http://localhost:5000/api/admin/sales/export-pdf?${params.toString()}`;
-      const response = await fetch(url, { credentials: "include" });
+      const blob = await exportSalesPDF(params);
 
-      if (!response.ok) {
-        throw new Error("Export PDF failed on server.");
-      }
-
-      const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = downloadUrl;
@@ -294,7 +303,7 @@ function AdminSales() {
       window.URL.revokeObjectURL(downloadUrl);
     } catch (err) {
       console.error("Export PDF error:", err);
-      alert("Failed to export sales report as PDF. Please try again.");
+      alert(err.response?.data?.message || "Failed to export sales report as PDF. Please try again.");
     } finally {
       setExportingPDF(false);
     }
@@ -306,11 +315,8 @@ function AdminSales() {
     setIsOrderModalOpen(true);
     setModalAlert(null);
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/sales/orders/${order._id}`, {
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (res.ok && data.success && data.order) {
+      const data = await getAdminSalesOrderDetails(order._id);
+      if (data?.success && data.order) {
         setSelectedOrder(data.order);
       }
     } catch (err) {
@@ -330,28 +336,19 @@ function AdminSales() {
       setModalProcessing(true);
       setModalAlert(null);
 
-      const res = await fetch(
-        `http://localhost:5000/api/admin/sales/orders/${selectedOrder._id}/items/${itemId}/approve-return`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ quantity: returnQty }),
-        }
-      );
+      const data = await approveSalesItemReturn(selectedOrder._id, itemId, { quantity: returnQty });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      if (data && data.success) {
         setModalAlert({ type: "success", message: data.message });
         if (data.order) setSelectedOrder(data.order);
         fetchOrdersData();
         fetchAnalyticsData();
       } else {
-        setModalAlert({ type: "error", message: data.message || "Failed to approve return." });
+        setModalAlert({ type: "error", message: data?.message || "Failed to approve return." });
       }
     } catch (err) {
       console.error("Approve return error:", err);
-      setModalAlert({ type: "error", message: "Network error approving return." });
+      setModalAlert({ type: "error", message: err.response?.data?.message || "Network error approving return." });
     } finally {
       setModalProcessing(false);
     }
@@ -363,27 +360,18 @@ function AdminSales() {
       setModalProcessing(true);
       setModalAlert(null);
 
-      const res = await fetch(
-        `http://localhost:5000/api/admin/sales/orders/${selectedOrder._id}/items/${itemId}/reject-return`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason }),
-        }
-      );
+      const data = await rejectSalesItemReturn(selectedOrder._id, itemId, { reason });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      if (data && data.success) {
         setModalAlert({ type: "success", message: data.message });
         if (data.order) setSelectedOrder(data.order);
         fetchOrdersData();
       } else {
-        setModalAlert({ type: "error", message: data.message || "Failed to reject return." });
+        setModalAlert({ type: "error", message: data?.message || "Failed to reject return." });
       }
     } catch (err) {
       console.error("Reject return error:", err);
-      setModalAlert({ type: "error", message: "Network error rejecting return." });
+      setModalAlert({ type: "error", message: err.response?.data?.message || "Network error rejecting return." });
     } finally {
       setModalProcessing(false);
     }
@@ -624,13 +612,13 @@ function AdminSales() {
             </div>
           ) : (
             <section className="sales-kpi-grid">
-              {/* Total Sales Revenue */}
+              {/* Total Net Revenue */}
               <div className="sales-kpi-card highlight">
                 <div className="kpi-header">
-                  <span className="kpi-label">TOTAL SALES REVENUE</span>
+                  <span className="kpi-label">TOTAL NET REVENUE</span>
                   <span className="kpi-icon">💰</span>
                 </div>
-                <div className="kpi-value">{formatINR(kpis?.recognizedRevenue || 0)}</div>
+                <div className="kpi-value">{formatINR(kpis?.totalNetRevenue ?? kpis?.recognizedRevenue ?? 0)}</div>
                 <div className="kpi-subtext">
                   {kpis?.growth?.revenueGrowth !== null && kpis?.growth?.revenueGrowth !== undefined ? (
                     <span
@@ -652,43 +640,27 @@ function AdminSales() {
                 </div>
               </div>
 
+              {/* Total Gross Sales */}
+              <div className="sales-kpi-card">
+                <div className="kpi-header">
+                  <span className="kpi-label">TOTAL GROSS SALES</span>
+                  <span className="kpi-icon">🏛️</span>
+                </div>
+                <div className="kpi-value">{formatINR(kpis?.totalGrossSales ?? kpis?.grossOrderValue ?? 0)}</div>
+                <div className="kpi-subtext">
+                  <span>Catalogue merchandise + logistics</span>
+                </div>
+              </div>
+
               {/* Total Orders */}
               <div className="sales-kpi-card">
                 <div className="kpi-header">
-                  <span className="kpi-label">TOTAL ELIGIBLE ORDERS</span>
+                  <span className="kpi-label">TOTAL ORDERS PLACED</span>
                   <span className="kpi-icon">📦</span>
                 </div>
                 <div className="kpi-value">{kpis?.totalOrders || 0}</div>
                 <div className="kpi-subtext">
-                  {kpis?.growth?.ordersGrowth !== null && kpis?.growth?.ordersGrowth !== undefined ? (
-                    <span
-                      className={`growth-badge ${
-                        kpis.growth.ordersGrowth > 0
-                          ? "positive"
-                          : kpis.growth.ordersGrowth < 0
-                          ? "negative"
-                          : "neutral"
-                      }`}
-                    >
-                      {kpis.growth.ordersGrowth > 0 ? "▲ +" : kpis.growth.ordersGrowth < 0 ? "▼ " : ""}
-                      {kpis.growth.ordersGrowth}%
-                    </span>
-                  ) : (
-                    <span className="growth-badge neutral">Baseline</span>
-                  )}
-                  <span>active fulfillment records</span>
-                </div>
-              </div>
-
-              {/* Units Sold */}
-              <div className="sales-kpi-card">
-                <div className="kpi-header">
-                  <span className="kpi-label">PERFUME UNITS SOLD</span>
-                  <span className="kpi-icon">🧪</span>
-                </div>
-                <div className="kpi-value">{kpis?.unitsSold || 0}</div>
-                <div className="kpi-subtext">
-                  <span>Across 30ml, 50ml, 100ml, 200ml bottles</span>
+                  <span>{kpis?.successfulOrdersCount || kpis?.paidOrdersCount || 0} Successful orders</span>
                 </div>
               </div>
 
@@ -700,19 +672,71 @@ function AdminSales() {
                 </div>
                 <div className="kpi-value">{formatINR(kpis?.averageOrderValue || 0)}</div>
                 <div className="kpi-subtext">
-                  <span>Revenue per verified customer purchase</span>
+                  <span>Realized revenue per successful order</span>
                 </div>
               </div>
 
-              {/* Successful Payments */}
+              {/* Total Discounts Granted */}
               <div className="sales-kpi-card">
                 <div className="kpi-header">
-                  <span className="kpi-label">SUCCESSFUL PAYMENTS</span>
-                  <span className="kpi-icon">✅</span>
+                  <span className="kpi-label">TOTAL DISCOUNTS</span>
+                  <span className="kpi-icon">🏷️</span>
                 </div>
-                <div className="kpi-value">{formatINR(kpis?.successfulPayments?.amount || 0)}</div>
+                <div className="kpi-value">{formatINR(kpis?.totalDiscounts ?? (kpis?.coupons?.totalDiscountAmount || 0))}</div>
                 <div className="kpi-subtext">
-                  <span>{kpis?.successfulPayments?.count || 0} verified online captures</span>
+                  <span>
+                    Coupons: {formatINR(kpis?.couponDiscounts ?? kpis?.coupons?.totalDiscountAmount ?? 0)} • Offers: {formatINR(kpis?.automaticOfferDiscounts || 0)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Total Refunds Disbursed */}
+              <div className="sales-kpi-card">
+                <div className="kpi-header">
+                  <span className="kpi-label">TOTAL REFUNDS</span>
+                  <span className="kpi-icon">🔄</span>
+                </div>
+                <div className="kpi-value" style={{ color: "#ff858d" }}>
+                  {formatINR(kpis?.totalRefunds || 0)}
+                </div>
+                <div className="kpi-subtext">
+                  <span>{kpis?.returnedOrdersCount || 0} returns & cancellations credited</span>
+                </div>
+              </div>
+
+              {/* Units Sold */}
+              <div className="sales-kpi-card">
+                <div className="kpi-header">
+                  <span className="kpi-label">PERFUME UNITS SOLD</span>
+                  <span className="kpi-icon">🧪</span>
+                </div>
+                <div className="kpi-value">{kpis?.unitsSold || 0}</div>
+                <div className="kpi-subtext">
+                  <span>Across 30ml, 50ml, 100ml, 200ml flacons</span>
+                </div>
+              </div>
+
+              {/* Shipping Revenue */}
+              <div className="sales-kpi-card">
+                <div className="kpi-header">
+                  <span className="kpi-label">SHIPPING REVENUE</span>
+                  <span className="kpi-icon">🚚</span>
+                </div>
+                <div className="kpi-value">{formatINR(kpis?.totalShippingRevenue || 0)}</div>
+                <div className="kpi-subtext">
+                  <span>Atelier logistics fees collected</span>
+                </div>
+              </div>
+
+              {/* Cancelled Orders */}
+              <div className="sales-kpi-card">
+                <div className="kpi-header">
+                  <span className="kpi-label">CANCELLED ORDERS</span>
+                  <span className="kpi-icon">✕</span>
+                </div>
+                <div className="kpi-value">{formatINR(kpis?.cancelledOrdersAmount ?? kpis?.cancelledOrders?.amount ?? 0)}</div>
+                <div className="kpi-subtext">
+                  <span>{kpis?.cancelledOrdersCount ?? kpis?.cancelledOrders?.count ?? 0} cancelled orders</span>
                 </div>
               </div>
 
@@ -724,33 +748,7 @@ function AdminSales() {
                 </div>
                 <div className="kpi-value">{formatINR(kpis?.pendingPayments?.amount || 0)}</div>
                 <div className="kpi-subtext">
-                  <span>{kpis?.pendingPayments?.count || 0} awaiting delivery / payment</span>
-                </div>
-              </div>
-
-              {/* Coupon Discounts */}
-              <div className="sales-kpi-card">
-                <div className="kpi-header">
-                  <span className="kpi-label">COUPON DISCOUNTS</span>
-                  <span className="kpi-icon">🎟️</span>
-                </div>
-                <div className="kpi-value">{formatINR(kpis?.coupons?.totalDiscountAmount || 0)}</div>
-                <div className="kpi-subtext">
-                  <span>{kpis?.coupons?.redemptionsCount || 0} privilege codes redeemed</span>
-                </div>
-              </div>
-
-              {/* Cancelled & Failed Orders */}
-              <div className="sales-kpi-card">
-                <div className="kpi-header">
-                  <span className="kpi-label">CANCELLED / FAILED</span>
-                  <span className="kpi-icon">❌</span>
-                </div>
-                <div className="kpi-value">{formatINR(kpis?.failedPayments?.amount || 0)}</div>
-                <div className="kpi-subtext">
-                  <span>
-                    {kpis?.failedPayments?.count || 0} failed / {kpis?.cancelledOrders?.count || 0} cancelled
-                  </span>
+                  <span>{kpis?.pendingPayments?.count || 0} in-progress orders</span>
                 </div>
               </div>
             </section>
@@ -910,7 +908,7 @@ function AdminSales() {
                     <span>💳</span>
                     <span>Payment Methods Distribution</span>
                   </h3>
-                  <p>Segregation of verified Razorpay settlements from COD placed and delivered orders.</p>
+                  <p>Segregation of verified Razorpay settlements, FEXA Wallet debits, and Cash on Delivery orders.</p>
                 </div>
               </div>
 
@@ -919,40 +917,48 @@ function AdminSales() {
                   <span className="pm-label">
                     <span>⚡</span> RAZORPAY VERIFIED
                   </span>
-                  <span className="pm-amount">{formatINR(payments.razorpayPaid.amount)}</span>
-                  <span className="pm-count">{payments.razorpayPaid.count} Verified Orders</span>
+                  <span className="pm-amount">{formatINR(payments.razorpay?.successful?.amount ?? payments.razorpayPaid?.amount ?? 0)}</span>
+                  <span className="pm-count">{payments.razorpay?.successful?.count ?? payments.razorpayPaid?.count ?? 0} Verified Orders</span>
+                </div>
+
+                <div className="payment-method-card">
+                  <span className="pm-label">
+                    <span>👛</span> FEXA WALLET
+                  </span>
+                  <span className="pm-amount">{formatINR(payments.wallet?.successful?.amount ?? payments.walletPaid?.amount ?? 0)}</span>
+                  <span className="pm-count">{payments.wallet?.successful?.count ?? payments.walletPaid?.count ?? 0} Instant Debits</span>
                 </div>
 
                 <div className="payment-method-card">
                   <span className="pm-label">
                     <span>📬</span> COD DELIVERED / COLLECTED
                   </span>
-                  <span className="pm-amount">{formatINR(payments.codDelivered.amount)}</span>
-                  <span className="pm-count">{payments.codDelivered.count} Fulfilled Deliveries</span>
+                  <span className="pm-amount">{formatINR(payments.cod?.successful?.amount ?? payments.codDelivered?.amount ?? 0)}</span>
+                  <span className="pm-count">{payments.cod?.successful?.count ?? payments.codDelivered?.count ?? 0} Fulfilled Deliveries</span>
                 </div>
 
                 <div className="payment-method-card">
                   <span className="pm-label">
                     <span>🚚</span> COD IN-TRANSIT (PENDING)
                   </span>
-                  <span className="pm-amount">{formatINR(payments.codInTransit.amount)}</span>
-                  <span className="pm-count">{payments.codInTransit.count} Orders In Progress</span>
+                  <span className="pm-amount">{formatINR(payments.cod?.pending?.amount ?? payments.codInTransit?.amount ?? 0)}</span>
+                  <span className="pm-count">{payments.cod?.pending?.count ?? payments.codInTransit?.count ?? 0} Orders In Progress</span>
                 </div>
 
                 <div className="payment-method-card">
                   <span className="pm-label">
-                    <span>⏳</span> RAZORPAY INCOMPLETE
+                    <span>⏳</span> ONLINE PENDING / INCOMPLETE
                   </span>
-                  <span className="pm-amount">{formatINR(payments.razorpayPending.amount)}</span>
-                  <span className="pm-count">{payments.razorpayPending.count} Pending Checkouts</span>
+                  <span className="pm-amount">{formatINR(payments.razorpay?.pending?.amount ?? payments.razorpayPending?.amount ?? 0)}</span>
+                  <span className="pm-count">{payments.razorpay?.pending?.count ?? payments.razorpayPending?.count ?? 0} Pending Checkouts</span>
                 </div>
 
                 <div className="payment-method-card">
                   <span className="pm-label">
                     <span>⚠️</span> FAILED PAYMENT ATTEMPTS
                   </span>
-                  <span className="pm-amount">{formatINR(payments.razorpayFailed.amount)}</span>
-                  <span className="pm-count">{payments.razorpayFailed.count} Dismissed / Declined</span>
+                  <span className="pm-amount">{formatINR(payments.razorpay?.failed?.amount ?? payments.razorpayFailed?.amount ?? 0)}</span>
+                  <span className="pm-count">{payments.razorpay?.failed?.count ?? payments.razorpayFailed?.count ?? 0} Dismissed / Declined</span>
                 </div>
               </div>
             </section>
@@ -1057,7 +1063,7 @@ function AdminSales() {
                           <div className="product-cell">
                             {p.image ? (
                               <img
-                                src={p.image.startsWith("http") ? p.image : `http://localhost:5000${p.image}`}
+                                src={getImageUrl(p.image)}
                                 alt={p.name}
                                 className="product-thumb"
                                 onError={(e) => {

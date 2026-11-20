@@ -10,7 +10,12 @@ node_modules/
 dist/
 build/
 
+# Temporary and local scratch files
+scratch/
+backup/
+
 # Logs
+logs/
 *.log
 npm-debug.log*
 

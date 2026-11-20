@@ -150,6 +150,18 @@ const orderItemSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    stockDeducted: {
+      type: Boolean,
+      default: false,
+    },
+    stockRestored: {
+      type: Boolean,
+      default: false,
+    },
+    stockRestoredAt: {
+      type: Date,
+      default: null,
+    },
   },
   { _id: true }
 );
@@ -242,7 +254,7 @@ const orderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["COD", "Card", "UPI", "NetBanking", "Razorpay"],
+      enum: ["COD", "Card", "UPI", "NetBanking", "Razorpay", "Wallet", "wallet"],
       default: "COD",
     },
     paymentStatus: {
@@ -308,6 +320,14 @@ const orderSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    walletTransactionId: {
+      type: String,
+      default: null,
+    },
+    paidAt: {
+      type: Date,
+      default: null,
+    },
     paymentFailureReason: {
       type: String,
       default: null,
@@ -329,6 +349,24 @@ const orderSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
       index: true,
+    },
+    inventoryProcessed: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    stockDeductedAt: {
+      type: Date,
+      default: null,
+    },
+    stockRestored: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    stockRestoredAt: {
+      type: Date,
+      default: null,
     },
   },
   {

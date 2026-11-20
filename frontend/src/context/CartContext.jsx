@@ -1,5 +1,12 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useAuth } from "./AuthContext";
+import {
+  getCart,
+  addToCart as addToCartService,
+  updateCartItemQuantity,
+  removeCartItem,
+  clearCart as clearCartService,
+} from "../services/cart.service.js";
 
 const CartContext = createContext();
 
@@ -46,23 +53,14 @@ export const CartProvider = ({ children }) => {
     try {
       setLoading(true);
       setError(null);
-      const headers = {};
-      const storedToken = localStorage.getItem("token");
-      if (storedToken) {
-        headers["Authorization"] = `Bearer ${storedToken}`;
+
+      const data = await getCart();
+
+      if (data && data.success && data.cart) {
+        setCart(data.cart);
       }
-
-      const res = await fetch("http://localhost:5000/api/cart", {
-        headers,
-        credentials: "include",
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.cart) {
-          setCart(data.cart);
-        }
-      } else if (res.status === 401) {
+    } catch (err) {
+      if (err.response?.status === 401) {
         // Unauthenticated session
         setCart({
           items: [],
@@ -73,12 +71,9 @@ export const CartProvider = ({ children }) => {
           amountForFreeShipping: 5000,
         });
       } else {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || "Unable to load your shopping bag.");
+        console.error("Cart fetch error:", err);
+        setError(err.response?.data?.message || "Unable to load your shopping bag.");
       }
-    } catch (err) {
-      console.error("Cart fetch error:", err);
-      setError("Unable to connect to your shopping bag.");
     } finally {
       setLoading(false);
     }
@@ -110,22 +105,9 @@ export const CartProvider = ({ children }) => {
       setActionLoading(true);
       setError(null);
 
-      const headers = { "Content-Type": "application/json" };
-      const storedToken = localStorage.getItem("token");
-      if (storedToken) {
-        headers["Authorization"] = `Bearer ${storedToken}`;
-      }
+      const data = await addToCartService({ productId, variantId, volumeMl, quantity });
 
-      const res = await fetch("http://localhost:5000/api/cart/items", {
-        method: "POST",
-        headers,
-        credentials: "include",
-        body: JSON.stringify({ productId, variantId, volumeMl, quantity }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok && data.success) {
+      if (data && data.success) {
         setCart(data.cart);
         // Automatically open the Cart Drawer on successful addition if openDrawer is true
         if (openDrawer) {
@@ -133,13 +115,13 @@ export const CartProvider = ({ children }) => {
         }
         return { success: true, message: data.message };
       } else {
-        const msg = data.message || "Unable to add product to your bag.";
+        const msg = data?.message || "Unable to add product to your bag.";
         setError(msg);
         return { success: false, message: msg };
       }
     } catch (err) {
       console.error("Add to cart error:", err);
-      const msg = "Unable to connect to the server. Please try again.";
+      const msg = err.response?.data?.message || "Unable to connect to the server. Please try again.";
       setError(msg);
       return { success: false, message: msg };
     } finally {
@@ -154,28 +136,20 @@ export const CartProvider = ({ children }) => {
     try {
       setActionLoading(true);
       setError(null);
-      const res = await fetch(`http://localhost:5000/api/cart/items/${identifier}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({ quantity, variantId }),
-      });
 
-      const data = await res.json();
+      const data = await updateCartItemQuantity(identifier, quantity, variantId);
 
-      if (res.ok && data.success) {
+      if (data && data.success) {
         setCart(data.cart);
         return { success: true };
       } else {
-        const msg = data.message || "Unable to update quantity.";
+        const msg = data?.message || "Unable to update quantity.";
         setError(msg);
         return { success: false, message: msg };
       }
     } catch (err) {
       console.error("Update quantity error:", err);
-      const msg = "Unable to connect to server.";
+      const msg = err.response?.data?.message || "Unable to connect to server.";
       setError(msg);
       return { success: false, message: msg };
     } finally {
@@ -190,28 +164,20 @@ export const CartProvider = ({ children }) => {
     try {
       setActionLoading(true);
       setError(null);
-      const url = variantId
-        ? `http://localhost:5000/api/cart/items/${identifier}?variantId=${encodeURIComponent(variantId)}`
-        : `http://localhost:5000/api/cart/items/${identifier}`;
 
-      const res = await fetch(url, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      const data = await removeCartItem(identifier, variantId);
 
-      const data = await res.json();
-
-      if (res.ok && data.success) {
+      if (data && data.success) {
         setCart(data.cart);
         return { success: true, message: data.message };
       } else {
-        const msg = data.message || "Unable to remove item.";
+        const msg = data?.message || "Unable to remove item.";
         setError(msg);
         return { success: false, message: msg };
       }
     } catch (err) {
       console.error("Remove from cart error:", err);
-      const msg = "Unable to connect to server.";
+      const msg = err.response?.data?.message || "Unable to connect to server.";
       setError(msg);
       return { success: false, message: msg };
     } finally {
@@ -226,24 +192,22 @@ export const CartProvider = ({ children }) => {
     try {
       setActionLoading(true);
       setError(null);
-      const res = await fetch("http://localhost:5000/api/cart", {
-        method: "DELETE",
-        credentials: "include",
-      });
 
-      const data = await res.json();
+      const data = await clearCartService();
 
-      if (res.ok && data.success) {
+      if (data && data.success) {
         setCart(data.cart);
         return { success: true };
       } else {
-        const msg = data.message || "Unable to clear bag.";
+        const msg = data?.message || "Unable to clear bag.";
         setError(msg);
         return { success: false, message: msg };
       }
     } catch (err) {
       console.error("Clear cart error:", err);
-      return { success: false, message: "Unable to connect to server." };
+      const msg = err.response?.data?.message || "Unable to connect to server.";
+      setError(msg);
+      return { success: false, message: msg };
     } finally {
       setActionLoading(false);
     }

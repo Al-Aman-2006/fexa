@@ -1,12 +1,10 @@
+import { getImageUrl } from "../../utils/imageUrl.js";
+
 function DeleteProductModal({ isOpen, product, onClose, onConfirm, isDeleting }) {
   if (!isOpen || !product) return null;
 
   const primaryImg = product.images && product.images.length > 0 ? product.images[0] : null;
-  const primaryImgUrl = primaryImg
-    ? primaryImg.startsWith("http")
-      ? primaryImg
-      : `http://localhost:5000${primaryImg}`
-    : null;
+  const primaryImgUrl = primaryImg ? getImageUrl(primaryImg) : null;
 
   return (
     <div className="admin-modal-overlay" onClick={isDeleting ? null : onClose}>

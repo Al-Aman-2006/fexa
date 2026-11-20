@@ -4,6 +4,7 @@ import Category from "../models/category.model.js";
 import Product from "../models/product.model.js";
 import { createProduct } from "./adminProduct.controller.js";
 import { normalizeCategory } from "../validators/product.validator.js";
+import { deleteFromCloudinary } from "../services/cloudinary.service.js";
 
 // Helper to generate a URL-friendly slug
 const slugify = (text) => {
@@ -394,11 +395,24 @@ const updateCategory = async (req, res) => {
       }
     }
 
+    const oldImage = category.image;
     if (description !== undefined) category.description = description.trim();
     if (image !== undefined) category.image = image.trim();
     if (typeof isActive === "boolean") category.isActive = isActive;
 
     await category.save();
+
+    // If an existing Cloudinary image was replaced, clean up after save succeeds
+    if (oldImage && image !== undefined && oldImage !== category.image && oldImage.includes("res.cloudinary.com")) {
+      try {
+        const isShared = await Category.exists({ _id: { $ne: category._id }, image: oldImage });
+        if (!isShared) {
+          await deleteFromCloudinary(oldImage);
+        }
+      } catch (cleanErr) {
+        console.warn("Non-critical error cleaning up old category image:", cleanErr.message);
+      }
+    }
 
     return res.status(200).json({
       success: true,
@@ -516,7 +530,21 @@ const deleteCategory = async (req, res) => {
       });
     }
 
+    const categoryImageToDelete = category.image;
+
     await Category.deleteOne({ _id: category._id });
+
+    // Clean up category image from Cloudinary if not shared
+    if (categoryImageToDelete && categoryImageToDelete.includes("res.cloudinary.com")) {
+      try {
+        const isShared = await Category.exists({ image: categoryImageToDelete });
+        if (!isShared) {
+          await deleteFromCloudinary(categoryImageToDelete);
+        }
+      } catch (cleanErr) {
+        console.warn("Non-critical error cleaning up deleted category image:", cleanErr.message);
+      }
+    }
 
     return res.status(200).json({
       success: true,

@@ -112,7 +112,7 @@ const userSchema = new mongoose.Schema(
 
 
     // ========================================
-    // PROFILE
+    // PROFILE 
     // ========================================
 
     profileImage: {

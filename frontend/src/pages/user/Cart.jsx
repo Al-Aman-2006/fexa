@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
 import Navbar from "../../components/common/Navbar";
+import { getImageUrl } from "../../utils/imageUrl";
 import "./Cart.css";
 
 function Cart() {
@@ -32,14 +33,6 @@ function Cart() {
   const formatPrice = (val) => {
     if (val === undefined || val === null) return "₹0";
     return `₹${Number(val).toLocaleString("en-IN")}`;
-  };
-
-  const getImageUrl = (imgPath) => {
-    if (!imgPath) return null;
-    if (imgPath.startsWith("http://") || imgPath.startsWith("https://")) {
-      return imgPath;
-    }
-    return `http://localhost:5000${imgPath}`;
   };
 
   const handleClearBag = () => {

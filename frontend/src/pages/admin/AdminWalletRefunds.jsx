@@ -2,6 +2,10 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useAdminAuth } from "../../context/AdminAuthContext";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminPagination from "../../components/admin/AdminPagination";
+import {
+  getAdminWalletRefunds,
+  getAdminWalletRefundById,
+} from "../../services/admin.service.js";
 import "./AdminWalletRefunds.css";
 
 const TRANSACTION_TYPES = [
@@ -90,32 +94,29 @@ export default function AdminWalletRefunds() {
   const fetchTransactions = useCallback(async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: "10",
+      const params = {
+        page,
+        limit: 10,
         search: appliedSearch,
         type: typeFilter,
         status: statusFilter,
-      });
+      };
 
-      if (startDate) params.append("startDate", startDate);
-      if (endDate) params.append("endDate", endDate);
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
 
-      const res = await fetch(`http://localhost:5000/api/admin/wallet-refunds?${params.toString()}`, {
-        credentials: "include",
-      });
+      const data = await getAdminWalletRefunds(params);
 
-      const data = await res.json();
-      if (data.success) {
+      if (data && data.success) {
         setTransactions(data.transactions || []);
         if (data.stats) setStats(data.stats);
         if (data.pagination) setPagination(data.pagination);
       } else {
-        showToast(data.message || "Failed to load wallet transactions", "error");
+        showToast(data?.message || "Failed to load wallet transactions", "error");
       }
     } catch (err) {
       console.error("Fetch admin wallet refunds error:", err);
-      showToast("Network error connecting to wallet refund service.", "error");
+      showToast(err.response?.data?.message || "Network error connecting to wallet refund service.", "error");
     } finally {
       setLoading(false);
     }
@@ -149,16 +150,13 @@ export default function AdminWalletRefunds() {
     setSelectedTx(null);
 
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/wallet-refunds/${tx.transactionId}`, {
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (data.success && data.transaction) {
+      const data = await getAdminWalletRefundById(tx.transactionId);
+      if (data && data.success && data.transaction) {
         setSelectedTx(data.transaction);
       } else {
         // Fallback to table row data
         setSelectedTx(tx);
-        showToast(data.message || "Loaded cached transaction details.", "info");
+        showToast(data?.message || "Loaded cached transaction details.", "info");
       }
     } catch (err) {
       console.error("Fetch transaction details error:", err);

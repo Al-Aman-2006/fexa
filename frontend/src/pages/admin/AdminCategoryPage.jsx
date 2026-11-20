@@ -4,8 +4,14 @@ import { useAdminAuth } from "../../context/AdminAuthContext";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import ProductFormModal from "../../components/admin/ProductFormModal";
 import ProductViewModal from "../../components/admin/ProductViewModal";
-import DeleteProductModal from "../../components/admin/DeleteProductModal";
 import AdminPagination from "../../components/admin/AdminPagination";
+import { getImageUrl } from "../../utils/imageUrl.js";
+import {
+  getAdminProducts,
+  getAdminCategoryBySlug,
+  toggleCategoryStatusBySlug,
+  toggleProductStatus,
+} from "../../services/admin.service.js";
 import "./AdminDashboard.css";
 import "./AdminProducts.css";
 import "./AdminCategoryPage.css";
@@ -115,9 +121,8 @@ function AdminCategoryPage({ category: categoryProp }) {
 
   // Sidebar & Modal states
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [activeModal, setActiveModal] = useState(null); // "create" | "edit" | "view" | "delete"
+  const [activeModal, setActiveModal] = useState(null); // "create" | "edit" | "view"
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   // Request race-condition tracking
   const requestIdRef = useRef(0);
@@ -146,12 +151,8 @@ function AdminCategoryPage({ category: categoryProp }) {
   const fetchCategoryDetails = useCallback(async () => {
     try {
       if (config.isAll) {
-        const res = await fetch(`http://localhost:5000/api/admin/products?limit=1`, {
-          method: "GET",
-          credentials: "include",
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
+        const data = await getAdminProducts({ limit: 1 });
+        if (data && data.success) {
           setCategoryStatus({
             name: "All",
             slug: "all",
@@ -172,15 +173,8 @@ function AdminCategoryPage({ category: categoryProp }) {
         return;
       }
 
-      const res = await fetch(
-        `http://localhost:5000/api/admin/categories/${config.slug}`,
-        {
-          method: "GET",
-          credentials: "include",
-        }
-      );
-      const data = await res.json();
-      if (res.ok && data.success && data.category) {
+      const data = await getAdminCategoryBySlug(config.slug);
+      if (data && data.success && data.category) {
         setCategoryStatus({
           name: data.category.name,
           slug: data.category.slug,
@@ -204,39 +198,31 @@ function AdminCategoryPage({ category: categoryProp }) {
         setLoading(true);
         setFetchError(null);
 
-        const queryParams = new URLSearchParams({
+        const params = {
           category: targetCategory,
           page: targetPage,
           limit: 10,
-        });
+        };
 
         if (targetSearch) {
-          queryParams.set("search", targetSearch);
+          params.search = targetSearch;
         }
 
         if (targetStatus && targetStatus !== "All") {
-          queryParams.set("status", targetStatus);
+          params.status = targetStatus;
         }
 
-        const response = await fetch(
-          `http://localhost:5000/api/admin/products?${queryParams.toString()}`,
-          {
-            method: "GET",
-            credentials: "include",
-          }
-        );
+        const data = await getAdminProducts(params);
 
         if (currentReqId !== requestIdRef.current) return;
 
-        const data = await response.json();
-
-        if (response.ok && data.success) {
+        if (data && data.success) {
           setProducts(data.products || []);
           setPagination(
             data.pagination || { page: 1, limit: 10, totalProducts: 0, totalPages: 1 }
           );
         } else {
-          setFetchError(data.message || `Unable to fetch ${targetCategory} products.`);
+          setFetchError(data?.message || `Unable to fetch ${targetCategory} products.`);
         }
       } catch (err) {
         if (currentReqId !== requestIdRef.current) return;
@@ -268,21 +254,9 @@ function AdminCategoryPage({ category: categoryProp }) {
 
       const targetNewStatus = !categoryStatus.isActive;
 
-      const response = await fetch(
-        `http://localhost:5000/api/admin/categories/${config.slug}/status`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify({ isActive: targetNewStatus }),
-        }
-      );
+      const data = await toggleCategoryStatusBySlug(config.slug, { isActive: targetNewStatus });
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setCategoryStatus({
           name: data.category.name,
           slug: data.category.slug,
@@ -302,14 +276,14 @@ function AdminCategoryPage({ category: categoryProp }) {
       } else {
         setToast({
           type: "error",
-          text: data.message || "Failed to update category activation status.",
+          text: data?.message || "Failed to update category activation status.",
         });
       }
     } catch (err) {
       console.error("Toggle category status error:", err);
       setToast({
         type: "error",
-        text: "Network error while updating category status. Please try again.",
+        text: err.response?.data?.message || "Network error while updating category status. Please try again.",
       });
     } finally {
       setIsTogglingCategory(false);
@@ -320,81 +294,27 @@ function AdminCategoryPage({ category: categoryProp }) {
   const handleToggleProductStatus = async (prod) => {
     try {
       setToast(null);
-      const response = await fetch(
-        `http://localhost:5000/api/admin/products/${prod._id}/status`,
-        {
-          method: "PATCH",
-          credentials: "include",
-        }
-      );
+      const data = await toggleProductStatus(prod._id);
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setToast({
           type: "success",
-          text: data.message || `Product status updated to ${data.product.status}.`,
+          text: data.message || `Product status updated to ${data.product?.status || "updated"}.`,
         });
         fetchCategoryDetails();
         fetchCategoryProducts(resolvedCategory, page, debouncedSearch, statusFilter);
       } else {
         setToast({
           type: "error",
-          text: data.message || "Failed to update product status.",
+          text: data?.message || "Failed to update product status.",
         });
       }
     } catch (err) {
       console.error("Toggle product status error:", err);
       setToast({
         type: "error",
-        text: "Network error while toggling product status.",
+        text: err.response?.data?.message || "Network error while toggling product status.",
       });
-    }
-  };
-
-  // Delete Individual Product Confirmation
-  const handleConfirmDelete = async (prod) => {
-    try {
-      setIsDeleting(true);
-      setToast(null);
-
-      const response = await fetch(
-        `http://localhost:5000/api/admin/products/${prod._id}`,
-        {
-          method: "DELETE",
-          credentials: "include",
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setToast({
-          type: "success",
-          text: data.message || "Product deleted successfully.",
-        });
-        setActiveModal(null);
-        setSelectedProduct(null);
-        const nextPage = products.length === 1 && page > 1 ? page - 1 : page;
-        if (nextPage !== page) {
-          setPage(nextPage);
-        }
-        fetchCategoryDetails();
-        fetchCategoryProducts(resolvedCategory, nextPage, debouncedSearch, statusFilter);
-      } else {
-        setToast({
-          type: "error",
-          text: data.message || "Failed to delete product.",
-        });
-      }
-    } catch (err) {
-      console.error("Delete product error:", err);
-      setToast({
-        type: "error",
-        text: "Network error while deleting product.",
-      });
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -756,9 +676,7 @@ function AdminCategoryPage({ category: categoryProp }) {
                     products.map((prod) => {
                       const primaryImage =
                         prod.images && prod.images.length > 0
-                          ? prod.images[0].startsWith("http")
-                            ? prod.images[0]
-                            : `http://localhost:5000${prod.images[0]}`
+                          ? getImageUrl(prod.images[0])
                           : null;
 
                       return (
@@ -862,17 +780,6 @@ function AdminCategoryPage({ category: categoryProp }) {
                                   {prod.status === "Active" ? "DEACTIVATE" : "ACTIVATE"}
                                 </button>
                               )}
-
-                              <button
-                                type="button"
-                                className="action-delete-btn"
-                                onClick={() => {
-                                  setSelectedProduct(prod);
-                                  setActiveModal("delete");
-                                }}
-                              >
-                                DELETE
-                              </button>
                             </div>
                           </td>
                         </tr>
@@ -985,20 +892,6 @@ function AdminCategoryPage({ category: categoryProp }) {
           setSelectedProduct(prod);
           setActiveModal("edit");
         }}
-      />
-
-      {/* DELETE PRODUCT CONFIRMATION MODAL */}
-      <DeleteProductModal
-        isOpen={activeModal === "delete"}
-        product={selectedProduct}
-        onClose={() => {
-          if (!isDeleting) {
-            setActiveModal(null);
-            setSelectedProduct(null);
-          }
-        }}
-        onConfirm={handleConfirmDelete}
-        isDeleting={isDeleting}
       />
     </div>
   );

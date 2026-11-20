@@ -138,7 +138,14 @@ export const streamOrderInvoicePDF = (order, customer, res) => {
   doc.font("Helvetica-Bold").text(order.orderNumber, 410, curY + 28);
 
   doc.font("Helvetica").text("Payment Method:", 315, curY + 41);
-  const pMethod = order.paymentMethod === "COD" ? "Cash on Delivery" : order.paymentMethod === "Razorpay" ? "Razorpay Online" : (order.paymentMethod || "Online");
+  const pMethod =
+    order.paymentMethod === "COD"
+      ? "Cash on Delivery"
+      : order.paymentMethod === "Wallet"
+        ? "FEXA Wallet"
+        : order.paymentMethod === "Razorpay"
+          ? "Razorpay Online"
+          : (order.paymentMethod || "Online");
   doc.font("Helvetica-Bold").text(pMethod, 410, curY + 41);
 
   doc.font("Helvetica").text("Payment Status:", 315, curY + 54);
@@ -444,9 +451,9 @@ export const streamSalesReportPDF = (reportData, res) => {
   const pmList = paymentMethods.length > 0
     ? paymentMethods
     : [
-        { method: "Razorpay Online", orders: metrics.completedOrders || 0, amount: metrics.netSales || 0 },
-        { method: "Cash on Delivery", orders: 0, amount: 0 },
-      ];
+      { method: "Razorpay Online", orders: metrics.completedOrders || 0, amount: metrics.netSales || 0 },
+      { method: "Cash on Delivery", orders: 0, amount: 0 },
+    ];
 
   pmList.forEach((pm, idx) => {
     const bg = idx % 2 === 1 ? rowAltBg : "#ffffff";

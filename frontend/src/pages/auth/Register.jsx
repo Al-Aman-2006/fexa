@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useGoogleLogin } from "@react-oauth/google";
 import heroImage from "../../assets/hero.png";
 import { validateName, normalizeName } from "../../utils/validation";
+import { register as registerApi, googleLogin as googleLoginApi } from "../../services/auth.service.js";
 
 
 function Register() {
@@ -15,22 +16,15 @@ const navigate = useNavigate();
   const handleGoogleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       try {
-        const response = await fetch("http://localhost:5000/api/auth/google", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ credential: tokenResponse.access_token }),
-        });
-        const data = await response.json();
-        if (!response.ok) {
-          setErrors((prev) => ({ ...prev, email: data.message || "Google authentication failed." }));
-          return;
-        }
+        const data = await googleLoginApi(tokenResponse.access_token);
         login(data.user);
         navigate("/home", { replace: true });
       } catch (err) {
         console.error("Google auth error:", err);
-        setErrors((prev) => ({ ...prev, email: "Unable to connect to Google auth server." }));
+        setErrors((prev) => ({
+          ...prev,
+          email: err.response?.data?.message || "Google authentication failed.",
+        }));
       }
     },
     onError: (err) => {
@@ -123,39 +117,36 @@ const navigate = useNavigate();
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:5000/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: normalizeName(formData.fullName),
-          email: formData.email.trim(),
-          password: formData.password,
-        }),
+      await registerApi({
+        name: normalizeName(formData.fullName),
+        email: formData.email.trim(),
+        password: formData.password,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
+      navigate("/verify-otp", { state: { email: formData.email.trim() } });
+    } catch (error) {
+      console.error("Registration error:", error);
+      const data = error.response?.data;
+      if (data) {
         if (data.errors) {
           const mappedErrors = { ...data.errors };
           if (data.errors.name && !data.errors.fullName) {
             mappedErrors.fullName = data.errors.name;
           }
-          setErrors(prev => ({ ...prev, ...mappedErrors }));
+          setErrors((prev) => ({ ...prev, ...mappedErrors }));
         } else if (data.message && data.message.toLowerCase().includes("already exists")) {
-          setErrors(prev => ({ ...prev, email: "An account with this email already exists." }));
+          setErrors((prev) => ({ ...prev, email: "An account with this email already exists." }));
         } else if (data.message && data.message.toLowerCase().includes("unable to send verification email")) {
-          setErrors(prev => ({ ...prev, email: "Unable to send verification email. Please check your email address or try again later." }));
+          setErrors((prev) => ({
+            ...prev,
+            email: "Unable to send verification email. Please check your email address or try again later.",
+          }));
         } else {
-          setErrors(prev => ({ ...prev, general: data.message || "Registration failed. Please try again." }));
+          setErrors((prev) => ({ ...prev, general: data.message || "Registration failed. Please try again." }));
         }
-        return;
+      } else {
+        setErrors((prev) => ({ ...prev, general: "Unable to connect to the server. Please try again." }));
       }
-
-      navigate("/verify-otp", { state: { email: formData.email.trim() } });
-    } catch (error) {
-      console.error("Registration error:", error);
-      setErrors(prev => ({ ...prev, general: "Unable to connect to the server. Please try again." }));
     } finally {
       setIsLoading(false);
     }

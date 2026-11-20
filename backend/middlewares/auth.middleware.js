@@ -33,12 +33,19 @@ const authMiddleware = (req, res, next) => {
     // Store user information inside request
     req.user = decoded;
 
+    const clearCookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      path: "/",
+    };
+
     // Check if user is blocked in DB
     User.findById(decoded.id)
       .select("isBlocked role")
       .then((user) => {
         if (!user) {
-          res.clearCookie("token");
+          res.clearCookie("token", clearCookieOptions);
           return res.status(401).json({
             success: false,
             message: "User account no longer exists",
@@ -46,7 +53,7 @@ const authMiddleware = (req, res, next) => {
         }
 
         if (user.isBlocked) {
-          res.clearCookie("token");
+          res.clearCookie("token", clearCookieOptions);
           return res.status(403).json({
             success: false,
             message: "Your account has been blocked. Please contact the administrator.",

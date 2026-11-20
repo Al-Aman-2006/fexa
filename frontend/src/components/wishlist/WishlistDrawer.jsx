@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useWishlist } from "../../context/WishlistContext";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
+import { getImageUrl } from "../../utils/imageUrl";
 import "./WishlistDrawer.css";
 
 function WishlistDrawer() {
@@ -66,14 +67,6 @@ function WishlistDrawer() {
   const formatPrice = (val) => {
     if (val === undefined || val === null) return "₹0";
     return `₹${Number(val).toLocaleString("en-IN")}`;
-  };
-
-  const getImageUrl = (imgPath) => {
-    if (!imgPath) return null;
-    if (imgPath.startsWith("http://") || imgPath.startsWith("https://")) {
-      return imgPath;
-    }
-    return `http://localhost:5000${imgPath}`;
   };
 
   const handleExploreClick = () => {

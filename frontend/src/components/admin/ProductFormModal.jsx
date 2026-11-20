@@ -5,6 +5,13 @@ import {
   validateProductForm,
   validateVariantsList,
 } from "../../utils/validation";
+import {
+  getAdminCategories,
+  createCategoryProduct,
+  updateAdminProduct,
+} from "../../services/admin.service.js";
+import axiosInstance from "../../api/axiosInstance.js";
+import { getImageUrl } from "../../utils/imageUrl.js";
 
 function ProductFormModal({
   isOpen,
@@ -32,10 +39,9 @@ function ProductFormModal({
 
   useEffect(() => {
     if (isOpen) {
-      fetch("http://localhost:5000/api/admin/categories", { credentials: "include" })
-        .then((res) => res.json())
+      getAdminCategories()
         .then((data) => {
-          if (data.success && data.categories) {
+          if (data && data.success && data.categories) {
             setCategoriesList(data.categories);
           }
         })
@@ -480,12 +486,10 @@ function ProductFormModal({
     if (!imgUrl) return;
 
     try {
-      const fullUrl = imgUrl.startsWith("http://") || imgUrl.startsWith("https://")
-        ? imgUrl
-        : `http://localhost:5000${imgUrl}`;
+      const fullUrl = getImageUrl(imgUrl);
 
-      const res = await fetch(fullUrl);
-      const blob = await res.blob();
+      const res = await axiosInstance.get(fullUrl, { responseType: "blob" });
+      const blob = res.data;
       const objectUrl = URL.createObjectURL(blob);
 
       setCropperState({
@@ -500,7 +504,7 @@ function ProductFormModal({
       console.error("Failed to load existing image for cropping:", err);
       setCropperState({
         isOpen: true,
-        imageSrc: imgUrl.startsWith("http") ? imgUrl : `http://localhost:5000${imgUrl}`,
+        imageSrc: getImageUrl(imgUrl),
         fileName: `cropped-saved-${idx + 1}.webp`,
         mode: "edit-existing",
         targetIndex: idx,
@@ -628,44 +632,37 @@ function ProductFormModal({
       });
 
       const categorySlug = (formData.category || "men").toLowerCase();
-      const url = isEdit
-        ? `http://localhost:5000/api/admin/products/${product._id}`
-        : `http://localhost:5000/api/admin/categories/${categorySlug}/products`;
 
-      const method = isEdit ? "PUT" : "POST";
-
-      const response = await fetch(url, {
-        method,
-        credentials: "include",
-        body: dataPayload,
-      });
-
-      let data = {};
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        data = await response.json();
-      } else {
-        const text = await response.text();
-        data = { message: text || `HTTP ${response.status} ${response.statusText}` };
+      let data;
+      let status = 200;
+      try {
+        if (isEdit) {
+          data = await updateAdminProduct(product._id, dataPayload);
+        } else {
+          data = await createCategoryProduct(categorySlug, dataPayload);
+        }
+      } catch (submitErr) {
+        status = submitErr.response?.status || 500;
+        data = submitErr.response?.data || { message: submitErr.message };
       }
 
-      if (response.ok && data.success) {
+      if (data && data.success) {
         if (onSuccess) {
           onSuccess(data.product, isEdit ? "edit" : "create");
         }
         onClose();
       } else {
-        if (response.status === 401) {
+        if (status === 401) {
           setModalErrors({ general: "Your admin session has expired. Please log in again." });
-        } else if (response.status === 403) {
+        } else if (status === 403) {
           setModalErrors({ general: "Access denied. Admin privileges required." });
-        } else if (response.status === 404) {
+        } else if (status === 404) {
           setModalErrors({ general: "Product API route not found on the backend." });
-        } else if (response.status === 409) {
-          setModalErrors({ general: data.message || "A product with this name already exists." });
-        } else if (response.status === 413) {
+        } else if (status === 409) {
+          setModalErrors({ general: data?.message || "A product with this name already exists." });
+        } else if (status === 413) {
           setModalErrors({ general: "Image size is too large. Maximum size per image is 5MB." });
-        } else if (response.status === 415) {
+        } else if (status === 415) {
           setModalErrors({ general: "Unsupported image format. Allowed formats: JPG, JPEG, PNG, WEBP." });
         } else {
           if (data.errors) {
@@ -1056,7 +1053,7 @@ function ProductFormModal({
                 {/* Existing Images (Edit mode) */}
                 {existingImages.map((imgUrl, idx) => (
                   <div key={`exist-${idx}`} className="preview-thumb-card">
-                    <img src={imgUrl.startsWith("http") ? imgUrl : `http://localhost:5000${imgUrl}`} alt="Existing" />
+                    <img src={getImageUrl(imgUrl)} alt="Existing" />
                     <div className="thumb-actions-overlay">
                       <button
                         type="button"

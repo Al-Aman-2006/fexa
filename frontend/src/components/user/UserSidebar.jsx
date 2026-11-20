@@ -1,14 +1,7 @@
 import React from "react";
 import { useWishlist } from "../../context/WishlistContext";
+import { getImageUrl } from "../../utils/imageUrl";
 import "./UserSidebar.css";
-
-const getProfileImageUrl = (imagePath) => {
-  if (!imagePath) return null;
-  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
-    return imagePath;
-  }
-  return `http://localhost:5000${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
-};
 
 const getInitials = (name) => {
   if (!name) return "F";
@@ -53,7 +46,7 @@ function UserSidebar({ user, activeTab, setActiveTab, onLogout, isMobileOpen, se
         <div className="sidebar-avatar-wrapper">
           {user?.profileImage ? (
             <img
-              src={getProfileImageUrl(user.profileImage)}
+              src={getImageUrl(user.profileImage)}
               alt={user?.name || "User Avatar"}
               className="sidebar-avatar-img"
             />

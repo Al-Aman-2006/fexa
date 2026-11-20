@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useCart } from "../../context/CartContext";
 import { useWishlist } from "../../context/WishlistContext";
+import { getProducts } from "../../services/product.service.js";
+import { getImageUrl } from "../../utils/imageUrl.js";
 import "./Navbar.css";
 
 function Navbar({
@@ -237,27 +239,27 @@ function Navbar({
     const timer = setTimeout(async () => {
       const currentReqId = ++requestIdRef.current;
       try {
-        const res = await fetch(
-          `http://localhost:5000/api/products?search=${encodeURIComponent(
-            trimmedQuery
-          )}&limit=6`
-        );
-        const data = await res.json();
+        const data = await getProducts({
+          search: trimmedQuery,
+          limit: 6,
+        });
 
         // Ignore stale out-of-order responses
         if (currentReqId !== requestIdRef.current) return;
 
-        if (res.ok && data.success) {
+        if (data && data.success) {
           setSearchResults(data.products || []);
         } else {
           setSearchError(
-            data.message || "Unable to search products. Please try again."
+            data?.message || "Unable to search products. Please try again."
           );
         }
       } catch (err) {
         if (currentReqId !== requestIdRef.current) return;
         console.error("Navbar search error:", err);
-        setSearchError("Unable to connect to product search. Please try again.");
+        setSearchError(
+          err.response?.data?.message || "Unable to connect to product search. Please try again."
+        );
       } finally {
         if (currentReqId === requestIdRef.current) {
           setIsSearching(false);
@@ -304,13 +306,7 @@ function Navbar({
     return `₹${Number(val).toLocaleString("en-IN")}`;
   };
 
-  const getImageUrl = (imgPath) => {
-    if (!imgPath) return null;
-    if (imgPath.startsWith("http://") || imgPath.startsWith("https://")) {
-      return imgPath;
-    }
-    return `http://localhost:5000${imgPath}`;
-  };
+
 
   const handleCollectionsToggle = (e) => {
     e.stopPropagation();

@@ -40,8 +40,10 @@ const walletTransactionSchema = new mongoose.Schema(
         "PURCHASE_DEBIT",
         "DEBIT",
         "Cancellation Refund",
+        "Order Cancellation Refund",
         "CANCELLATION",
         "CANCELLATION_REFUND",
+        "ORDER_CANCELLATION_REFUND",
         "Admin Adjustment",
         "ADMIN_ADJUSTMENT",
       ],
@@ -171,7 +173,7 @@ walletTransactionSchema.pre("validate", function (next) {
     if (typeUpper === "TOPUP" || typeUpper === "TOP_UP") this.type = "Top-up";
     else if (typeUpper === "REFUND" || typeUpper === "RETURN_REFUND") this.type = "Return Refund";
     else if (typeUpper === "PURCHASE" || typeUpper === "PURCHASE_DEBIT" || typeUpper === "DEBIT") this.type = "Purchase Debit";
-    else if (typeUpper === "CANCELLATION" || typeUpper === "CANCELLATION_REFUND") this.type = "Cancellation Refund";
+    else if (typeUpper === "CANCELLATION" || typeUpper === "CANCELLATION_REFUND" || typeUpper === "ORDER_CANCELLATION_REFUND") this.type = "Cancellation Refund";
     else if (typeUpper === "ADMIN_ADJUSTMENT" || typeUpper === "ADJUSTMENT") this.type = "Admin Adjustment";
   }
 

@@ -1,6 +1,12 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useAuth } from "./AuthContext";
 import { useCart } from "./CartContext";
+import {
+  getWishlist,
+  addToWishlist as addToWishlistService,
+  removeFromWishlist as removeFromWishlistService,
+  moveToCart as moveToCartService,
+} from "../services/wishlist.service.js";
 
 const WishlistContext = createContext();
 
@@ -33,24 +39,19 @@ export const WishlistProvider = ({ children }) => {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch("http://localhost:5000/api/wishlist", {
-        credentials: "include",
-      });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.wishlist)) {
-          setWishlist(data.wishlist);
-        }
-      } else if (res.status === 401) {
-        setWishlist([]);
-      } else {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || "Unable to load your wishlist.");
+      const data = await getWishlist();
+
+      if (data && data.success && Array.isArray(data.wishlist)) {
+        setWishlist(data.wishlist);
       }
     } catch (err) {
-      console.error("Wishlist fetch error:", err);
-      setError("Unable to connect to the atelier service.");
+      if (err.response?.status === 401) {
+        setWishlist([]);
+      } else {
+        console.error("Wishlist fetch error:", err);
+        setError(err.response?.data?.message || "Unable to connect to the atelier service.");
+      }
     } finally {
       setLoading(false);
     }
@@ -98,22 +99,9 @@ export const WishlistProvider = ({ children }) => {
       setActionLoading(true);
       setError(null);
 
-      const headers = { "Content-Type": "application/json" };
-      const storedToken = localStorage.getItem("token");
-      if (storedToken) {
-        headers["Authorization"] = `Bearer ${storedToken}`;
-      }
+      const data = await addToWishlistService(productId);
 
-      const res = await fetch("http://localhost:5000/api/wishlist/items", {
-        method: "POST",
-        headers,
-        credentials: "include",
-        body: JSON.stringify({ productId }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok && data.success) {
+      if (data && data.success) {
         if (Array.isArray(data.wishlist)) {
           setWishlist(data.wishlist);
         } else {
@@ -126,13 +114,13 @@ export const WishlistProvider = ({ children }) => {
           message: data.message || "Added to your wishlist.",
         };
       } else {
-        const msg = data.message || "Unable to add fragrance to wishlist.";
+        const msg = data?.message || "Unable to add fragrance to wishlist.";
         setError(msg);
         return { success: false, message: msg };
       }
     } catch (err) {
       console.error("Add to wishlist error:", err);
-      const msg = "Unable to connect to the atelier service. Please try again.";
+      const msg = err.response?.data?.message || "Unable to connect to the atelier service. Please try again.";
       setError(msg);
       return { success: false, message: msg };
     } finally {
@@ -159,21 +147,9 @@ export const WishlistProvider = ({ children }) => {
       setActionLoading(true);
       setError(null);
 
-      const headers = {};
-      const storedToken = localStorage.getItem("token");
-      if (storedToken) {
-        headers["Authorization"] = `Bearer ${storedToken}`;
-      }
+      const data = await removeFromWishlistService(productId);
 
-      const res = await fetch(`http://localhost:5000/api/wishlist/items/${productId}`, {
-        method: "DELETE",
-        headers,
-        credentials: "include",
-      });
-
-      const data = await res.json();
-
-      if (res.ok && data.success) {
+      if (data && data.success) {
         if (Array.isArray(data.wishlist)) {
           setWishlist(data.wishlist);
         } else {
@@ -185,13 +161,13 @@ export const WishlistProvider = ({ children }) => {
         }
         return { success: true, message: data.message || "Removed from wishlist." };
       } else {
-        const msg = data.message || "Unable to remove item from wishlist.";
+        const msg = data?.message || "Unable to remove item from wishlist.";
         setError(msg);
         return { success: false, message: msg };
       }
     } catch (err) {
       console.error("Remove from wishlist error:", err);
-      const msg = "Unable to connect to the atelier service. Please try again.";
+      const msg = err.response?.data?.message || "Unable to connect to the atelier service. Please try again.";
       setError(msg);
       return { success: false, message: msg };
     } finally {
@@ -225,22 +201,9 @@ export const WishlistProvider = ({ children }) => {
       setActionLoading(true);
       setError(null);
 
-      const headers = { "Content-Type": "application/json" };
-      const storedToken = localStorage.getItem("token");
-      if (storedToken) {
-        headers["Authorization"] = `Bearer ${storedToken}`;
-      }
+      const data = await moveToCartService({ productId, variantId, quantity });
 
-      const res = await fetch("http://localhost:5000/api/wishlist/move-to-cart", {
-        method: "POST",
-        headers,
-        credentials: "include",
-        body: JSON.stringify({ productId, variantId, quantity }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok && data.success) {
+      if (data && data.success) {
         // 1. Update Cart state
         if (data.cart && setCart) {
           setCart(data.cart);
@@ -260,13 +223,13 @@ export const WishlistProvider = ({ children }) => {
           message: data.message || "Added to your shopping bag and removed from wishlist.",
         };
       } else {
-        const msg = data.message || "Unable to add product to your bag.";
+        const msg = data?.message || "Unable to add product to your bag.";
         setError(msg);
         return { success: false, message: msg };
       }
     } catch (err) {
       console.error("Move item to cart error:", err);
-      const msg = "Unable to connect to the atelier service. Please try again.";
+      const msg = err.response?.data?.message || "Unable to connect to the atelier service. Please try again.";
       setError(msg);
       return { success: false, message: msg };
     } finally {

@@ -4,6 +4,14 @@ import { useAdminAuth } from "../../context/AdminAuthContext";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminPagination from "../../components/admin/AdminPagination";
 import RevenueAnalyticsGraph from "../../components/admin/RevenueAnalyticsGraph";
+import {
+  getAdminUsers,
+  createAdminUser,
+  updateAdminUser,
+  blockUser,
+  unblockUser,
+  deleteAdminUser,
+} from "../../services/admin.service.js";
 import "./AdminDashboard.css";
 
 function AdminDashboard() {
@@ -54,26 +62,18 @@ function AdminDashboard() {
   const fetchUsers = useCallback(async (targetPage = 1, targetSearch = "") => {
     try {
       setLoading(true);
-      const queryParams = new URLSearchParams({
+      const params = {
         page: targetPage,
         limit: 10,
-      });
+      };
 
       if (targetSearch.trim()) {
-        queryParams.set("search", targetSearch.trim());
+        params.search = targetSearch.trim();
       }
 
-      const response = await fetch(
-        `http://localhost:5000/api/admin/users?${queryParams.toString()}`,
-        {
-          method: "GET",
-          credentials: "include",
-        }
-      );
+      const data = await getAdminUsers(params);
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setUsers(data.users || []);
         setPagination(
           data.pagination || { page: 1, limit: 10, totalUsers: 0, totalPages: 1 }
@@ -82,14 +82,14 @@ function AdminDashboard() {
       } else {
         setToast({
           type: "error",
-          text: data.message || "Unable to fetch user list.",
+          text: data?.message || "Unable to fetch user list.",
         });
       }
     } catch (error) {
       console.error("Fetch admin users error:", error);
       setToast({
         type: "error",
-        text: "Unable to connect to the server.",
+        text: error.response?.data?.message || "Unable to connect to the server.",
       });
     } finally {
       setLoading(false);
@@ -173,32 +173,32 @@ function AdminDashboard() {
 
     try {
       setActionProcessing(true);
-      const response = await fetch("http://localhost:5000/api/admin/users", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+      const data = await createAdminUser(formData);
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setToast({ type: "success", text: "User created successfully." });
         closeModal();
         setPage(1);
         fetchUsers(1, appliedSearch);
       } else {
-        if (data.errors) {
+        if (data?.errors) {
           setModalErrors(data.errors);
         }
         setModalErrors((prev) => ({
           ...prev,
-          general: data.message || "Unable to create user.",
+          general: data?.message || "Unable to create user.",
         }));
       }
     } catch (error) {
       console.error("Create user error:", error);
-      setModalErrors({ general: "Unable to connect to server." });
+      const resData = error.response?.data;
+      if (resData?.errors) {
+        setModalErrors(resData.errors);
+      }
+      setModalErrors((prev) => ({
+        ...prev,
+        general: resData?.message || "Unable to connect to server.",
+      }));
     } finally {
       setActionProcessing(false);
     }
@@ -216,32 +216,22 @@ function AdminDashboard() {
 
     try {
       setActionProcessing(true);
-      const response = await fetch(
-        `http://localhost:5000/api/admin/users/${modalUser._id}`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: formData.name,
-            email: formData.email,
-            phone: formData.phone,
-          }),
-        }
-      );
+      const data = await updateAdminUser(modalUser._id, {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+      });
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setToast({ type: "success", text: "User updated successfully." });
         closeModal();
         fetchUsers(page, appliedSearch);
       } else {
-        setModalErrors({ general: data.message || "Unable to update user." });
+        setModalErrors({ general: data?.message || "Unable to update user." });
       }
     } catch (error) {
       console.error("Edit user error:", error);
-      setModalErrors({ general: "Unable to connect to server." });
+      setModalErrors({ general: error.response?.data?.message || "Unable to connect to server." });
     } finally {
       setActionProcessing(false);
     }
@@ -255,25 +245,16 @@ function AdminDashboard() {
       setActionProcessing(true);
       setToast(null);
 
-      let endpoint = "";
-      let method = "PATCH";
-
-      if (activeModal === "block" || activeModal === "unblock") {
-        endpoint = `http://localhost:5000/api/admin/users/${modalUser._id}/${activeModal}`;
+      let data;
+      if (activeModal === "block") {
+        data = await blockUser(modalUser._id);
+      } else if (activeModal === "unblock") {
+        data = await unblockUser(modalUser._id);
       } else if (activeModal === "delete") {
-        endpoint = `http://localhost:5000/api/admin/users/${modalUser._id}`;
-        method = "DELETE";
+        data = await deleteAdminUser(modalUser._id);
       }
 
-      const response = await fetch(endpoint, {
-        method,
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setToast({
           type: "success",
           text: data.message || `Operation completed successfully.`,
@@ -287,7 +268,7 @@ function AdminDashboard() {
       } else {
         setToast({
           type: "error",
-          text: data.message || `Operation failed.`,
+          text: data?.message || `Operation failed.`,
         });
         closeModal();
       }
@@ -295,7 +276,7 @@ function AdminDashboard() {
       console.error(`Admin action error (${activeModal}):`, error);
       setToast({
         type: "error",
-        text: "Unable to connect to the server.",
+        text: error.response?.data?.message || "Unable to connect to the server.",
       });
       closeModal();
     } finally {
@@ -461,97 +442,97 @@ function AdminDashboard() {
           <div className="admin-table-card">
             <div className="admin-table-scroll-wrapper">
               <table className="admin-users-table">
-              <thead>
-                <tr>
-                  <th>NAME</th>
-                  <th>EMAIL</th>
-                  <th>PHONE</th>
-                  <th>STATUS</th>
-                  <th>JOINED DATE</th>
-                  <th>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
+                <thead>
                   <tr>
-                    <td colSpan="6" className="admin-loading-row">
-                      Loading users list...
-                    </td>
+                    <th>NAME</th>
+                    <th>EMAIL</th>
+                    <th>PHONE</th>
+                    <th>STATUS</th>
+                    <th>JOINED DATE</th>
+                    <th>ACTIONS</th>
                   </tr>
-                ) : users.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="admin-empty-row">
-                      {appliedSearch
-                        ? `No users found matching "${appliedSearch}"`
-                        : "No registered users found."}
-                    </td>
-                  </tr>
-                ) : (
-                  users.map((u) => {
-                    const isSelf = admin?.id === u._id || admin?._id === u._id;
-                    const isGoogleUser = u.authProvider === "google" || Boolean(u.googleId);
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan="6" className="admin-loading-row">
+                        Loading users list...
+                      </td>
+                    </tr>
+                  ) : users.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="admin-empty-row">
+                        {appliedSearch
+                          ? `No users found matching "${appliedSearch}"`
+                          : "No registered users found."}
+                      </td>
+                    </tr>
+                  ) : (
+                    users.map((u) => {
+                      const isSelf = admin?.id === u._id || admin?._id === u._id;
+                      const isGoogleUser = u.authProvider === "google" || Boolean(u.googleId);
 
-                    return (
-                      <tr key={u._id}>
-                        <td className="user-name-cell">{u.name || "N/A"}</td>
-                        <td className="user-email-cell">
-                          {u.email}
-                          {isGoogleUser && (
-                            <small style={{ color: "#4285f4", marginLeft: "6px" }}>(Google)</small>
-                          )}
-                        </td>
-                        <td className="user-phone-cell">{u.phone || "Not added"}</td>
-                        <td>
-                          {u.isBlocked ? (
-                            <span className="status-badge blocked">● Blocked</span>
-                          ) : (
-                            <span className="status-badge active">● Active</span>
-                          )}
-                        </td>
-                        <td>{formatDate(u.createdAt)}</td>
-                        <td>
-                          {isSelf ? (
-                            <span className="action-self-label">Current Admin</span>
-                          ) : (
-                            <div className="admin-actions-cell">
-                              <button
-                                className="action-edit-btn"
-                                onClick={() => openEditModal(u)}
-                              >
-                                EDIT
-                              </button>
-
-                              {u.isBlocked ? (
+                      return (
+                        <tr key={u._id}>
+                          <td className="user-name-cell">{u.name || "N/A"}</td>
+                          <td className="user-email-cell">
+                            {u.email}
+                            {isGoogleUser && (
+                              <small style={{ color: "#4285f4", marginLeft: "6px" }}>(Google)</small>
+                            )}
+                          </td>
+                          <td className="user-phone-cell">{u.phone || "Not added"}</td>
+                          <td>
+                            {u.isBlocked ? (
+                              <span className="status-badge blocked">● Blocked</span>
+                            ) : (
+                              <span className="status-badge active">● Active</span>
+                            )}
+                          </td>
+                          <td>{formatDate(u.createdAt)}</td>
+                          <td>
+                            {isSelf ? (
+                              <span className="action-self-label">Current Admin</span>
+                            ) : (
+                              <div className="admin-actions-cell">
                                 <button
-                                  className="action-unblock-btn"
-                                  onClick={() => openConfirmModal(u, "unblock")}
+                                  className="action-edit-btn"
+                                  onClick={() => openEditModal(u)}
                                 >
-                                  UNBLOCK
+                                  EDIT
                                 </button>
-                              ) : (
-                                <button
-                                  className="action-block-btn"
-                                  onClick={() => openConfirmModal(u, "block")}
-                                >
-                                  BLOCK
-                                </button>
-                              )}
 
-                              <button
-                                className="action-delete-btn"
-                                onClick={() => openConfirmModal(u, "delete")}
-                              >
-                                DELETE
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                                {u.isBlocked ? (
+                                  <button
+                                    className="action-unblock-btn"
+                                    onClick={() => openConfirmModal(u, "unblock")}
+                                  >
+                                    UNBLOCK
+                                  </button>
+                                ) : (
+                                  <button
+                                    className="action-block-btn"
+                                    onClick={() => openConfirmModal(u, "block")}
+                                  >
+                                    BLOCK
+                                  </button>
+                                )}
+
+                                <button
+                                  className="action-delete-btn"
+                                  onClick={() => openConfirmModal(u, "delete")}
+                                >
+                                  DELETE
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
 
             {/* PAGINATION CONTROLS */}
@@ -745,8 +726,8 @@ function AdminDashboard() {
                 {activeModal === "block"
                   ? "Confirm Block User"
                   : activeModal === "unblock"
-                  ? "Confirm Unblock User"
-                  : "Confirm Delete User"}
+                    ? "Confirm Unblock User"
+                    : "Confirm Delete User"}
               </h3>
             </div>
             <div className="admin-modal-body">
@@ -774,8 +755,8 @@ function AdminDashboard() {
                   activeModal === "delete"
                     ? "modal-confirm-delete-btn"
                     : activeModal === "block"
-                    ? "modal-confirm-block-btn"
-                    : "modal-confirm-unblock-btn"
+                      ? "modal-confirm-block-btn"
+                      : "modal-confirm-unblock-btn"
                 }
                 onClick={handleConfirmAction}
                 disabled={actionProcessing}
@@ -783,10 +764,10 @@ function AdminDashboard() {
                 {actionProcessing
                   ? "PROCESSING..."
                   : activeModal === "delete"
-                  ? "CONFIRM DELETE"
-                  : activeModal === "block"
-                  ? "CONFIRM BLOCK"
-                  : "CONFIRM UNBLOCK"}
+                    ? "CONFIRM DELETE"
+                    : activeModal === "block"
+                      ? "CONFIRM BLOCK"
+                      : "CONFIRM UNBLOCK"}
               </button>
             </div>
           </div>

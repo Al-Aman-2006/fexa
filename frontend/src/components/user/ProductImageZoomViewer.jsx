@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { getImageUrl } from "../../utils/imageUrl";
 import "./ProductImageZoomViewer.css";
 
 function ProductImageZoomViewer({
@@ -210,14 +211,6 @@ function ProductImageZoomViewer({
 
   const activeSrc = images[currentIndex];
 
-  const getFullImageUrl = (imgPath) => {
-    if (!imgPath) return "";
-    if (imgPath.startsWith("http://") || imgPath.startsWith("https://")) {
-      return imgPath;
-    }
-    return `http://localhost:5000${imgPath}`;
-  };
-
   return (
     <div
       className="fexa-zoom-viewer-overlay"
@@ -297,7 +290,7 @@ function ProductImageZoomViewer({
           onDoubleClick={handleDoubleClick}
         >
           <img
-            src={getFullImageUrl(activeSrc)}
+            src={getImageUrl(activeSrc)}
             alt={`${productName} view ${currentIndex + 1}`}
             className="viewer-main-image"
             draggable={false}
@@ -369,7 +362,7 @@ function ProductImageZoomViewer({
                 onClick={() => changeImage(idx)}
                 aria-label={`View image ${idx + 1}`}
               >
-                <img src={getFullImageUrl(img)} alt="" />
+                <img src={getImageUrl(img)} alt="" />
               </button>
             ))}
           </div>

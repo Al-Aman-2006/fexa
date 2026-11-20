@@ -3,6 +3,7 @@ import {
   useNavigate,
   useParams,
 } from "react-router-dom";
+import { resetPassword as resetPasswordApi } from "../../services/auth.service.js";
 
 import "./ResetPassword.css";
 
@@ -159,42 +160,7 @@ function ResetPassword() {
 
 
     try {
-
-      const response = await fetch(
-        `http://localhost:5000/api/auth/reset-password/${token}`,
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-
-          body: JSON.stringify({
-            password: password,
-          }),
-        }
-      );
-
-
-      const data =
-        await response.json();
-
-
-      // ========================================
-      // RESET FAILED
-      // ========================================
-
-      if (!response.ok) {
-
-        setMessage(
-          data.message ||
-            "Unable to reset password."
-        );
-
-        return;
-      }
-
+      await resetPasswordApi(token, password);
 
       // ========================================
       // RESET SUCCESS
@@ -206,31 +172,27 @@ function ResetPassword() {
         "Password reset successfully. Redirecting to login..."
       );
 
-
       setTimeout(() => {
-
         navigate("/login", {
           replace: true,
         });
-
       }, 2000);
 
-
     } catch (error) {
-
       console.error(
         "Reset password error:",
         error
       );
 
       setMessage(
-        "Unable to connect to the server. Please try again."
+        error.response?.data?.message ||
+        (error.response
+          ? "Unable to reset password."
+          : "Unable to connect to the server. Please try again.")
       );
 
     } finally {
-
       setLoading(false);
-
     }
   };
 

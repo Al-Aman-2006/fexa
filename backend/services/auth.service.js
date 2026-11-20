@@ -874,45 +874,54 @@ const googleLoginUser = async (credential) => {
     throw new Error("Google credential token is required");
   }
 
-  let payload;
-  const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+  const googleClientId = process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.trim() : "";
+  if (!googleClientId) {
+    throw new Error("Google authentication is not configured on the server");
+  }
+
+  const client = new OAuth2Client(googleClientId);
+  let ticket;
 
   try {
-    const ticket = await client.verifyIdToken({
+    ticket = await client.verifyIdToken({
       idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID || undefined,
+      audience: googleClientId,
     });
-    payload = ticket.getPayload();
   } catch (err) {
-    payload = jwt.decode(credential);
+    throw new Error("Invalid, expired or untrusted Google ID token");
   }
 
+  const payload = ticket.getPayload();
   if (!payload || !payload.sub || !payload.email) {
-    try {
-      const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-        headers: { Authorization: `Bearer ${credential}` },
-      });
-      if (response.ok) {
-        payload = await response.json();
-      }
-    } catch (e) {
-      console.error("Google userinfo fetch error:", e);
-    }
+    throw new Error("Google ID token payload is missing required user identity claims");
   }
 
-  if (!payload || (!payload.sub && !payload.id) || !payload.email) {
-    throw new Error("Invalid or expired Google token");
+  // Cryptographic Issuer Validation
+  const validIssuers = ["accounts.google.com", "https://accounts.google.com"];
+  if (!payload.iss || !validIssuers.includes(payload.iss)) {
+    throw new Error("Invalid token issuer");
   }
 
-  const sub = payload.sub || payload.id;
+  // Explicit Audience Validation
+  if (payload.aud !== googleClientId) {
+    throw new Error("Token audience mismatch");
+  }
+
+  // Cryptographic Expiration Validation
+  const nowInSeconds = Math.floor(Date.now() / 1000);
+  if (payload.exp && payload.exp < nowInSeconds) {
+    throw new Error("Google token has expired");
+  }
+
+  // Require email_verified === true (reject missing, null, or false)
+  if (payload.email_verified !== true) {
+    throw new Error("Google account email is not verified");
+  }
+
+  const sub = payload.sub;
   const email = payload.email;
-  const email_verified = payload.email_verified;
   const name = payload.name;
   const picture = payload.picture;
-
-  if (email_verified === false) {
-    throw new Error("Google email is not verified");
-  }
 
   const normalizedEmail = email.trim().toLowerCase();
 

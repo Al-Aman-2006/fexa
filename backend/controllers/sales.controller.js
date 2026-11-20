@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Order from "../models/order.model.js";
+import Category from "../models/category.model.js";
 import { normalizeOrderWithAllocations } from "../utils/couponAllocation.js";
 import { streamSalesReportPDF } from "../services/pdf.service.js";
 
@@ -137,6 +138,9 @@ const getRecognizedSalesMatch = (start, end) => ({
   ],
 });
 
+// Helper to round currency amounts safely to 2 decimal places
+const roundToPaise = (val) => Math.round(Number(val || 0) * 100) / 100;
+
 // =========================================================================
 // 1. GET SALES OVERVIEW
 // Calculates all top-level KPI cards and previous-period growth
@@ -146,6 +150,24 @@ const getSalesOverview = async (req, res) => {
     const { period, startDate, endDate } = req.query;
     const { start, end, prevStart, prevEnd, periodLabel } = parseDateRange(period, startDate, endDate);
 
+    // Condition identifying a recognized paid / delivered order
+    const isRecognizedCond = {
+      $and: [
+        { $ne: ["$orderStatus", "Cancelled"] },
+        {
+          $or: [
+            { $eq: ["$paymentStatus", "Paid"] },
+            {
+              $and: [
+                { $eq: ["$paymentMethod", "COD"] },
+                { $eq: ["$orderStatus", "Delivered"] },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
     // Current period aggregation across all orders in range
     const [currentStats] = await Order.aggregate([
       { $match: getBaseSalesFilter(start, end) },
@@ -154,122 +176,115 @@ const getSalesOverview = async (req, res) => {
           _id: null,
           totalAllOrders: { $sum: 1 },
 
-          // Recognized / Paid Revenue (Verified Paid Online or Delivered COD)
-          recognizedRevenue: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $ne: ["$orderStatus", "Cancelled"] },
-                    {
-                      $or: [
-                        { $eq: ["$paymentStatus", "Paid"] },
-                        {
-                          $and: [
-                            { $eq: ["$paymentMethod", "COD"] },
-                            { $eq: ["$orderStatus", "Delivered"] },
-                          ],
-                        },
-                      ],
-                    },
-                  ],
-                },
-                "$totalAmount",
-                0,
-              ],
-            },
+          // Successful Orders (Recognized Paid or COD Delivered)
+          successfulOrdersCount: {
+            $sum: { $cond: [isRecognizedCond, 1, 0] },
           },
-
-          // Gross Order Value of all eligible orders (excludes Failed & Cancelled)
-          grossOrderValue: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $ne: ["$paymentStatus", "Failed"] },
-                    { $ne: ["$orderStatus", "Cancelled"] },
-                  ],
-                },
-                "$totalAmount",
-                0,
-              ],
-            },
-          },
-
-          // Eligible Orders Count
-          eligibleOrdersCount: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $ne: ["$paymentStatus", "Failed"] },
-                    { $ne: ["$orderStatus", "Cancelled"] },
-                  ],
-                },
-                1,
-                0,
-              ],
-            },
-          },
-
-          // Paid Orders Count
-          paidOrdersCount: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $ne: ["$orderStatus", "Cancelled"] },
-                    {
-                      $or: [
-                        { $eq: ["$paymentStatus", "Paid"] },
-                        {
-                          $and: [
-                            { $eq: ["$paymentMethod", "COD"] },
-                            { $eq: ["$orderStatus", "Delivered"] },
-                          ],
-                        },
-                      ],
-                    },
-                  ],
-                },
-                1,
-                0,
-              ],
-            },
-          },
-
-          // Successful Payments (paymentStatus === 'Paid')
           successfulPaymentsAmount: {
-            $sum: {
-              $cond: [{ $eq: ["$paymentStatus", "Paid"] }, "$totalAmount", 0],
-            },
+            $sum: { $cond: [isRecognizedCond, "$totalAmount", 0] },
           },
-          successfulPaymentsCount: {
+
+          // Total Refunds disbursed across all orders in period
+          totalRefunds: {
+            $sum: { $ifNull: ["$totalRefundedAmount", 0] },
+          },
+
+          // Net Revenue: Realized revenue minus refunds
+          totalNetRevenue: {
             $sum: {
-              $cond: [{ $eq: ["$paymentStatus", "Paid"] }, 1, 0],
+              $cond: [
+                isRecognizedCond,
+                {
+                  $max: [
+                    0,
+                    { $subtract: ["$totalAmount", { $ifNull: ["$totalRefundedAmount", 0] }] },
+                  ],
+                },
+                0,
+              ],
             },
           },
 
-          // Pending Payments (Razorpay Pending online or COD in-transit)
+          // Gross Product Sales (catalogue value before offer & coupon discounts)
+          totalGrossProductSales: {
+            $sum: {
+              $cond: [
+                { $ne: ["$orderStatus", "Cancelled"] },
+                {
+                  $ifNull: [
+                    "$originalSubtotal",
+                    { $add: ["$subtotal", { $ifNull: ["$totalOfferDiscount", 0] }] },
+                  ],
+                },
+                0,
+              ],
+            },
+          },
+
+          // Automatic Offer Discounts (product / category level)
+          automaticOfferDiscounts: {
+            $sum: {
+              $cond: [
+                { $ne: ["$orderStatus", "Cancelled"] },
+                { $ifNull: ["$totalOfferDiscount", 0] },
+                0,
+              ],
+            },
+          },
+
+          // Coupon Discounts
+          couponDiscounts: {
+            $sum: {
+              $cond: [
+                { $ne: ["$orderStatus", "Cancelled"] },
+                { $ifNull: ["$discountAmount", 0] },
+                0,
+              ],
+            },
+          },
+          couponRedemptionsCount: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $ne: ["$orderStatus", "Cancelled"] },
+                    { $gt: [{ $ifNull: ["$discountAmount", 0] }, 0] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+
+          // Shipping Revenue on recognized orders
+          totalShippingRevenue: {
+            $sum: {
+              $cond: [isRecognizedCond, { $ifNull: ["$shippingCost", 0] }, 0],
+            },
+          },
+
+          // Pending Payments (non-cancelled, not yet paid/delivered, not failed)
           pendingPaymentsAmount: {
             $sum: {
               $cond: [
                 {
                   $and: [
                     { $ne: ["$orderStatus", "Cancelled"] },
+                    { $ne: ["$paymentStatus", "Failed"] },
                     {
                       $or: [
                         {
                           $and: [
-                            { $eq: ["$paymentMethod", "Razorpay"] },
-                            { $eq: ["$paymentStatus", "Pending"] },
+                            { $ne: ["$paymentMethod", "COD"] },
+                            { $ne: ["$paymentStatus", "Paid"] },
                           ],
                         },
                         {
                           $and: [
                             { $eq: ["$paymentMethod", "COD"] },
-                            { $eq: ["$paymentStatus", "Pending"] },
                             { $ne: ["$orderStatus", "Delivered"] },
+                            { $ne: ["$paymentStatus", "Paid"] },
                           ],
                         },
                       ],
@@ -287,19 +302,20 @@ const getSalesOverview = async (req, res) => {
                 {
                   $and: [
                     { $ne: ["$orderStatus", "Cancelled"] },
+                    { $ne: ["$paymentStatus", "Failed"] },
                     {
                       $or: [
                         {
                           $and: [
-                            { $eq: ["$paymentMethod", "Razorpay"] },
-                            { $eq: ["$paymentStatus", "Pending"] },
+                            { $ne: ["$paymentMethod", "COD"] },
+                            { $ne: ["$paymentStatus", "Paid"] },
                           ],
                         },
                         {
                           $and: [
                             { $eq: ["$paymentMethod", "COD"] },
-                            { $eq: ["$paymentStatus", "Pending"] },
                             { $ne: ["$orderStatus", "Delivered"] },
+                            { $ne: ["$paymentStatus", "Paid"] },
                           ],
                         },
                       ],
@@ -336,32 +352,31 @@ const getSalesOverview = async (req, res) => {
             },
           },
 
-          // Coupon Discounts on Eligible Orders
-          totalDiscountsAmount: {
+          // Returned / Refunded Orders
+          returnedOrdersCount: {
             $sum: {
               $cond: [
                 {
-                  $and: [
-                    { $ne: ["$paymentStatus", "Failed"] },
-                    { $ne: ["$orderStatus", "Cancelled"] },
+                  $or: [
+                    { $in: ["$orderStatus", ["Returned", "Refunded", "Return Approved"]] },
+                    { $gt: [{ $ifNull: ["$totalRefundedAmount", 0] }, 0] },
                   ],
                 },
-                { $ifNull: ["$discountAmount", 0] },
+                1,
                 0,
               ],
             },
           },
-          couponRedemptionsCount: {
+          returnedOrdersAmount: {
             $sum: {
               $cond: [
                 {
-                  $and: [
-                    { $ne: ["$paymentStatus", "Failed"] },
-                    { $ne: ["$orderStatus", "Cancelled"] },
-                    { $gt: [{ $ifNull: ["$discountAmount", 0] }, 0] },
+                  $or: [
+                    { $in: ["$orderStatus", ["Returned", "Refunded", "Return Approved"]] },
+                    { $gt: [{ $ifNull: ["$totalRefundedAmount", 0] }, 0] },
                   ],
                 },
-                1,
+                { $ifNull: ["$totalRefundedAmount", 0] },
                 0,
               ],
             },
@@ -388,43 +403,22 @@ const getSalesOverview = async (req, res) => {
       {
         $group: {
           _id: null,
-          recognizedRevenue: {
+          totalNetRevenue: {
             $sum: {
               $cond: [
+                isRecognizedCond,
                 {
-                  $and: [
-                    { $ne: ["$orderStatus", "Cancelled"] },
-                    {
-                      $or: [
-                        { $eq: ["$paymentStatus", "Paid"] },
-                        {
-                          $and: [
-                            { $eq: ["$paymentMethod", "COD"] },
-                            { $eq: ["$orderStatus", "Delivered"] },
-                          ],
-                        },
-                      ],
-                    },
+                  $max: [
+                    0,
+                    { $subtract: ["$totalAmount", { $ifNull: ["$totalRefundedAmount", 0] }] },
                   ],
                 },
-                "$totalAmount",
                 0,
               ],
             },
           },
-          eligibleOrdersCount: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $ne: ["$paymentStatus", "Failed"] },
-                    { $ne: ["$orderStatus", "Cancelled"] },
-                  ],
-                },
-                1,
-                0,
-              ],
-            },
+          successfulOrdersCount: {
+            $sum: { $cond: [isRecognizedCond, 1, 0] },
           },
         },
       },
@@ -432,52 +426,61 @@ const getSalesOverview = async (req, res) => {
 
     const stats = currentStats || {
       totalAllOrders: 0,
-      recognizedRevenue: 0,
-      grossOrderValue: 0,
-      eligibleOrdersCount: 0,
-      paidOrdersCount: 0,
+      successfulOrdersCount: 0,
       successfulPaymentsAmount: 0,
-      successfulPaymentsCount: 0,
+      totalRefunds: 0,
+      totalNetRevenue: 0,
+      totalGrossProductSales: 0,
+      automaticOfferDiscounts: 0,
+      couponDiscounts: 0,
+      couponRedemptionsCount: 0,
+      totalShippingRevenue: 0,
       pendingPaymentsAmount: 0,
       pendingPaymentsCount: 0,
       cancelledOrdersAmount: 0,
       cancelledOrdersCount: 0,
       failedPaymentsAmount: 0,
       failedPaymentsCount: 0,
-      totalDiscountsAmount: 0,
-      couponRedemptionsCount: 0,
+      returnedOrdersCount: 0,
+      returnedOrdersAmount: 0,
     };
 
     const unitsSold = unitsResult?.totalUnitsSold || 0;
 
-    // Average Order Value calculation:
-    // If we have verified paid orders, AOV is recognized revenue / paid orders count.
-    // If not, calculate from gross order value / eligible orders count.
+    // Gross Sales = Total Gross Product Sales + Total Shipping Revenue
+    const totalGrossSales = roundToPaise(stats.totalGrossProductSales + stats.totalShippingRevenue);
+    const totalNetRevenue = roundToPaise(stats.totalNetRevenue);
+    const totalDiscounts = roundToPaise(stats.couponDiscounts + stats.automaticOfferDiscounts);
+    const couponDiscounts = roundToPaise(stats.couponDiscounts);
+    const automaticOfferDiscounts = roundToPaise(stats.automaticOfferDiscounts);
+    const totalShippingRevenue = roundToPaise(stats.totalShippingRevenue);
+    const totalRefunds = roundToPaise(stats.totalRefunds);
+
+    // Average Order Value calculation: Net Revenue / Successful Orders Count
     let aov = 0;
-    if (stats.paidOrdersCount > 0) {
-      aov = Math.round(stats.recognizedRevenue / stats.paidOrdersCount);
-    } else if (stats.eligibleOrdersCount > 0) {
-      aov = Math.round(stats.grossOrderValue / stats.eligibleOrdersCount);
+    if (stats.successfulOrdersCount > 0) {
+      aov = roundToPaise(totalNetRevenue / stats.successfulOrdersCount);
+    } else if (stats.totalAllOrders > 0) {
+      aov = roundToPaise(totalGrossSales / stats.totalAllOrders);
     }
 
-    // Comparison growth percentage:
-    // Only calculate when previous period contains actual data
+    // Comparison growth percentage vs previous equivalent duration
     let revenueGrowth = null;
     let ordersGrowth = null;
 
-    if (prevStats && prevStats.recognizedRevenue > 0) {
+    if (prevStats && prevStats.totalNetRevenue > 0) {
       revenueGrowth = Number(
-        (((stats.recognizedRevenue - prevStats.recognizedRevenue) / prevStats.recognizedRevenue) * 100).toFixed(1)
+        (((totalNetRevenue - prevStats.totalNetRevenue) / prevStats.totalNetRevenue) * 100).toFixed(1)
       );
-    } else if (prevStats && prevStats.recognizedRevenue === 0 && stats.recognizedRevenue > 0) {
+    } else if (prevStats && prevStats.totalNetRevenue === 0 && totalNetRevenue > 0) {
       revenueGrowth = 100;
     }
 
-    if (prevStats && prevStats.eligibleOrdersCount > 0) {
+    if (prevStats && prevStats.successfulOrdersCount > 0) {
       ordersGrowth = Number(
-        (((stats.eligibleOrdersCount - prevStats.eligibleOrdersCount) / prevStats.eligibleOrdersCount) * 100).toFixed(1)
+        (((stats.successfulOrdersCount - prevStats.successfulOrdersCount) / prevStats.successfulOrdersCount) * 100).toFixed(1)
       );
-    } else if (prevStats && prevStats.eligibleOrdersCount === 0 && stats.eligibleOrdersCount > 0) {
+    } else if (prevStats && prevStats.successfulOrdersCount === 0 && stats.successfulOrdersCount > 0) {
       ordersGrowth = 100;
     }
 
@@ -493,39 +496,56 @@ const getSalesOverview = async (req, res) => {
           prevEnd: prevEnd.toISOString(),
         },
         overview: {
-          recognizedRevenue: stats.recognizedRevenue,
-          grossOrderValue: stats.grossOrderValue,
-          netSales: Math.max(0, stats.recognizedRevenue - stats.totalDiscountsAmount),
-          totalOrders: stats.eligibleOrdersCount,
-          totalAllOrders: stats.totalAllOrders,
-          paidOrdersCount: stats.paidOrdersCount,
-          unitsSold,
+          // Authoritative Financial Aggregations
+          totalGrossSales,
+          totalNetRevenue,
+          totalOrders: stats.totalAllOrders,
+          successfulOrdersCount: stats.successfulOrdersCount,
+          cancelledOrdersCount: stats.cancelledOrdersCount,
+          cancelledOrdersAmount: roundToPaise(stats.cancelledOrdersAmount),
+          returnedOrdersCount: stats.returnedOrdersCount,
+          returnedOrdersAmount: roundToPaise(stats.returnedOrdersAmount),
+          totalRefunds,
+          totalDiscounts,
+          couponDiscounts,
+          automaticOfferDiscounts,
+          totalShippingRevenue,
           averageOrderValue: aov,
+          unitsSold,
+
+          // Legacy and compatibility properties
+          recognizedRevenue: totalNetRevenue,
+          grossOrderValue: totalGrossSales,
+          netSales: totalNetRevenue,
+          paidOrdersCount: stats.successfulOrdersCount,
           successfulPayments: {
-            amount: stats.successfulPaymentsAmount,
-            count: stats.successfulPaymentsCount,
+            amount: roundToPaise(stats.successfulPaymentsAmount),
+            count: stats.successfulOrdersCount,
           },
           pendingPayments: {
-            amount: stats.pendingPaymentsAmount,
+            amount: roundToPaise(stats.pendingPaymentsAmount),
             count: stats.pendingPaymentsCount,
           },
           cancelledOrders: {
-            amount: stats.cancelledOrdersAmount,
+            amount: roundToPaise(stats.cancelledOrdersAmount),
             count: stats.cancelledOrdersCount,
           },
           failedPayments: {
-            amount: stats.failedPaymentsAmount,
+            amount: roundToPaise(stats.failedPaymentsAmount),
             count: stats.failedPaymentsCount,
           },
           coupons: {
-            totalDiscountAmount: stats.totalDiscountsAmount,
+            totalDiscountAmount: couponDiscounts,
             redemptionsCount: stats.couponRedemptionsCount,
+          },
+          offers: {
+            totalDiscountAmount: automaticOfferDiscounts,
           },
           growth: {
             revenueGrowth,
             ordersGrowth,
-            previousRevenue: prevStats?.recognizedRevenue || 0,
-            previousOrders: prevStats?.eligibleOrdersCount || 0,
+            previousRevenue: prevStats?.totalNetRevenue || 0,
+            previousOrders: prevStats?.successfulOrdersCount || 0,
           },
         },
       },
@@ -555,32 +575,77 @@ const getSalesTrends = async (req, res) => {
     // Group format
     const dateFormat = isYearlyOrLong ? "%Y-%m" : "%Y-%m-%d";
 
+    const isRecognizedCond = {
+      $and: [
+        { $ne: ["$orderStatus", "Cancelled"] },
+        {
+          $or: [
+            { $eq: ["$paymentStatus", "Paid"] },
+            {
+              $and: [
+                { $eq: ["$paymentMethod", "COD"] },
+                { $eq: ["$orderStatus", "Delivered"] },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
     const trendsData = await Order.aggregate([
-      { $match: getEligibleOrdersMatch(start, end) },
+      { $match: getBaseSalesFilter(start, end) },
       {
         $group: {
           _id: { $dateToString: { format: dateFormat, date: "$createdAt" } },
           orderCount: { $sum: 1 },
+          successfulOrders: { $sum: { $cond: [isRecognizedCond, 1, 0] } },
           recognizedRevenue: {
             $sum: {
               $cond: [
+                isRecognizedCond,
                 {
-                  $or: [
-                    { $eq: ["$paymentStatus", "Paid"] },
-                    {
-                      $and: [
-                        { $eq: ["$paymentMethod", "COD"] },
-                        { $eq: ["$orderStatus", "Delivered"] },
-                      ],
-                    },
+                  $max: [
+                    0,
+                    { $subtract: ["$totalAmount", { $ifNull: ["$totalRefundedAmount", 0] }] },
                   ],
                 },
-                "$totalAmount",
                 0,
               ],
             },
           },
-          grossValue: { $sum: "$totalAmount" },
+          grossValue: {
+            $sum: {
+              $cond: [
+                { $ne: ["$orderStatus", "Cancelled"] },
+                {
+                  $add: [
+                    {
+                      $ifNull: [
+                        "$originalSubtotal",
+                        { $add: ["$subtotal", { $ifNull: ["$totalOfferDiscount", 0] }] },
+                      ],
+                    },
+                    { $ifNull: ["$shippingCost", 0] },
+                  ],
+                },
+                0,
+              ],
+            },
+          },
+          discounts: {
+            $sum: {
+              $cond: [
+                { $ne: ["$orderStatus", "Cancelled"] },
+                {
+                  $add: [
+                    { $ifNull: ["$discountAmount", 0] },
+                    { $ifNull: ["$totalOfferDiscount", 0] },
+                  ],
+                },
+                0,
+              ],
+            },
+          },
         },
       },
       { $sort: { _id: 1 } },
@@ -590,9 +655,11 @@ const getSalesTrends = async (req, res) => {
     const map = new Map();
     trendsData.forEach((row) => {
       map.set(row._id, {
-        revenue: row.recognizedRevenue,
+        revenue: roundToPaise(row.recognizedRevenue),
         orderCount: row.orderCount,
-        grossValue: row.grossValue,
+        successfulOrders: row.successfulOrders,
+        grossValue: roundToPaise(row.grossValue),
+        discounts: roundToPaise(row.discounts),
       });
     });
 
@@ -604,15 +671,18 @@ const getSalesTrends = async (req, res) => {
         const year = cursor.getFullYear();
         const month = String(cursor.getMonth() + 1).padStart(2, "0");
         const key = `${year}-${month}`;
-        const data = map.get(key) || { revenue: 0, orderCount: 0, grossValue: 0 };
+        const data = map.get(key) || { revenue: 0, orderCount: 0, successfulOrders: 0, grossValue: 0, discounts: 0 };
         const label = cursor.toLocaleString("en-US", { month: "short", year: "numeric" });
 
         series.push({
           key,
           label,
           revenue: data.revenue,
+          netRevenue: data.revenue,
           orderCount: data.orderCount,
+          successfulOrders: data.successfulOrders,
           grossValue: data.grossValue,
+          discounts: data.discounts,
         });
 
         cursor.setMonth(cursor.getMonth() + 1);
@@ -627,15 +697,18 @@ const getSalesTrends = async (req, res) => {
         const month = String(cursor.getMonth() + 1).padStart(2, "0");
         const day = String(cursor.getDate()).padStart(2, "0");
         const key = `${year}-${month}-${day}`;
-        const data = map.get(key) || { revenue: 0, orderCount: 0, grossValue: 0 };
+        const data = map.get(key) || { revenue: 0, orderCount: 0, successfulOrders: 0, grossValue: 0, discounts: 0 };
         const label = cursor.toLocaleString("en-US", { month: "short", day: "numeric" });
 
         series.push({
           key,
           label,
           revenue: data.revenue,
+          netRevenue: data.revenue,
           orderCount: data.orderCount,
+          successfulOrders: data.successfulOrders,
           grossValue: data.grossValue,
+          discounts: data.discounts,
         });
 
         cursor.setDate(cursor.getDate() + 1);
@@ -692,6 +765,8 @@ const getProductPerformance = async (req, res) => {
           productId: { $first: "$items.product" },
           variantId: { $first: "$items.variantId" },
           unitsSold: { $sum: "$items.quantity" },
+          returnedQuantity: { $sum: { $ifNull: ["$items.returnedQuantity", 0] } },
+          refundedAmount: { $sum: { $ifNull: ["$items.refundAmount", 0] } },
           grossSales: { $sum: "$items.lineTotal" },
           ordersCount: { $addToSet: "$_id" },
           unitPrices: { $addToSet: "$items.unitPrice" },
@@ -708,8 +783,11 @@ const getProductPerformance = async (req, res) => {
           productId: 1,
           variantId: 1,
           unitsSold: 1,
+          returnedQuantity: 1,
+          netUnitsSold: { $max: [0, { $subtract: ["$unitsSold", "$returnedQuantity"] }] },
           grossSales: 1,
-          netSales: "$grossSales", // lineTotal is snapshot price paid
+          refundedAmount: 1,
+          netSales: { $max: [0, { $subtract: ["$grossSales", "$refundedAmount"] }] },
           ordersCount: { $size: "$ordersCount" },
           averageUnitPrice: { $avg: "$unitPrices" },
         },
@@ -745,12 +823,19 @@ const getProductPerformance = async (req, res) => {
 
 // =========================================================================
 // 4. GET CATEGORY PERFORMANCE
-// Men, Women, Unisex breakdown without double-counting
+// Dynamic category breakdown without double-counting
 // =========================================================================
 const getCategoryPerformance = async (req, res) => {
   try {
     const { period, startDate, endDate } = req.query;
     const { start, end } = parseDateRange(period, startDate, endDate);
+
+    // Fetch dynamic categories from Category collection
+    const dbCategories = await Category.find({ isActive: true }).select("name").lean();
+    const knownCategoryNames = new Set(["Men", "Women", "Unisex"]);
+    dbCategories.forEach((c) => {
+      if (c.name && c.name.trim()) knownCategoryNames.add(c.name.trim());
+    });
 
     const categoriesData = await Order.aggregate([
       { $match: getEligibleOrdersMatch(start, end) },
@@ -760,6 +845,8 @@ const getCategoryPerformance = async (req, res) => {
           _id: { $ifNull: ["$items.category", "Unisex"] },
           unitsSold: { $sum: "$items.quantity" },
           grossSales: { $sum: "$items.lineTotal" },
+          returnedQuantity: { $sum: { $ifNull: ["$items.returnedQuantity", 0] } },
+          refundedAmount: { $sum: { $ifNull: ["$items.refundAmount", 0] } },
           orderIds: { $addToSet: "$_id" },
         },
       },
@@ -768,6 +855,9 @@ const getCategoryPerformance = async (req, res) => {
           category: "$_id",
           unitsSold: 1,
           grossSales: 1,
+          netSales: { $max: [0, { $subtract: ["$grossSales", "$refundedAmount"] }] },
+          returnedQuantity: 1,
+          refundedAmount: 1,
           ordersCount: { $size: "$orderIds" },
           _id: 0,
         },
@@ -775,27 +865,32 @@ const getCategoryPerformance = async (req, res) => {
       { $sort: { grossSales: -1 } },
     ]);
 
-    // Ensure all standard categories (Men, Women, Unisex) exist in response
-    const standardCategories = ["Men", "Women", "Unisex"];
     const resultMap = new Map(categoriesData.map((c) => [c.category, c]));
 
     let totalGross = 0;
-    const categories = standardCategories.map((cat) => {
-      const existing = resultMap.get(cat) || {
-        category: cat,
+    let totalNet = 0;
+
+    const categories = Array.from(knownCategoryNames).map((catName) => {
+      const existing = resultMap.get(catName) || {
+        category: catName,
         unitsSold: 0,
         grossSales: 0,
+        netSales: 0,
+        returnedQuantity: 0,
+        refundedAmount: 0,
         ordersCount: 0,
       };
       totalGross += existing.grossSales;
+      totalNet += existing.netSales;
       return existing;
     });
 
-    // Add any non-standard categories that exist in data
+    // Add any non-standard categories that exist in actual order items
     categoriesData.forEach((c) => {
-      if (!standardCategories.includes(c.category)) {
+      if (!knownCategoryNames.has(c.category)) {
         categories.push(c);
         totalGross += c.grossSales;
+        totalNet += c.netSales;
       }
     });
 
@@ -809,7 +904,8 @@ const getCategoryPerformance = async (req, res) => {
       success: true,
       data: {
         categories: categoriesWithShares,
-        totalGrossSales: totalGross,
+        totalGrossSales: roundToPaise(totalGross),
+        totalNetSales: roundToPaise(totalNet),
       },
     });
   } catch (error) {
@@ -824,96 +920,106 @@ const getCategoryPerformance = async (req, res) => {
 
 // =========================================================================
 // 5. GET PAYMENT METHOD BREAKDOWN
-// Razorpay paid vs COD delivered vs COD pending vs Failed
+// Razorpay vs FEXA Wallet vs Cash on Delivery
 // =========================================================================
 const getPaymentMethodBreakdown = async (req, res) => {
   try {
     const { period, startDate, endDate } = req.query;
     const { start, end } = parseDateRange(period, startDate, endDate);
 
-    const paymentStats = await Order.aggregate([
-      { $match: getBaseSalesFilter(start, end) },
-      {
-        $group: {
-          _id: {
-            paymentMethod: "$paymentMethod",
-            paymentStatus: "$paymentStatus",
-            orderStatus: "$orderStatus",
-          },
-          count: { $sum: 1 },
-          amount: { $sum: "$totalAmount" },
-        },
+    const orders = await Order.find(getBaseSalesFilter(start, end))
+      .select("paymentMethod paymentStatus orderStatus totalAmount totalRefundedAmount")
+      .lean();
+
+    const breakdown = {
+      razorpay: {
+        successful: { count: 0, amount: 0 },
+        pending: { count: 0, amount: 0 },
+        failed: { count: 0, amount: 0 },
+        refunded: { count: 0, amount: 0 },
+        cancelled: { count: 0, amount: 0 },
       },
-    ]);
+      wallet: {
+        successful: { count: 0, amount: 0 },
+        pending: { count: 0, amount: 0 },
+        failed: { count: 0, amount: 0 },
+        refunded: { count: 0, amount: 0 },
+        cancelled: { count: 0, amount: 0 },
+      },
+      cod: {
+        successful: { count: 0, amount: 0 },
+        pending: { count: 0, amount: 0 },
+        failed: { count: 0, amount: 0 },
+        refunded: { count: 0, amount: 0 },
+        cancelled: { count: 0, amount: 0 },
+      },
+    };
 
-    let razorpayPaid = { count: 0, amount: 0 };
-    let razorpayPending = { count: 0, amount: 0 };
-    let razorpayFailed = { count: 0, amount: 0 };
+    orders.forEach((o) => {
+      const pm = (o.paymentMethod || "").toLowerCase();
+      const methodKey = pm === "cod" ? "cod" : pm === "wallet" ? "wallet" : "razorpay";
+      const target = breakdown[methodKey];
+      const amount = Number(o.totalAmount || 0);
+      const refundAmt = Number(o.totalRefundedAmount || 0);
 
-    let codDelivered = { count: 0, amount: 0 };
-    let codInTransit = { count: 0, amount: 0 };
-    let codCancelled = { count: 0, amount: 0 };
+      if (refundAmt > 0) {
+        target.refunded.count += 1;
+        target.refunded.amount = roundToPaise(target.refunded.amount + refundAmt);
+      }
 
-    let cancelledOrders = { count: 0, amount: 0 };
-
-    paymentStats.forEach((group) => {
-      const { paymentMethod, paymentStatus, orderStatus } = group._id;
-      const count = group.count;
-      const amount = group.amount;
-
-      if (orderStatus === "Cancelled") {
-        cancelledOrders.count += count;
-        cancelledOrders.amount += amount;
+      if (o.orderStatus === "Cancelled") {
+        target.cancelled.count += 1;
+        target.cancelled.amount = roundToPaise(target.cancelled.amount + amount);
         return;
       }
 
-      if (paymentMethod === "Razorpay") {
-        if (paymentStatus === "Paid") {
-          razorpayPaid.count += count;
-          razorpayPaid.amount += amount;
-        } else if (paymentStatus === "Failed") {
-          razorpayFailed.count += count;
-          razorpayFailed.amount += amount;
-        } else {
-          razorpayPending.count += count;
-          razorpayPending.amount += amount;
-        }
-      } else if (paymentMethod === "COD") {
-        if (orderStatus === "Delivered" || paymentStatus === "Paid") {
-          codDelivered.count += count;
-          codDelivered.amount += amount;
-        } else {
-          codInTransit.count += count;
-          codInTransit.amount += amount;
-        }
+      if (o.paymentStatus === "Failed") {
+        target.failed.count += 1;
+        target.failed.amount = roundToPaise(target.failed.amount + amount);
+        return;
+      }
+
+      if (o.paymentStatus === "Paid" || (methodKey === "cod" && o.orderStatus === "Delivered")) {
+        target.successful.count += 1;
+        target.successful.amount = roundToPaise(target.successful.amount + amount);
       } else {
-        // Any other payment method (Card/UPI direct)
-        if (paymentStatus === "Paid") {
-          razorpayPaid.count += count;
-          razorpayPaid.amount += amount;
-        } else if (paymentStatus === "Failed") {
-          razorpayFailed.count += count;
-          razorpayFailed.amount += amount;
-        } else {
-          razorpayPending.count += count;
-          razorpayPending.amount += amount;
-        }
+        target.pending.count += 1;
+        target.pending.amount = roundToPaise(target.pending.amount + amount);
       }
     });
 
-    const totalCollected = razorpayPaid.amount + codDelivered.amount;
+    const totalCollected = roundToPaise(
+      breakdown.razorpay.successful.amount +
+      breakdown.wallet.successful.amount +
+      breakdown.cod.successful.amount -
+      (breakdown.razorpay.refunded.amount + breakdown.wallet.refunded.amount + breakdown.cod.refunded.amount)
+    );
+
+    const cancelledSummary = {
+      count: breakdown.razorpay.cancelled.count + breakdown.wallet.cancelled.count + breakdown.cod.cancelled.count,
+      amount: roundToPaise(breakdown.razorpay.cancelled.amount + breakdown.wallet.cancelled.amount + breakdown.cod.cancelled.amount),
+    };
 
     return res.status(200).json({
       success: true,
       data: {
         totalCollected,
         methods: {
-          razorpayPaid,
-          razorpayPending,
-          razorpayFailed,
-          codDelivered,
-          codInTransit,
-          cancelledOrders,
+          // Structured buckets by payment gateway / system
+          razorpay: breakdown.razorpay,
+          wallet: breakdown.wallet,
+          cod: breakdown.cod,
+
+          // Backwards compatibility mappings for existing UI
+          razorpayPaid: breakdown.razorpay.successful,
+          razorpayPending: breakdown.razorpay.pending,
+          razorpayFailed: breakdown.razorpay.failed,
+          walletPaid: breakdown.wallet.successful,
+          walletPending: breakdown.wallet.pending,
+          walletFailed: breakdown.wallet.failed,
+          codDelivered: breakdown.cod.successful,
+          codInTransit: breakdown.cod.pending,
+          cancelledOrders: cancelledSummary,
         },
       },
     });
@@ -1166,14 +1272,18 @@ const exportSalesReportCSV = async (req, res) => {
       "Order Date (UTC)",
       "Customer Name",
       "Customer Email",
+      "Customer Phone",
       "Product Summary",
       "Perfume Sizes",
       "Total Units",
-      "Merchandise Subtotal (INR)",
+      "Catalogue Subtotal (INR)",
+      "Offer Discounts (INR)",
       "Coupon Code",
       "Coupon Discount (INR)",
       "Shipping Cost (INR)",
       "Final Order Amount (INR)",
+      "Total Refunded Amount (INR)",
+      "Net Realized Revenue (INR)",
       "Payment Method",
       "Payment Status",
       "Order Status",
@@ -1192,19 +1302,28 @@ const exportSalesReportCSV = async (req, res) => {
         o.user?.name ||
         (o.user?.email ? o.user.email.split("@")[0] : "Customer");
 
+      const refundAmount = Number(o.totalRefundedAmount || 0);
+      const isPaid = (o.paymentStatus === "Paid" && o.orderStatus !== "Cancelled") ||
+        (o.paymentMethod === "COD" && o.orderStatus === "Delivered");
+      const netRevenue = isPaid ? Math.max(0, (o.totalAmount || 0) - refundAmount) : 0;
+
       const row = [
         o.orderNumber,
         new Date(o.createdAt).toISOString().replace("T", " ").substring(0, 19),
         customerName,
         o.user?.email || "N/A",
+        o.shippingAddress?.phone || "N/A",
         itemsSummary,
         sizesSummary,
         totalUnits,
         o.subtotal || 0,
+        o.totalOfferDiscount || 0,
         o.couponCode || "None",
         o.discountAmount || 0,
         o.shippingCost || 0,
         o.totalAmount || 0,
+        refundAmount,
+        netRevenue,
         o.paymentMethod || "COD",
         o.paymentStatus || "Pending",
         o.orderStatus || "Processing",

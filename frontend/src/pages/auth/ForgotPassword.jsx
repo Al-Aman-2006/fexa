@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { forgotPassword as forgotPasswordApi } from "../../services/auth.service.js";
 import "./ForgotPassword.css";
 
 function ForgotPassword() {
@@ -17,19 +18,17 @@ function ForgotPassword() {
     setLoading(true);
     setMessage({ text: "", type: "" });
     try {
-      const response = await fetch("http://localhost:5000/api/auth/forgot-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await response.json();
+      const data = await forgotPasswordApi(email);
       setMessage({
-        text: data.message || "If an account exists for this email, a password reset link has been sent.",
+        text: data?.message || "If an account exists for this email, a password reset link has been sent.",
         type: "success",
       });
     } catch (error) {
       console.error("Forgot password error:", error);
-      setMessage({ text: "Unable to connect to the server.", type: "error" });
+      setMessage({
+        text: error.response?.data?.message || "Unable to connect to the server.",
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }

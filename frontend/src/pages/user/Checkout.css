@@ -637,6 +637,41 @@
   gap: 10px;
 }
 
+.chk-header-add-btn {
+  background: #6a4f82;
+  border: 1px solid #6a4f82;
+  color: #ffffff;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  padding: 0.45rem 0.9rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chk-header-add-btn:hover {
+  background: #543c69;
+  border-color: #543c69;
+}
+
+.chk-header-cancel-btn {
+  background: #ffffff;
+  border: 1px solid #dcd1e8;
+  color: #7b6f8a;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.45rem 0.85rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chk-header-cancel-btn:hover {
+  background: #faf7fd;
+  color: #2b2238;
+}
+
 .chk-header-action-btn {
   background: #f6f0fc;
   border: 1px solid #dfd2ec;
@@ -1839,6 +1874,768 @@
   color: #8c7f9c;
   font-size: 0.85rem;
 }
+
+/* ==========================================================================
+   INLINE ADDRESS FORM & EMPTY STATE (FEATURE 2)
+   ========================================================================== */
+
+.chk-add-address-header-btn {
+  background: #fbf9fd;
+  border: 1px solid #c9b8db;
+  color: #6a4f82;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.45rem 0.85rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chk-add-address-header-btn:hover {
+  background: #6a4f82;
+  color: #ffffff;
+  border-color: #6a4f82;
+}
+
+.chk-empty-address-card {
+  background: #faf8fd;
+  border: 2px dashed #d5c8e3;
+  border-radius: 12px;
+  padding: 2.25rem 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.chk-empty-icon {
+  font-size: 2.2rem;
+}
+
+.chk-empty-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #2b2238;
+}
+
+.chk-empty-subtext {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #7b6f8a;
+  max-width: 440px;
+  line-height: 1.45;
+}
+
+.chk-empty-actions {
+  margin-top: 0.5rem;
+}
+
+.chk-primary-add-btn {
+  background: #6a4f82;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.75rem 1.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(106, 79, 130, 0.2);
+}
+
+.chk-primary-add-btn:hover {
+  background: #543c69;
+  transform: translateY(-1px);
+}
+
+.chk-inline-address-form-card {
+  background: #ffffff;
+  border: 1px solid #d4c8e3;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.75rem;
+  box-shadow: 0 4px 18px rgba(106, 79, 130, 0.06);
+}
+
+.chk-address-form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #f0eaf7;
+}
+
+.chk-form-heading {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #2b2238;
+  letter-spacing: 0.04em;
+}
+
+.chk-form-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: #8c7f9c;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.chk-form-close-btn:hover {
+  background: #f5effc;
+  color: #2b2238;
+}
+
+.chk-address-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.chk-grid-span-2 {
+  grid-column: span 2;
+}
+
+.chk-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.chk-form-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #4a3e5c;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.chk-form-label .required-star {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+.chk-form-input {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #dcd1e8;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #1a1824;
+  background: #ffffff;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.chk-form-input:focus {
+  outline: none;
+  border-color: #6a4f82;
+  box-shadow: 0 0 0 3px rgba(106, 79, 130, 0.12);
+}
+
+.chk-form-input.input-error {
+  border-color: #ef4444;
+  background: #fff8f8;
+}
+
+.chk-phone-input-wrap {
+  display: flex;
+  align-items: center;
+  border: 1px solid #dcd1e8;
+  border-radius: 6px;
+  background: #ffffff;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.chk-phone-input-wrap:focus-within {
+  border-color: #6a4f82;
+  box-shadow: 0 0 0 3px rgba(106, 79, 130, 0.12);
+}
+
+.chk-phone-input-wrap.input-error {
+  border-color: #ef4444;
+  background: #fff8f8;
+}
+
+.chk-country-prefix {
+  padding: 0.7rem 0.75rem;
+  background: #f7f3fb;
+  border-right: 1px solid #dcd1e8;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #6a4f82;
+}
+
+.chk-phone-input-wrap .chk-form-input {
+  border: none;
+  border-radius: 0;
+  box-shadow: none !important;
+}
+
+.chk-field-error-text {
+  font-size: 0.72rem;
+  color: #dc2626;
+  margin-top: 2px;
+}
+
+.chk-address-type-selector {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+}
+
+.chk-type-chip {
+  flex: 1;
+  background: #fbf9fd;
+  border: 1px solid #dcd1e8;
+  color: #5c526d;
+  padding: 0.55rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chk-type-chip:hover {
+  background: #f3ecf9;
+  border-color: #ba9ed4;
+}
+
+.chk-type-chip.active {
+  background: #6a4f82;
+  color: #ffffff;
+  border-color: #6a4f82;
+}
+
+.chk-form-checkbox-row {
+  margin-top: 0.5rem;
+}
+
+.chk-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: #3d334d;
+  cursor: pointer;
+  user-select: none;
+}
+
+.chk-checkbox-label input[type="checkbox"] {
+  accent-color: #6a4f82;
+  width: 16px;
+  height: 16px;
+}
+
+.chk-form-server-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 0.65rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  margin-top: 1rem;
+}
+
+.chk-form-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f0eaf7;
+}
+
+.chk-btn-cancel {
+  background: #ffffff;
+  border: 1px solid #dcd1e8;
+  color: #6a5e7b;
+  padding: 0.65rem 1.25rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chk-btn-cancel:hover {
+  background: #fbf9fd;
+  color: #2b2238;
+}
+
+.chk-btn-submit {
+  background: #6a4f82;
+  color: #ffffff;
+  border: none;
+  padding: 0.65rem 1.4rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chk-btn-submit:hover:not(:disabled) {
+  background: #543c69;
+}
+
+.chk-btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   WALLET PAYMENT INTEGRATION (FEATURE 3)
+   ========================================================================== */
+
+.payment-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.85rem;
+}
+
+.wallet-live-badge {
+  background: #f4ecfa;
+  color: #6a4f82;
+  border: 1px solid #d9c8eb;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.65rem;
+  border-radius: 20px;
+}
+
+.wlt-pill-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 12px;
+}
+
+.wlt-pill-badge.sufficient {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.wlt-pill-badge.low {
+  background: #fffbeb;
+  color: #d97706;
+  border: 1px solid #fde68a;
+}
+
+.checkout-wallet-details-card {
+  margin-top: 1rem;
+  background: #fdfcff;
+  border: 1px solid #dfd3ec;
+  border-radius: 10px;
+  padding: 1.25rem;
+  box-shadow: 0 3px 12px rgba(106, 79, 130, 0.05);
+}
+
+.wallet-details-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  color: #3b2c4c;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+}
+
+.wlt-icon {
+  font-size: 1.1rem;
+}
+
+.wlt-breakdown-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.wlt-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  color: #635675;
+}
+
+.wlt-val-bold {
+  font-weight: 700;
+  color: #2b2238;
+}
+
+.wlt-deduct-row {
+  color: #dc2626;
+}
+
+.wlt-deduct-val {
+  font-weight: 700;
+  color: #dc2626;
+}
+
+.wlt-breakdown-divider {
+  height: 1px;
+  background: #e9e0f2;
+  margin: 0.35rem 0;
+}
+
+.wlt-net-row {
+  font-weight: 700;
+  color: #2b2238;
+}
+
+.wlt-net-val.positive {
+  color: #059669;
+  font-size: 0.92rem;
+}
+
+.wlt-net-val.negative {
+  color: #dc2626;
+  font-size: 0.92rem;
+}
+
+.wlt-insufficient-alert {
+  margin-top: 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 0.85rem;
+  display: flex;
+  gap: 0.75rem;
+  color: #991b1b;
+}
+
+.wlt-alert-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.wlt-insufficient-alert strong {
+  display: block;
+  font-size: 0.82rem;
+  margin-bottom: 0.2rem;
+}
+
+.wlt-insufficient-alert p {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: #b91c1c;
+}
+
+.wlt-sufficient-notice {
+  margin-top: 1rem;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  padding: 0.75rem 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: #065f46;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.wlt-check-icon {
+  font-weight: 900;
+  color: #059669;
+  font-size: 0.95rem;
+}
+
+/* ==========================================================================
+   WALLET SUCCESS RECEIPT & INSUFFICIENT BALANCE MODAL
+   ========================================================================== */
+
+.wallet-payment-success-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 2rem;
+  width: 100%;
+}
+
+.wallet-success-receipt-box {
+  width: 100%;
+  max-width: 600px;
+  background: #fbf9fd;
+  border: 1.5px solid #dcd1e8;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+  text-align: left;
+  box-shadow: 0 4px 16px rgba(106, 79, 130, 0.06);
+  box-sizing: border-box;
+}
+
+.receipt-box-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 0.85rem;
+  border-bottom: 1.5px dashed #dfd4eb;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #5c4e70;
+}
+
+.receipt-status-pill {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.receipt-rows-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.receipt-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  color: #635675;
+}
+
+.receipt-row strong {
+  color: #2b2238;
+}
+
+.receipt-monospace {
+  font-family: monospace;
+  font-weight: 700;
+  color: #6a4f82;
+  font-size: 0.82rem;
+}
+
+.receipt-divider {
+  height: 1px;
+  background: #e9e0f2;
+  margin: 0.35rem 0;
+}
+
+.receipt-row.deduct .deduct-val {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.receipt-row.net-balance {
+  font-size: 0.92rem;
+}
+
+.receipt-row.net-balance .net-val {
+  color: #059669;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+/* INSUFFICIENT WALLET BALANCE MODAL */
+.wallet-insufficient-modal-card {
+  background: #ffffff;
+  border-radius: 14px;
+  width: 92%;
+  max-width: 500px;
+  padding: 1.75rem;
+  box-shadow: 0 10px 40px rgba(43, 34, 56, 0.22);
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  animation: modalSlideUp 0.25s ease-out;
+  box-sizing: border-box;
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wlt-fail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.wlt-fail-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wlt-fail-badge-icon {
+  font-size: 1.4rem;
+}
+
+.wlt-fail-modal-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #991b1b;
+  line-height: 1.35;
+}
+
+.wlt-fail-modal-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #5c526d;
+  line-height: 1.5;
+}
+
+.wlt-fail-metrics-table {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.wlt-fail-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  color: #7f1d1d;
+}
+
+.metric-bold {
+  color: #1a1824;
+}
+
+.wlt-fail-metric-divider {
+  height: 1px;
+  background: #fca5a5;
+  margin: 0.25rem 0;
+}
+
+.wlt-fail-metric-row.shortfall {
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.shortfall-amount {
+  color: #dc2626;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.wlt-fail-actions-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.wlt-actions-title {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #7b6f8a;
+  margin-bottom: 0.2rem;
+}
+
+.wlt-fail-btn {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  border: 1px solid #dcd1e8;
+  background: #fbf9fd;
+  color: #3b2c4c;
+}
+
+.wlt-fail-btn:hover {
+  background: #f3ecf9;
+  border-color: #ba9ed4;
+}
+
+.wlt-fail-btn.topup-btn {
+  background: #6a4f82;
+  color: #ffffff;
+  border-color: #6a4f82;
+  box-shadow: 0 4px 12px rgba(106, 79, 130, 0.2);
+}
+
+.wlt-fail-btn.topup-btn:hover {
+  background: #543c69;
+}
+
+.wlt-fail-btn.rzp-btn {
+  background: #f4ecfb;
+  border-color: #c9b4df;
+  color: #5c387b;
+}
+
+.wlt-fail-btn.rzp-btn:hover {
+  background: #eadcf5;
+}
+
+.wlt-fail-btn.dismiss-btn {
+  background: transparent;
+  border: none;
+  color: #7b6f8a;
+  font-size: 0.75rem;
+  padding: 0.5rem;
+}
+
+.wlt-fail-btn.dismiss-btn:hover {
+  color: #1a1824;
+  text-decoration: underline;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 640px) {
+  .chk-address-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .chk-grid-span-2 {
+    grid-column: span 1;
+  }
+  .chk-address-type-selector {
+    flex-direction: row;
+  }
+  .wallet-insufficient-modal-card {
+    padding: 1.25rem;
+  }
+}
+
 
 
 

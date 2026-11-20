@@ -3,6 +3,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import path from "path";
 import { fileURLToPath } from "url";
+import mongoose from "mongoose";
 
 import authRoutes from "./routes/auth.routes.js";
 import profileRoutes from "./routes/profile.routes.js";
@@ -32,16 +33,53 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// Enable reverse proxy support for Render and cloud load balancers (required for secure cookies and accurate client IP)
+app.set("trust proxy", 1);
+
+// Build explicit allowed origins whitelist from environment and local dev defaults
+const configuredClientUrls = [
+  process.env.CLIENT_URL,
+  process.env.FRONTEND_URL,
+]
+  .filter(Boolean)
+  .flatMap((url) => url.split(",").map((s) => s.trim().replace(/\/$/, "")));
+
+const localDevOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
+];
+
+const allowedOrigins = Array.from(new Set([...configuredClientUrls, ...localDevOrigins]));
+
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-      "http://localhost:5174",
-      "http://127.0.0.1:5174",
-      "http://localhost:3000",
-    ],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, server-to-server webhooks)
+      if (!origin) return callback(null, true);
+
+      const normalizedOrigin = origin.replace(/\/$/, "");
+      if (allowedOrigins.includes(normalizedOrigin)) {
+        return callback(null, true);
+      }
+
+      // In development, permit any localhost / 127.0.0.1 port
+      if (process.env.NODE_ENV !== "production" && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS policy rejection: Origin ${origin} is not allowed.`));
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "x-category-context",
+      "x-razorpay-signature",
+    ],
   })
 );
 
@@ -81,6 +119,25 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/admin/reviews", adminReviewRoutes);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/returns", returnRoutes);
+
+// Health & readiness check endpoint for Render deployment and uptime monitors
+app.get("/api/health", (req, res) => {
+  const dbStatus = mongoose.connection.readyState;
+  // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+  const isDbReady = dbStatus === 1;
+
+  const statusCode = isDbReady ? 200 : 503;
+  res.status(statusCode).json({
+    success: isDbReady,
+    status: isDbReady ? "healthy" : "degraded",
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+    services: {
+      server: "up",
+      database: isDbReady ? "connected" : "disconnected",
+    },
+  });
+});
 
 app.get("/", (req, res) => {
   res.json({

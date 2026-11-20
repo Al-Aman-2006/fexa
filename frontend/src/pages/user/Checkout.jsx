@@ -2,6 +2,19 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
+import { validateAddressField, validateAddressForm } from "../../utils/validation";
+import { getAddresses, addAddress, getWalletBalance } from "../../services/user.service.js";
+import { createOrder } from "../../services/order.service.js";
+import {
+  getAvailableCoupons,
+  applyCoupon,
+  removeCoupon,
+  recordPaymentFailure,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
+  checkOrderStatus,
+} from "../../services/payment.service.js";
+import { getImageUrl } from "../../utils/imageUrl.js";
 import "./Checkout.css";
 
 function Checkout() {
@@ -15,6 +28,31 @@ function Checkout() {
   const [loadingAddresses, setLoadingAddresses] = useState(true);
   const [addressError, setAddressError] = useState(null);
   const [isChangingAddress, setIsChangingAddress] = useState(false);
+
+  // Inline Add Address Form states
+  const [showAddAddressForm, setShowAddAddressForm] = useState(false);
+  const [addressFormData, setAddressFormData] = useState({
+    fullName: "",
+    phone: "",
+    house: "",
+    street: "",
+    city: "",
+    state: "",
+    pincode: "",
+    country: "India",
+    label: "Home",
+    isDefault: false,
+  });
+  const [addressFieldErrors, setAddressFieldErrors] = useState({});
+  const [addressTouched, setAddressTouched] = useState({});
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
+  const [saveAddressError, setSaveAddressError] = useState(null);
+
+  // FEXA Wallet states
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [walletError, setWalletError] = useState(null);
+  const [walletInsufficientModal, setWalletInsufficientModal] = useState(null);
 
   // Coupon state
   const [appliedCoupon, setAppliedCoupon] = useState(null);
@@ -65,32 +103,14 @@ function Checkout() {
     return `₹${Number(val).toLocaleString("en-IN")}`;
   };
 
-  const getImageUrl = (imgPath) => {
-    if (!imgPath) return null;
-    if (imgPath.startsWith("http://") || imgPath.startsWith("https://")) {
-      return imgPath;
-    }
-    return `http://localhost:5000${imgPath}`;
-  };
-
   // Fetch saved addresses belonging to authenticated user from Profile API
   const fetchSavedAddresses = async () => {
     try {
       setLoadingAddresses(true);
       setAddressError(null);
 
-      const token = localStorage.getItem("token");
-      const headers = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const res = await fetch("http://localhost:5000/api/profile/addresses", {
-        method: "GET",
-        headers,
-        credentials: "include",
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = await getAddresses();
+      if (data?.success) {
         const list = data.addresses || [];
         setAddresses(list);
         if (list.length > 0) {
@@ -107,29 +127,155 @@ function Checkout() {
           setSelectedAddressId(null);
         }
       } else {
-        setAddressError(data.message || "Failed to load saved delivery addresses.");
+        setAddressError(data?.message || "Failed to load saved delivery addresses.");
       }
     } catch (err) {
       console.error("Fetch saved addresses error:", err);
-      setAddressError("Unable to connect to server to load saved addresses.");
+      setAddressError(err.response?.data?.message || "Unable to connect to server to load saved addresses.");
     } finally {
       setLoadingAddresses(false);
     }
   };
 
+  // Fetch current user wallet balance from backend
+  const fetchWalletBalance = async () => {
+    try {
+      setWalletLoading(true);
+      setWalletError(null);
+
+      const data = await getWalletBalance();
+      if (data?.success) {
+        setWalletBalance(Number(data.balance || 0));
+      } else {
+        setWalletError(data?.message || "Failed to load wallet balance.");
+      }
+    } catch (err) {
+      console.error("Fetch wallet balance error:", err);
+      setWalletError(err.response?.data?.message || "Unable to connect to wallet server.");
+    } finally {
+      setWalletLoading(false);
+    }
+  };
+
+  // Inline address form input handler with real-time blur/change validation
+  const handleAddressInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    const val = type === "checkbox" ? checked : value;
+
+    setAddressFormData((prev) => {
+      const next = { ...prev, [name]: val };
+      if (addressTouched[name]) {
+        const fieldErr = validateAddressField(name, val, next);
+        setAddressFieldErrors((prevErr) => ({ ...prevErr, [name]: fieldErr }));
+      }
+      return next;
+    });
+  };
+
+  const handleAddressInputBlur = (e) => {
+    const { name, value, type, checked } = e.target;
+    const val = type === "checkbox" ? checked : value;
+    setAddressTouched((prev) => ({ ...prev, [name]: true }));
+    const fieldErr = validateAddressField(name, val, addressFormData);
+    setAddressFieldErrors((prevErr) => ({ ...prevErr, [name]: fieldErr }));
+  };
+
+  // Save new delivery address directly to user profile in MongoDB from Checkout
+  const handleSaveNewAddress = async (e) => {
+    e.preventDefault();
+    setSaveAddressError(null);
+
+    const validation = validateAddressForm(addressFormData);
+    if (!validation.isValid) {
+      setAddressFieldErrors(validation.errors);
+      const touchedAll = {};
+      Object.keys(addressFormData).forEach((k) => (touchedAll[k] = true));
+      setAddressTouched(touchedAll);
+      return;
+    }
+
+    try {
+      setIsSavingAddress(true);
+
+      const data = await addAddress(validation.normalizedData || addressFormData);
+      if (data?.success) {
+        const updatedList = data.addresses || [];
+        setAddresses(updatedList);
+
+        // Auto-select the newly added address
+        if (updatedList.length > 0) {
+          const newlyAdded = updatedList[updatedList.length - 1];
+          setSelectedAddressId(newlyAdded._id);
+        }
+
+        // Close inline form and reset
+        setShowAddAddressForm(false);
+        setIsChangingAddress(false);
+        setAddressFormData({
+          fullName: "",
+          phone: "",
+          house: "",
+          street: "",
+          city: "",
+          state: "",
+          pincode: "",
+          country: "India",
+          label: "Home",
+          isDefault: false,
+        });
+        setAddressFieldErrors({});
+        setAddressTouched({});
+      } else {
+        setSaveAddressError(data?.message || "Failed to save address.");
+        if (data?.errors) {
+          setAddressFieldErrors(data.errors);
+        }
+      }
+    } catch (err) {
+      console.error("Save address error:", err);
+      const data = err.response?.data;
+      if (data?.errors) {
+        setAddressFieldErrors(data.errors);
+      }
+      setSaveAddressError(data?.message || "Unable to connect to server. Please try again.");
+    } finally {
+      setIsSavingAddress(false);
+    }
+  };
+
+  const handleCancelAddAddress = () => {
+    setShowAddAddressForm(false);
+    setSaveAddressError(null);
+    setAddressFieldErrors({});
+    setAddressTouched({});
+  };
+
   useEffect(() => {
     fetchSavedAddresses();
     fetchAvailableOffers();
+    fetchWalletBalance();
   }, []);
 
-  // When window gains focus (e.g. user returns from adding an address in Profile), re-fetch
+  // When window gains focus or wallet is updated elsewhere, re-fetch
   useEffect(() => {
     const handleFocus = () => {
       fetchSavedAddresses();
       fetchAvailableOffers();
+      fetchWalletBalance();
+    };
+    const handleWalletUpdated = (e) => {
+      if (e.detail && e.detail.newBalance !== undefined) {
+        setWalletBalance(Number(e.detail.newBalance));
+      } else {
+        fetchWalletBalance();
+      }
     };
     window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
+    window.addEventListener("fexa:wallet-updated", handleWalletUpdated);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("fexa:wallet-updated", handleWalletUpdated);
+    };
   }, []);
 
   const selectedAddress = addresses.find((a) => a._id === selectedAddressId) || null;
@@ -138,17 +284,8 @@ function Checkout() {
   const fetchAvailableOffers = async () => {
     try {
       setLoadingOffers(true);
-      const token = localStorage.getItem("token");
-      const headers = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const res = await fetch("http://localhost:5000/api/coupons/available", {
-        method: "GET",
-        headers,
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = await getAvailableCoupons();
+      if (data && data.success) {
         setAvailableOffers(data.coupons || []);
       }
     } catch (err) {
@@ -170,30 +307,19 @@ function Checkout() {
       setCouponError(null);
       setCouponSuccess(null);
 
-      const token = localStorage.getItem("token");
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const res = await fetch("http://localhost:5000/api/coupons/apply", {
-        method: "POST",
-        headers,
-        credentials: "include",
-        body: JSON.stringify({ couponCode: code }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success && data.coupon) {
+      const data = await applyCoupon({ couponCode: code });
+      if (data && data.success && data.coupon) {
         setAppliedCoupon(data.coupon);
         setCouponSuccess(`Coupon ${data.coupon.code} applied successfully! You save ${formatPrice(data.coupon.discountAmount)} (${data.coupon.discountPercentage}% OFF).`);
         setCouponInput("");
         setShowOffersDrawer(false);
       } else {
         // PRESERVE valid existing coupon if replacement code fails validation (Rule 5 & Test E)
-        setCouponError(data.message || "Invalid coupon code.");
+        setCouponError(data?.message || "Invalid coupon code.");
       }
     } catch (err) {
       console.error("Apply coupon error:", err);
-      setCouponError("Unable to apply coupon. Please check your network connection.");
+      setCouponError(err.response?.data?.message || "Unable to apply coupon. Please check your network connection.");
     } finally {
       setCouponLoading(false);
     }
@@ -206,18 +332,8 @@ function Checkout() {
       setCouponError(null);
       setCouponSuccess(null);
 
-      const token = localStorage.getItem("token");
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const res = await fetch("http://localhost:5000/api/coupons/remove", {
-        method: "POST",
-        headers,
-        credentials: "include",
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = await removeCoupon();
+      if (data && data.success) {
         setAppliedCoupon(null);
         setCouponSuccess("Coupon removed successfully.");
       } else {
@@ -240,20 +356,12 @@ function Checkout() {
   // Helper to record payment failure reasons on backend safely without stock deduction
   const recordBackendFailure = async (orderId, rzpOrderId, rzpPaymentId, code, description) => {
     try {
-      const token = localStorage.getItem("token");
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      await fetch("http://localhost:5000/api/orders/razorpay/payment-failed", {
-        method: "POST",
-        headers,
-        credentials: "include",
-        body: JSON.stringify({
-          orderId,
-          razorpayOrderId: rzpOrderId,
-          razorpayPaymentId: rzpPaymentId || null,
-          code: code || "PAYMENT_FAILED",
-          description: description || "Payment was not completed.",
-        }),
+      await recordPaymentFailure({
+        orderId,
+        razorpayOrderId: rzpOrderId,
+        razorpayPaymentId: rzpPaymentId || null,
+        code: code || "PAYMENT_FAILED",
+        description: description || "Payment was not completed.",
       });
     } catch (err) {
       console.warn("Could not report payment failure to backend:", err);
@@ -269,25 +377,23 @@ function Checkout() {
       return;
     }
 
-    const token = localStorage.getItem("token");
-    const headers = { "Content-Type": "application/json" };
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-
     // Create or reuse internal order and Razorpay order
-    const rzpInitRes = await fetch("http://localhost:5000/api/orders/razorpay/create-order", {
-      method: "POST",
-      headers,
-      credentials: "include",
-      body: JSON.stringify({
+    let rzpInitData;
+    try {
+      rzpInitData = await createRazorpayOrder({
         addressId: selectedAddressId,
         orderId: existingOrderId || activeInternalOrderId || undefined,
         couponCode: appliedCoupon ? appliedCoupon.code : undefined,
-      }),
-    });
+      });
+    } catch (initErr) {
+      console.error("Razorpay order creation error:", initErr);
+      setError(initErr.response?.data?.message || "Failed to initialize payment gateway.");
+      setIsSubmitting(false);
+      return;
+    }
 
-    const rzpInitData = await rzpInitRes.json();
-    if (!rzpInitRes.ok || !rzpInitData.success) {
-      setError(rzpInitData.message || "Failed to initialize payment gateway.");
+    if (!rzpInitData || !rzpInitData.success) {
+      setError(rzpInitData?.message || "Failed to initialize payment gateway.");
       setIsSubmitting(false);
       return;
     }
@@ -340,22 +446,16 @@ function Checkout() {
           setIsSubmitting(true);
           setCancellationNotice(null);
 
-          const verifyRes = await fetch("http://localhost:5000/api/orders/razorpay/verify-payment", {
-            method: "POST",
-            headers,
-            credentials: "include",
-            body: JSON.stringify({
-              orderId: internalOrderId,
-              addressId: selectedAddressId,
-              paymentMethod: "Razorpay",
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            }),
+          const verifyData = await verifyRazorpayPayment({
+            orderId: internalOrderId,
+            addressId: selectedAddressId,
+            paymentMethod: "Razorpay",
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
           });
 
-          const verifyData = await verifyRes.json();
-          if (verifyRes.ok && verifyData.success && verifyData.order) {
+          if (verifyData && verifyData.success && verifyData.order) {
             setCompletedOrder(verifyData.order);
             setFailedOrder(null);
             setPendingVerification(null);
@@ -367,7 +467,7 @@ function Checkout() {
               orderId: internalOrderId,
               orderNumber: internalOrderNumber,
               totalAmount: finalPayableTotal,
-              reason: verifyData.message || "Payment signature verification failed. Please contact boutique concierge.",
+              reason: verifyData?.message || "Payment signature verification failed. Please contact boutique concierge.",
               code: "SIGNATURE_VERIFICATION_FAILED",
               paymentId: response.razorpay_payment_id || null,
               items: cart.items || [],
@@ -441,7 +541,9 @@ function Checkout() {
     }
 
     if (!selectedAddressId || !selectedAddress) {
-      setError("Please select a saved delivery address from your profile.");
+      setError("Please select or add a valid delivery address above to complete your order.");
+      const addrEl = document.querySelector(".checkout-address-section");
+      if (addrEl) addrEl.scrollIntoView({ behavior: "smooth" });
       return;
     }
 
@@ -465,28 +567,99 @@ function Checkout() {
       }
 
       // ========================================================
-      // 2. CASH ON DELIVERY (COD) FLOW (safely reuses existing order if available)
+      // 2. FEXA WALLET PAYMENT FLOW
       // ========================================================
-      const res = await fetch("http://localhost:5000/api/orders", {
-        method: "POST",
-        headers,
-        credentials: "include",
-        body: JSON.stringify({
+      if (paymentMethod === "Wallet") {
+        if (walletBalance < finalPayableTotal) {
+          const shortfall = Math.max(0, finalPayableTotal - walletBalance);
+          setWalletInsufficientModal({
+            availableBalance: walletBalance,
+            requiredAmount: finalPayableTotal,
+            shortfall,
+          });
+          setIsSubmitting(false);
+          return;
+        }
+
+        let data;
+        try {
+          data = await createOrder({
+            addressId: selectedAddressId,
+            paymentMethod: "Wallet",
+            orderId: activeInternalOrderId || undefined,
+            couponCode: appliedCoupon ? appliedCoupon.code : undefined,
+          });
+        } catch (walletErr) {
+          data = walletErr.response?.data;
+          if (!data) throw walletErr;
+        }
+
+        if (data && data.success && data.order) {
+          const updatedBalance = data.walletTransaction?.newBalance !== undefined
+            ? Number(data.walletTransaction.newBalance)
+            : Math.max(0, walletBalance - finalPayableTotal);
+
+          setWalletBalance(updatedBalance);
+          setCompletedOrder({
+            ...data.order,
+            walletTransaction: data.walletTransaction || {
+              transactionId: data.order.walletTransactionId,
+              amount: data.order.totalAmount,
+              balanceBefore: walletBalance,
+              balanceAfter: updatedBalance,
+              newBalance: updatedBalance,
+            },
+          });
+          setActiveInternalOrderId(null);
+          setWalletInsufficientModal(null);
+
+          // Broadcast live wallet balance update to all open components & tabs
+          window.dispatchEvent(
+            new CustomEvent("fexa:wallet-updated", {
+              detail: { newBalance: updatedBalance },
+            })
+          );
+
+          if (fetchCart) fetchCart();
+        } else {
+          if (data?.errorType === "INSUFFICIENT_WALLET_BALANCE" || data?.shortfall !== undefined) {
+            setWalletInsufficientModal({
+              availableBalance: Number(data.walletBalance ?? walletBalance),
+              requiredAmount: Number(data.requiredAmount ?? finalPayableTotal),
+              shortfall: Number(data.shortfall ?? Math.max(0, finalPayableTotal - walletBalance)),
+            });
+            if (data.walletBalance !== undefined) {
+              setWalletBalance(Number(data.walletBalance));
+            }
+          } else {
+            setError(data?.message || "Failed to process wallet payment. Please try again.");
+          }
+        }
+        return;
+      }
+
+      // ========================================================
+      // 3. CASH ON DELIVERY (COD) FLOW (safely reuses existing order if available)
+      // ========================================================
+      let data;
+      try {
+        data = await createOrder({
           addressId: selectedAddressId,
           paymentMethod: "COD",
           orderId: activeInternalOrderId || undefined,
           couponCode: appliedCoupon ? appliedCoupon.code : undefined,
-        }),
-      });
+        });
+      } catch (codErr) {
+        data = codErr.response?.data;
+        if (!data) throw codErr;
+      }
 
-      const data = await res.json();
-
-      if (res.ok && data.success && data.order) {
+      if (data && data.success && data.order) {
         setCompletedOrder(data.order);
         setActiveInternalOrderId(null);
         if (fetchCart) fetchCart();
       } else {
-        setError(data.message || "Failed to process your order. Please try again.");
+        setError(data?.message || "Failed to process your order. Please try again.");
       }
     } catch (err) {
       console.error("Place order error:", err);
@@ -510,34 +683,71 @@ function Checkout() {
     try {
       setIsSubmitting(true);
       setError(null);
-      const token = localStorage.getItem("token");
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const res = await fetch("http://localhost:5000/api/orders", {
-        method: "POST",
-        headers,
-        credentials: "include",
-        body: JSON.stringify({
+      let data;
+      try {
+        data = await createOrder({
           addressId: selectedAddressId,
           paymentMethod: "COD",
           orderId: activeInternalOrderId || (failedOrder && failedOrder.orderId) || undefined,
           couponCode: appliedCoupon ? appliedCoupon.code : undefined,
-        }),
-      });
+        });
+      } catch (codErr) {
+        data = codErr.response?.data;
+        if (!data) throw codErr;
+      }
 
-      const data = await res.json();
-      if (res.ok && data.success && data.order) {
+      if (data && data.success && data.order) {
         setCompletedOrder(data.order);
         setFailedOrder(null);
         setActiveInternalOrderId(null);
         if (fetchCart) fetchCart();
       } else {
-        setError(data.message || "Failed to switch order to Cash on Delivery.");
+        setError(data?.message || "Failed to switch order to Cash on Delivery.");
       }
     } catch (err) {
       console.error("Switch to COD error:", err);
       setError("Unable to connect to order server. Please check your connection.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Convert failed online order to Wallet payment without creating duplicates
+  const handleSwitchToWallet = async () => {
+    if (walletBalance < finalPayableTotal) {
+      setError("Insufficient wallet balance to cover order total.");
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
+      let data;
+      try {
+        data = await createOrder({
+          addressId: selectedAddressId,
+          paymentMethod: "Wallet",
+          orderId: activeInternalOrderId || (failedOrder && failedOrder.orderId) || undefined,
+          couponCode: appliedCoupon ? appliedCoupon.code : undefined,
+        });
+      } catch (wErr) {
+        data = wErr.response?.data;
+        if (!data) throw wErr;
+      }
+
+      if (data && data.success && data.order) {
+        setCompletedOrder(data.order);
+        setFailedOrder(null);
+        setActiveInternalOrderId(null);
+        fetchWalletBalance();
+        if (fetchCart) fetchCart();
+      } else {
+        setError(data?.message || "Failed to switch order to Wallet payment.");
+      }
+    } catch (err) {
+      console.error("Switch to wallet error:", err);
+      setError("Network interruption switching payment method.");
     } finally {
       setIsSubmitting(false);
     }
@@ -555,47 +765,42 @@ function Checkout() {
     try {
       setIsVerifyingPending(true);
       setError(null);
-      const token = localStorage.getItem("token");
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
 
       // 1. Try verify-payment first with signature
-      const verifyRes = await fetch("http://localhost:5000/api/orders/razorpay/verify-payment", {
-        method: "POST",
-        headers,
-        credentials: "include",
-        body: JSON.stringify({
+      try {
+        const verifyData = await verifyRazorpayPayment({
           orderId: pendingVerification.orderId,
           addressId: selectedAddressId,
           paymentMethod: "Razorpay",
           razorpay_order_id: pendingVerification.razorpayOrderId,
           razorpay_payment_id: pendingVerification.razorpayPaymentId,
           razorpay_signature: pendingVerification.razorpaySignature,
-        }),
-      });
+        });
 
-      const verifyData = await verifyRes.json();
-      if (verifyRes.ok && verifyData.success && verifyData.order) {
-        setCompletedOrder(verifyData.order);
-        setPendingVerification(null);
-        setActiveInternalOrderId(null);
-        if (fetchCart) fetchCart();
-        return;
+        if (verifyData && verifyData.success && verifyData.order) {
+          setCompletedOrder(verifyData.order);
+          setPendingVerification(null);
+          setActiveInternalOrderId(null);
+          if (fetchCart) fetchCart();
+          return;
+        }
+      } catch (sigErr) {
+        console.warn("Signature re-verification attempt note:", sigErr);
       }
 
       // 2. Check status directly from order controller
-      const statusRes = await fetch(`http://localhost:5000/api/orders/razorpay/check-status/${pendingVerification.orderId}`, {
-        headers,
-        credentials: "include",
-      });
-      const statusData = await statusRes.json();
-      if (statusRes.ok && statusData.success && statusData.order && statusData.order.paymentStatus === "Paid") {
-        setCompletedOrder(statusData.order);
-        setPendingVerification(null);
-        setActiveInternalOrderId(null);
-        if (fetchCart) fetchCart();
-      } else {
-        setError("Could not confirm payment capture yet. If your account was debited, your order will automatically be marked Paid via webhook shortly.");
+      try {
+        const statusData = await checkOrderStatus(pendingVerification.orderId);
+        if (statusData && statusData.success && statusData.order && statusData.order.paymentStatus === "Paid") {
+          setCompletedOrder(statusData.order);
+          setPendingVerification(null);
+          setActiveInternalOrderId(null);
+          if (fetchCart) fetchCart();
+        } else {
+          setError("Could not confirm payment capture yet. If your account was debited, your order will automatically be marked Paid via webhook shortly.");
+        }
+      } catch (statusErr) {
+        setError(statusErr.response?.data?.message || "Could not confirm payment capture yet. If your account was debited, your order will automatically be marked Paid via webhook shortly.");
       }
     } catch (err) {
       console.error("Retry verification error:", err);
@@ -625,15 +830,89 @@ function Checkout() {
 
         <main className="checkout-main-container">
           <div className="order-confirmed-card">
-            <div className="confirmed-seal-icon">⚜️</div>
-            <span className="confirmed-eyebrow">ORDER CONFIRMED & RESERVED</span>
-            <h2 className="confirmed-title">Thank You For Your Order</h2>
-            <p className="confirmed-order-number">
-              ATELIER DISPATCH MANIFEST: <strong>{completedOrder.orderNumber}</strong>
-            </p>
-            <p className="confirmed-subtext">
-              Your artisanal fragrances have been reserved directly in our Grasse vault. Each flacon is being prepared in our climate-stabilized atelier.
-            </p>
+            {completedOrder.paymentMethod === "Wallet" ? (
+              <div className="wallet-payment-success-header">
+                <div className="confirmed-seal-icon" style={{ fontSize: "2.6rem", marginBottom: "8px" }}>✨👛✨</div>
+                <span className="confirmed-eyebrow" style={{ color: "#059669", background: "#ecfdf5", border: "1px solid #a7f3d0" }}>
+                  PAYMENT SUCCESSFUL • FEXA WALLET
+                </span>
+                <h2 className="confirmed-title" style={{ marginTop: "12px" }}>Payment Successful!</h2>
+                <p className="confirmed-order-number">
+                  ORDER ID: <strong>{completedOrder.orderNumber}</strong>
+                </p>
+                <p className="confirmed-subtext">
+                  Your purchase has been debited seamlessly from your FEXA Atelier Wallet. Your flacons are now locked into reservation.
+                </p>
+
+                {/* DEDICATED WALLET TRANSACTION BREAKDOWN CARD */}
+                <div className="wallet-success-receipt-box">
+                  <div className="receipt-box-header">
+                    <span>FEXA WALLET TRANSACTION RECEIPT</span>
+                    <span className="receipt-status-pill">● SUCCESSFUL</span>
+                  </div>
+                  <div className="receipt-rows-container">
+                    <div className="receipt-row">
+                      <span>Order ID</span>
+                      <strong>{completedOrder.orderNumber}</strong>
+                    </div>
+                    <div className="receipt-row">
+                      <span>Payment Method</span>
+                      <strong>FEXA Wallet</strong>
+                    </div>
+                    <div className="receipt-row">
+                      <span>Amount Paid</span>
+                      <strong style={{ color: "#059669", fontSize: "0.95rem" }}>
+                        {formatPrice(completedOrder.totalAmount)}
+                      </strong>
+                    </div>
+                    <div className="receipt-row">
+                      <span>Wallet Transaction Reference</span>
+                      <span className="receipt-monospace">
+                        {completedOrder.walletTransactionId || completedOrder.walletTransaction?.transactionId || `TXN-WLT-${completedOrder.orderNumber}`}
+                      </span>
+                    </div>
+                    <div className="receipt-row">
+                      <span>Payment Date</span>
+                      <span>
+                        {new Date(completedOrder.paidAt || completedOrder.createdAt || Date.now()).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </span>
+                    </div>
+                    <div className="receipt-divider" />
+                    <div className="receipt-row">
+                      <span>Previous Wallet Balance</span>
+                      <span>{formatPrice(completedOrder.walletTransaction?.balanceBefore ?? (walletBalance + completedOrder.totalAmount))}</span>
+                    </div>
+                    <div className="receipt-row deduct">
+                      <span>Amount Deducted</span>
+                      <span className="deduct-val">-{formatPrice(completedOrder.walletTransaction?.amount ?? completedOrder.totalAmount)}</span>
+                    </div>
+                    <div className="receipt-divider" />
+                    <div className="receipt-row net-balance">
+                      <span>Remaining Wallet Balance</span>
+                      <strong className="net-val">
+                        {formatPrice(completedOrder.walletTransaction?.balanceAfter ?? walletBalance)}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="confirmed-seal-icon">⚜️</div>
+                <span className="confirmed-eyebrow">ORDER CONFIRMED & RESERVED</span>
+                <h2 className="confirmed-title">Thank You For Your Order</h2>
+                <p className="confirmed-order-number">
+                  ATELIER DISPATCH MANIFEST: <strong>{completedOrder.orderNumber}</strong>
+                </p>
+                <p className="confirmed-subtext">
+                  Your artisanal fragrances have been reserved directly in our Grasse vault. Each flacon is being prepared in our climate-stabilized atelier.
+                </p>
+              </>
+            )}
 
             <div className="confirmed-items-list">
               <h3>PURCHASED FLACONS & FORMULATIONS</h3>
@@ -690,7 +969,13 @@ function Checkout() {
               </div>
               <div className="conf-row">
                 <span>Payment Method</span>
-                <span>{completedOrder.paymentMethod === "COD" ? "Cash on Delivery" : "Razorpay Secure Gateway"}</span>
+                <span>
+                  {completedOrder.paymentMethod === "COD"
+                    ? "Cash on Delivery"
+                    : completedOrder.paymentMethod === "Wallet"
+                    ? "FEXA Wallet"
+                    : "Razorpay Secure Gateway"}
+                </span>
               </div>
               <div className="conf-row">
                 <span>Payment Status</span>
@@ -713,20 +998,20 @@ function Checkout() {
               </div>
             </div>
 
-            <div className="confirmed-actions-row" style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap", marginTop: "20px" }}>
+            <div className="confirmed-actions-row" style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap", marginTop: "24px" }}>
               <button
                 type="button"
                 className="checkout-return-btn"
                 onClick={() => navigate("/collections")}
               >
-                EXPLORE MORE COLLECTIONS →
+                CONTINUE SHOPPING →
               </button>
               <button
                 type="button"
                 className="checkout-bag-btn"
                 onClick={() => navigate("/profile", { state: { activeTab: "orders" } })}
               >
-                VIEW IN MY ORDERS →
+                VIEW ORDER DETAILS →
               </button>
             </div>
           </div>
@@ -967,13 +1252,38 @@ function Checkout() {
                     <div>
                       <span className="chk-section-eyebrow">DELIVERY ADDRESS</span>
                       <h3 className="chk-section-title">
-                        {isChangingAddress ? "Select a Saved Address" : "Delivery Destination"}
+                        {showAddAddressForm
+                          ? "New Delivery Destination"
+                          : isChangingAddress
+                          ? "Select a Saved Address"
+                          : "Delivery Destination"}
                       </h3>
                     </div>
 
-                    {addresses.length > 0 && !loadingAddresses && (
+                    {!loadingAddresses && (
                       <div className="chk-address-header-actions">
-                        {addresses.length > 1 && (
+                        {!showAddAddressForm && (
+                          <button
+                            type="button"
+                            className="chk-header-add-btn"
+                            onClick={() => {
+                              setShowAddAddressForm(true);
+                              setIsChangingAddress(false);
+                            }}
+                          >
+                            + ADD NEW ADDRESS
+                          </button>
+                        )}
+                        {showAddAddressForm && (
+                          <button
+                            type="button"
+                            className="chk-header-cancel-btn"
+                            onClick={handleCancelAddAddress}
+                          >
+                            ✕ Cancel
+                          </button>
+                        )}
+                        {addresses.length > 1 && !showAddAddressForm && (
                           <button
                             type="button"
                             className="chk-header-action-btn"
@@ -1012,27 +1322,273 @@ function Checkout() {
                     </div>
                   )}
 
+                  {/* INLINE ADD ADDRESS FORM DIRECTLY IN CHECKOUT */}
+                  {showAddAddressForm && (
+                    <div className="chk-inline-address-form-card">
+                      <div className="chk-address-form-header">
+                        <div>
+                          <span className="chk-form-eyebrow">NEW DESTINATION</span>
+                          <h4 className="chk-form-heading">Add Delivery Address</h4>
+                        </div>
+                        <button
+                          type="button"
+                          className="chk-form-close-btn"
+                          onClick={handleCancelAddAddress}
+                          disabled={isSavingAddress}
+                          title="Close form"
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      {saveAddressError && (
+                        <div className="chk-form-server-error" role="alert">
+                          <span>⚠️ {saveAddressError}</span>
+                        </div>
+                      )}
+
+                      <div className="chk-address-form-grid">
+                        {/* Full Name */}
+                        <div className="chk-form-field">
+                          <label className="chk-form-label">
+                            Full Name <span className="required-star">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            name="fullName"
+                            value={addressFormData.fullName}
+                            onChange={handleAddressInputChange}
+                            onBlur={handleAddressInputBlur}
+                            placeholder="e.g. Alistair Vance"
+                            className={`chk-form-input ${addressFieldErrors.fullName && addressTouched.fullName ? "input-error" : ""}`}
+                            disabled={isSavingAddress}
+                          />
+                          {addressFieldErrors.fullName && addressTouched.fullName && (
+                            <span className="chk-field-error-text">{addressFieldErrors.fullName}</span>
+                          )}
+                        </div>
+
+                        {/* Mobile Number */}
+                        <div className="chk-form-field">
+                          <label className="chk-form-label">
+                            Mobile Number <span className="required-star">*</span>
+                          </label>
+                          <div className={`chk-phone-input-wrap ${addressFieldErrors.phone && addressTouched.phone ? "input-error" : ""}`}>
+                            <span className="chk-country-prefix">+91</span>
+                            <input
+                              type="tel"
+                              name="phone"
+                              value={addressFormData.phone}
+                              onChange={handleAddressInputChange}
+                              onBlur={handleAddressInputBlur}
+                              placeholder="10-digit mobile number"
+                              className="chk-form-input"
+                              disabled={isSavingAddress}
+                            />
+                          </div>
+                          {addressFieldErrors.phone && addressTouched.phone && (
+                            <span className="chk-field-error-text">{addressFieldErrors.phone}</span>
+                          )}
+                        </div>
+
+                        {/* Flat / House / Building */}
+                        <div className="chk-form-field">
+                          <label className="chk-form-label">
+                            House / Building Name <span className="required-star">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            name="house"
+                            value={addressFormData.house}
+                            onChange={handleAddressInputChange}
+                            onBlur={handleAddressInputBlur}
+                            placeholder="e.g. Suite 4B, Imperial Residency"
+                            className={`chk-form-input ${addressFieldErrors.house && addressTouched.house ? "input-error" : ""}`}
+                            disabled={isSavingAddress}
+                          />
+                          {addressFieldErrors.house && addressTouched.house && (
+                            <span className="chk-field-error-text">{addressFieldErrors.house}</span>
+                          )}
+                        </div>
+
+                        {/* Street / Locality */}
+                        <div className="chk-form-field">
+                          <label className="chk-form-label">
+                            Street Address / Locality <span className="required-star">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            name="street"
+                            value={addressFormData.street}
+                            onChange={handleAddressInputChange}
+                            onBlur={handleAddressInputBlur}
+                            placeholder="e.g. Park Avenue, Near Botanical Gardens"
+                            className={`chk-form-input ${addressFieldErrors.street && addressTouched.street ? "input-error" : ""}`}
+                            disabled={isSavingAddress}
+                          />
+                          {addressFieldErrors.street && addressTouched.street && (
+                            <span className="chk-field-error-text">{addressFieldErrors.street}</span>
+                          )}
+                        </div>
+
+                        {/* City */}
+                        <div className="chk-form-field">
+                          <label className="chk-form-label">
+                            City <span className="required-star">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            name="city"
+                            value={addressFormData.city}
+                            onChange={handleAddressInputChange}
+                            onBlur={handleAddressInputBlur}
+                            placeholder="e.g. Mumbai"
+                            className={`chk-form-input ${addressFieldErrors.city && addressTouched.city ? "input-error" : ""}`}
+                            disabled={isSavingAddress}
+                          />
+                          {addressFieldErrors.city && addressTouched.city && (
+                            <span className="chk-field-error-text">{addressFieldErrors.city}</span>
+                          )}
+                        </div>
+
+                        {/* State */}
+                        <div className="chk-form-field">
+                          <label className="chk-form-label">
+                            State <span className="required-star">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            name="state"
+                            value={addressFormData.state}
+                            onChange={handleAddressInputChange}
+                            onBlur={handleAddressInputBlur}
+                            placeholder="e.g. Maharashtra"
+                            className={`chk-form-input ${addressFieldErrors.state && addressTouched.state ? "input-error" : ""}`}
+                            disabled={isSavingAddress}
+                          />
+                          {addressFieldErrors.state && addressTouched.state && (
+                            <span className="chk-field-error-text">{addressFieldErrors.state}</span>
+                          )}
+                        </div>
+
+                        {/* PIN Code */}
+                        <div className="chk-form-field">
+                          <label className="chk-form-label">
+                            PIN Code <span className="required-star">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            name="pincode"
+                            value={addressFormData.pincode}
+                            onChange={handleAddressInputChange}
+                            onBlur={handleAddressInputBlur}
+                            placeholder="6-digit PIN code"
+                            maxLength={6}
+                            className={`chk-form-input ${addressFieldErrors.pincode && addressTouched.pincode ? "input-error" : ""}`}
+                            disabled={isSavingAddress}
+                          />
+                          {addressFieldErrors.pincode && addressTouched.pincode && (
+                            <span className="chk-field-error-text">{addressFieldErrors.pincode}</span>
+                          )}
+                        </div>
+
+                        {/* Country */}
+                        <div className="chk-form-field">
+                          <label className="chk-form-label">
+                            Country <span className="required-star">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            name="country"
+                            value={addressFormData.country}
+                            onChange={handleAddressInputChange}
+                            onBlur={handleAddressInputBlur}
+                            placeholder="e.g. India"
+                            className={`chk-form-input ${addressFieldErrors.country && addressTouched.country ? "input-error" : ""}`}
+                            disabled={isSavingAddress}
+                          />
+                          {addressFieldErrors.country && addressTouched.country && (
+                            <span className="chk-field-error-text">{addressFieldErrors.country}</span>
+                          )}
+                        </div>
+
+                        {/* Address Type (Label) */}
+                        <div className="chk-form-field chk-grid-span-2">
+                          <label className="chk-form-label">Address Type</label>
+                          <div className="chk-address-type-selector">
+                            {["Home", "Work", "Other"].map((lbl) => (
+                              <button
+                                type="button"
+                                key={lbl}
+                                className={`chk-type-chip ${addressFormData.label === lbl ? "active" : ""}`}
+                                onClick={() => setAddressFormData((prev) => ({ ...prev, label: lbl }))}
+                              >
+                                {lbl === "Home" ? "🏠 Home" : lbl === "Work" ? "💼 Work" : "📍 Other"}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Set Default */}
+                        <div className="chk-form-field chk-grid-span-2 chk-form-checkbox-row">
+                          <label className="chk-checkbox-label">
+                            <input
+                              type="checkbox"
+                              name="isDefault"
+                              checked={addressFormData.isDefault}
+                              onChange={handleAddressInputChange}
+                              disabled={isSavingAddress}
+                            />
+                            <span>Set as my default delivery address</span>
+                          </label>
+                        </div>
+
+                        {/* Form action buttons */}
+                        <div className="chk-form-actions-row chk-grid-span-2">
+                          <button
+                            type="button"
+                            className="chk-btn-cancel"
+                            onClick={handleCancelAddAddress}
+                            disabled={isSavingAddress}
+                          >
+                            CANCEL
+                          </button>
+                          <button
+                            type="button"
+                            className="chk-btn-submit"
+                            onClick={handleSaveNewAddress}
+                            disabled={isSavingAddress}
+                          >
+                            {isSavingAddress ? "SAVING DESTINATION..." : "SAVE & DELIVER HERE →"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* NO ADDRESSES SAVED (EMPTY STATE) */}
-                  {!loadingAddresses && !addressError && addresses.length === 0 && (
-                    <div className="chk-no-address-card">
-                      <div className="chk-no-address-icon">📍</div>
-                      <h4>No saved delivery address found.</h4>
-                      <p>
+                  {!loadingAddresses && !addressError && addresses.length === 0 && !showAddAddressForm && (
+                    <div className="chk-empty-address-card">
+                      <div className="chk-empty-icon">📍</div>
+                      <h4 className="chk-empty-title">No delivery address found. Please add your delivery address to continue.</h4>
+                      <p className="chk-empty-subtext">
                         You do not have any delivery addresses saved in your profile yet.
-                        Please add a delivery address to complete your order.
+                        Please add your delivery destination below to complete your order.
                       </p>
-                      <button
-                        type="button"
-                        className="chk-add-address-profile-btn"
-                        onClick={() => navigate("/profile", { state: { activeTab: "addresses", openAddressForm: true } })}
-                      >
-                        ADD ADDRESS IN PROFILE →
-                      </button>
+                      <div className="chk-empty-actions">
+                        <button
+                          type="button"
+                          className="chk-primary-add-btn"
+                          onClick={() => setShowAddAddressForm(true)}
+                        >
+                          + ADD DELIVERY ADDRESS →
+                        </button>
+                      </div>
                     </div>
                   )}
 
                   {/* SAVED ADDRESS CARDS GRID (When user chooses CHANGE ADDRESS) */}
-                  {!loadingAddresses && !addressError && addresses.length > 0 && isChangingAddress && (
+                  {!loadingAddresses && !addressError && addresses.length > 0 && isChangingAddress && !showAddAddressForm && (
                     <div className="chk-address-cards-grid">
                       {addresses.map((addr) => {
                         const isSelected = addr._id === selectedAddressId;
@@ -1081,11 +1637,26 @@ function Checkout() {
                           </div>
                         );
                       })}
+
+                      {/* Add new address card inside the grid */}
+                      <div
+                        className="chk-address-card add-card"
+                        onClick={() => {
+                          setShowAddAddressForm(true);
+                          setIsChangingAddress(false);
+                        }}
+                      >
+                        <div className="chk-add-card-inner">
+                          <span className="chk-add-card-icon">➕</span>
+                          <span className="chk-add-card-title">Add New Address</span>
+                          <span className="chk-add-card-sub">Deliver to another home or office</span>
+                        </div>
+                      </div>
                     </div>
                   )}
 
-                  {/* SELECTED ADDRESS SUMMARY VIEW (When not in list mode) */}
-                  {!loadingAddresses && !addressError && addresses.length > 0 && !isChangingAddress && selectedAddress && (
+                  {/* SELECTED ADDRESS SUMMARY VIEW (When not in list mode and not adding) */}
+                  {!loadingAddresses && !addressError && addresses.length > 0 && !isChangingAddress && !showAddAddressForm && selectedAddress && (
                     <div className="chk-selected-address-summary">
                       <div className="chk-summary-top">
                         <div className="chk-summary-label-group">
@@ -1212,7 +1783,15 @@ function Checkout() {
 
                 {/* PAYMENT METHOD SECTION */}
                 <div className="payment-method-section">
-                  <span className="payment-section-title">PAYMENT METHOD</span>
+                  <div className="payment-section-header">
+                    <span className="payment-section-title">PAYMENT METHOD</span>
+                    {paymentMethod === "Wallet" && (
+                      <span className="wallet-live-badge">
+                        Wallet Balance: {formatPrice(walletBalance)}
+                      </span>
+                    )}
+                  </div>
+
                   <div className="payment-options-row">
                     <label className={`payment-option-card ${paymentMethod === "Razorpay" ? "active" : ""}`}>
                       <input
@@ -1240,11 +1819,83 @@ function Checkout() {
                         onChange={(e) => setPaymentMethod(e.target.value)}
                       />
                       <div className="payment-card-body">
-                        <strong>Cash on Delivery (COD)</strong>
+                        <div className="payment-card-title-row">
+                          <strong>Cash on Delivery (COD)</strong>
+                        </div>
                         <small>Pay concierge upon white-glove arrival</small>
                       </div>
                     </label>
+
+                    <label className={`payment-option-card ${paymentMethod === "Wallet" ? "active" : ""}`}>
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="Wallet"
+                        checked={paymentMethod === "Wallet"}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                      />
+                      <div className="payment-card-body">
+                        <div className="payment-card-title-row">
+                          <strong>FEXA Wallet</strong>
+                          <span className={`wlt-pill-badge ${walletBalance >= finalPayableTotal ? "sufficient" : "low"}`}>
+                            {walletLoading ? "CHECKING..." : formatPrice(walletBalance)}
+                          </span>
+                        </div>
+                        <small>Instant debited checkout from your atelier wallet balance</small>
+                      </div>
+                    </label>
                   </div>
+
+                  {/* FEXA Wallet Details & Breakdown when Wallet is selected */}
+                  {paymentMethod === "Wallet" && (
+                    <div className="checkout-wallet-details-card">
+                      <div className="wallet-details-title-row">
+                        <span className="wlt-icon">💼</span>
+                        <strong>FEXA WALLET PAYMENT BREAKDOWN</strong>
+                      </div>
+
+                      <div className="wlt-breakdown-table">
+                        <div className="wlt-breakdown-row">
+                          <span>Available Wallet Balance</span>
+                          <span className="wlt-val-bold">{formatPrice(walletBalance)}</span>
+                        </div>
+                        <div className="wlt-breakdown-row">
+                          <span>Final Checkout Total</span>
+                          <span className="wlt-val-bold">{formatPrice(finalPayableTotal)}</span>
+                        </div>
+                        <div className="wlt-breakdown-row wlt-deduct-row">
+                          <span>Amount to be Deducted</span>
+                          <span className="wlt-deduct-val">-{formatPrice(finalPayableTotal)}</span>
+                        </div>
+                        <div className="wlt-breakdown-divider" />
+                        <div className="wlt-breakdown-row wlt-net-row">
+                          <span>Remaining Balance After Payment</span>
+                          <span className={`wlt-net-val ${walletBalance >= finalPayableTotal ? "positive" : "negative"}`}>
+                            {walletBalance >= finalPayableTotal
+                              ? formatPrice(walletBalance - finalPayableTotal)
+                              : formatPrice(0)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {walletBalance < finalPayableTotal ? (
+                        <div className="wlt-insufficient-alert">
+                          <span className="wlt-alert-icon">⚠️</span>
+                          <div>
+                            <strong>Insufficient Wallet Balance</strong>
+                            <p>
+                              You need {formatPrice(finalPayableTotal - walletBalance)} more in your wallet to complete this order. Please select Razorpay or Cash on Delivery, or top up your wallet in your profile.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="wlt-sufficient-notice">
+                          <span className="wlt-check-icon">✓</span>
+                          <span>Your wallet has sufficient balance. Order total of {formatPrice(finalPayableTotal)} will be seamlessly debited upon confirmation.</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="checkout-guarantee-list">
@@ -1262,6 +1913,29 @@ function Checkout() {
                   </div>
                 </div>
 
+                {/* Inline submit error banner right above the action button */}
+                {error && (
+                  <div
+                    className="checkout-action-error-banner"
+                    style={{
+                      background: "#fef2f2",
+                      border: "1px solid #fecaca",
+                      color: "#b91c1c",
+                      padding: "12px 16px",
+                      borderRadius: "8px",
+                      marginBottom: "16px",
+                      fontSize: "14px",
+                      fontWeight: 500,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                    }}
+                  >
+                    <span style={{ fontSize: "16px" }}>⚠️</span>
+                    <span>{error}</span>
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   className="checkout-place-order-btn"
@@ -1270,13 +1944,18 @@ function Checkout() {
                     !cart.items ||
                     cart.items.length === 0 ||
                     loadingAddresses ||
-                    !selectedAddressId
+                    !selectedAddressId ||
+                    (paymentMethod === "Wallet" && walletBalance < finalPayableTotal)
                   }
                 >
                   {isSubmitting
                     ? "COMMUNICATING WITH ATELIER..."
                     : addresses.length === 0 && !loadingAddresses
-                    ? "ADD DELIVERY ADDRESS IN PROFILE TO ORDER"
+                    ? "ADD DELIVERY ADDRESS TO ORDER"
+                    : paymentMethod === "Wallet"
+                    ? walletBalance < finalPayableTotal
+                      ? "INSUFFICIENT WALLET BALANCE"
+                      : `PAY ${formatPrice(finalPayableTotal)} WITH FEXA WALLET →`
                     : paymentMethod === "Razorpay"
                     ? `PROCEED TO PAY ${formatPrice(finalPayableTotal)} VIA RAZORPAY →`
                     : "PLACE ORDER WITH CASH ON DELIVERY"}
@@ -1473,6 +2152,86 @@ function Checkout() {
                   );
                 })
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* INSUFFICIENT WALLET BALANCE MODAL */}
+      {walletInsufficientModal && (
+        <div className="offers-modal-overlay" onClick={() => setWalletInsufficientModal(null)}>
+          <div className="wallet-insufficient-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="wlt-fail-header">
+              <div className="wlt-fail-title-group">
+                <span className="wlt-fail-badge-icon">⚠️</span>
+                <h3 className="wlt-fail-modal-title">Payment Failed – Insufficient Wallet Balance</h3>
+              </div>
+              <button
+                type="button"
+                className="offers-modal-close-btn"
+                onClick={() => setWalletInsufficientModal(null)}
+                title="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="wlt-fail-modal-desc">
+              Your FEXA Wallet does not have enough balance to complete this purchase. No money has been deducted from your wallet, and your shopping bag remains intact.
+            </p>
+
+            <div className="wlt-fail-metrics-table">
+              <div className="wlt-fail-metric-row">
+                <span>Available Wallet Balance:</span>
+                <strong className="metric-bold">{formatPrice(walletInsufficientModal.availableBalance)}</strong>
+              </div>
+              <div className="wlt-fail-metric-row">
+                <span>Required Order Total:</span>
+                <strong className="metric-bold">{formatPrice(walletInsufficientModal.requiredAmount)}</strong>
+              </div>
+              <div className="wlt-fail-metric-divider" />
+              <div className="wlt-fail-metric-row shortfall">
+                <span>Shortfall to Complete Purchase:</span>
+                <strong className="shortfall-amount">{formatPrice(walletInsufficientModal.shortfall)}</strong>
+              </div>
+            </div>
+
+            <div className="wlt-fail-actions-container">
+              <span className="wlt-actions-title">CHOOSE HOW TO PROCEED:</span>
+              <button
+                type="button"
+                className="wlt-fail-btn topup-btn"
+                onClick={() => navigate("/profile", { state: { activeTab: "wallet" } })}
+              >
+                💳 Add Money to Wallet in Profile →
+              </button>
+              <button
+                type="button"
+                className="wlt-fail-btn rzp-btn"
+                onClick={() => {
+                  setPaymentMethod("Razorpay");
+                  setWalletInsufficientModal(null);
+                }}
+              >
+                ⚡ Proceed with Razorpay (Cards, UPI, NetBanking)
+              </button>
+              <button
+                type="button"
+                className="wlt-fail-btn cod-btn"
+                onClick={() => {
+                  setPaymentMethod("COD");
+                  setWalletInsufficientModal(null);
+                }}
+              >
+                📦 Proceed with Cash on Delivery (COD)
+              </button>
+              <button
+                type="button"
+                className="wlt-fail-btn dismiss-btn"
+                onClick={() => setWalletInsufficientModal(null)}
+              >
+                ← Return to Checkout
+              </button>
             </div>
           </div>
         </div>

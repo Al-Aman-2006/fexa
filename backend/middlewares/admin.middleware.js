@@ -39,7 +39,12 @@ const adminMiddleware = async (req, res, next) => {
     }
 
     if (user.isBlocked) {
-      res.clearCookie("adminToken");
+      res.clearCookie("adminToken", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        path: "/",
+      });
       return res.status(403).json({
         success: false,
         message: "Your admin account has been blocked.",

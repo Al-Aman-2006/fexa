@@ -12,6 +12,10 @@ import {
 } from "../validators/user.validator.js";
 import { generateOtp, hashOtp } from "../utils/otp.js";
 import { sendEmailChangeOtpEmail } from "../services/email.service.js";
+import {
+  uploadToCloudinary,
+  deleteFromCloudinary,
+} from "../services/cloudinary.service.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -221,7 +225,7 @@ const uploadProfileImage = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    if (!req.file) {
+    if (!req.file || !req.file.buffer) {
       return res.status(400).json({
         success: false,
         message: "Please select an image",
@@ -237,23 +241,47 @@ const uploadProfileImage = async (req, res) => {
       });
     }
 
-    // Delete old profile image if it exists in uploads folder
-    if (user.profileImage && user.profileImage.startsWith("/uploads/")) {
-      const oldFilename = path.basename(user.profileImage);
-      const oldPath = path.join(__dirname, "../uploads", oldFilename);
-      if (fs.existsSync(oldPath)) {
-        fs.unlink(oldPath, (err) => {
-          if (err) console.error("Error removing old profile image:", err);
+    const oldImage = user.profileImage;
+
+    // 1. Upload new image buffer to Cloudinary (fexa/profiles folder)
+    const uploadResult = await uploadToCloudinary(req.file.buffer, {
+      folder: "fexa/profiles",
+      resource_type: "image",
+    });
+
+    // 2. Save new Cloudinary secure URL in database
+    user.profileImage = uploadResult.secure_url;
+    await user.save();
+
+    // 3. Delete previous image ONLY after database update succeeds
+    if (oldImage && oldImage !== uploadResult.secure_url) {
+      try {
+        // Prevent accidental deletion if image is still referenced by another user
+        const isShared = await User.exists({
+          _id: { $ne: userId },
+          profileImage: oldImage,
         });
+
+        if (!isShared) {
+          if (oldImage.includes("res.cloudinary.com")) {
+            await deleteFromCloudinary(oldImage);
+          } else if (oldImage.startsWith("/uploads/")) {
+            const oldFilename = path.basename(oldImage);
+            const oldPath = path.join(__dirname, "../uploads", oldFilename);
+            if (fs.existsSync(oldPath)) {
+              fs.unlink(oldPath, (err) => {
+                if (err) console.error("Error removing old local profile image:", err.message);
+              });
+            }
+          }
+          // Note: Google OAuth avatars (e.g. lh3.googleusercontent.com) are external and left intact
+        }
+      } catch (cleanupErr) {
+        console.warn("Non-critical error cleaning up old profile image:", cleanupErr.message);
       }
     }
 
-    // Save image URL in database
-    user.profileImage = `/uploads/${req.file.filename}`;
-
-    await user.save();
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Profile image uploaded successfully",
       profileImage: user.profileImage,
@@ -272,9 +300,9 @@ const uploadProfileImage = async (req, res) => {
       error.message
     );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: "Unable to upload profile image",
+      message: error.message || "Unable to upload profile image",
     });
   }
 };

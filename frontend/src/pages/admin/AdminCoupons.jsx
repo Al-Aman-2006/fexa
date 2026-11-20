@@ -3,6 +3,13 @@ import { useLocation } from "react-router-dom";
 import { useAdminAuth } from "../../context/AdminAuthContext";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminPagination from "../../components/admin/AdminPagination";
+import {
+  getAdminCoupons,
+  createAdminCoupon,
+  updateAdminCoupon,
+  toggleCouponStatus,
+  deleteAdminCoupon,
+} from "../../services/admin.service.js";
 import "./AdminDashboard.css";
 import "./AdminCoupons.css";
 
@@ -77,29 +84,22 @@ function AdminCoupons() {
   const fetchCoupons = useCallback(async (targetPage = 1, targetSearch = "", targetStatus = "All") => {
     try {
       setLoading(true);
-      const queryParams = new URLSearchParams({
+      const params = {
         page: targetPage,
         limit: 10,
-      });
+      };
 
       if (targetSearch.trim()) {
-        queryParams.set("search", targetSearch.trim());
+        params.search = targetSearch.trim();
       }
 
       if (targetStatus && targetStatus !== "All") {
-        queryParams.set("status", targetStatus);
+        params.status = targetStatus;
       }
 
-      const response = await fetch(
-        `http://localhost:5000/api/admin/coupons?${queryParams.toString()}`,
-        {
-          method: "GET",
-          credentials: "include",
-        }
-      );
+      const data = await getAdminCoupons(params);
 
-      const data = await response.json();
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setCoupons(data.coupons || []);
         setPagination(
           data.pagination || { page: 1, limit: 10, totalCoupons: 0, totalPages: 1 }
@@ -111,14 +111,14 @@ function AdminCoupons() {
       } else {
         setToast({
           type: "error",
-          text: data.message || "Unable to fetch coupons list.",
+          text: data?.message || "Unable to fetch coupons list.",
         });
       }
     } catch (error) {
       console.error("Fetch admin coupons error:", error);
       setToast({
         type: "error",
-        text: "Unable to connect to the server to load coupons.",
+        text: error.response?.data?.message || "Unable to connect to the server to load coupons.",
       });
     } finally {
       setLoading(false);
@@ -274,12 +274,6 @@ function AdminCoupons() {
       setActionProcessing(true);
       setToast(null);
 
-      const endpoint =
-        activeModal === "edit"
-          ? `http://localhost:5000/api/admin/coupons/${modalCoupon._id}`
-          : "http://localhost:5000/api/admin/coupons";
-      const method = activeModal === "edit" ? "PUT" : "POST";
-
       const payload = {
         code: formData.code.trim().toUpperCase(),
         name: formData.name.trim(),
@@ -301,15 +295,12 @@ function AdminCoupons() {
         perUserLimit: parseInt(formData.perUserLimit, 10) || 1,
       };
 
-      const response = await fetch(endpoint, {
-        method,
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const data =
+        activeModal === "edit"
+          ? await updateAdminCoupon(modalCoupon._id, payload)
+          : await createAdminCoupon(payload);
 
-      const data = await response.json();
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setToast({
           type: "success",
           text: data.message || `Coupon ${activeModal === "edit" ? "updated" : "created"} successfully.`,
@@ -319,18 +310,22 @@ function AdminCoupons() {
       } else {
         setToast({
           type: "error",
-          text: data.message || "Operation failed. Please review your input.",
+          text: data?.message || "Operation failed. Please review your input.",
         });
-        if (data.message && data.message.toLowerCase().includes("code")) {
+        if (data?.message && data.message.toLowerCase().includes("code")) {
           setFormErrors((prev) => ({ ...prev, code: data.message }));
         }
       }
     } catch (error) {
       console.error("Coupon form submit error:", error);
+      const errMsg = error.response?.data?.message;
       setToast({
         type: "error",
-        text: "Unable to connect to the server.",
+        text: errMsg || "Unable to connect to the server.",
       });
+      if (errMsg && errMsg.toLowerCase().includes("code")) {
+        setFormErrors((prev) => ({ ...prev, code: errMsg }));
+      }
     } finally {
       setActionProcessing(false);
     }
@@ -342,17 +337,8 @@ function AdminCoupons() {
       setActionProcessing(true);
       setToast(null);
 
-      const response = await fetch(
-        `http://localhost:5000/api/admin/coupons/${coupon._id}/status`,
-        {
-          method: "PATCH",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-
-      const data = await response.json();
-      if (response.ok && data.success) {
+      const data = await toggleCouponStatus(coupon._id);
+      if (data && data.success) {
         setToast({
           type: "success",
           text: data.message || `Coupon status updated.`,
@@ -361,14 +347,14 @@ function AdminCoupons() {
       } else {
         setToast({
           type: "error",
-          text: data.message || "Failed to update status.",
+          text: data?.message || "Failed to update status.",
         });
       }
     } catch (error) {
       console.error("Toggle status error:", error);
       setToast({
         type: "error",
-        text: "Unable to connect to server.",
+        text: error.response?.data?.message || "Unable to connect to server.",
       });
     } finally {
       setActionProcessing(false);
@@ -382,16 +368,8 @@ function AdminCoupons() {
       setActionProcessing(true);
       setToast(null);
 
-      const response = await fetch(
-        `http://localhost:5000/api/admin/coupons/${modalCoupon._id}`,
-        {
-          method: "DELETE",
-          credentials: "include",
-        }
-      );
-
-      const data = await response.json();
-      if (response.ok && data.success) {
+      const data = await deleteAdminCoupon(modalCoupon._id);
+      if (data && data.success) {
         setToast({
           type: "success",
           text: data.message || `Coupon archived successfully.`,
@@ -405,7 +383,7 @@ function AdminCoupons() {
       } else {
         setToast({
           type: "error",
-          text: data.message || "Failed to archive coupon.",
+          text: data?.message || "Failed to archive coupon.",
         });
         closeModal();
       }
@@ -413,7 +391,7 @@ function AdminCoupons() {
       console.error("Delete coupon error:", error);
       setToast({
         type: "error",
-        text: "Unable to connect to server.",
+        text: error.response?.data?.message || "Unable to connect to server.",
       });
       closeModal();
     } finally {

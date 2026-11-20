@@ -4,8 +4,10 @@ import { useAdminAuth } from "../../context/AdminAuthContext";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import ProductFormModal from "../../components/admin/ProductFormModal";
 import ProductViewModal from "../../components/admin/ProductViewModal";
-import DeleteProductModal from "../../components/admin/DeleteProductModal";
 import AdminPagination from "../../components/admin/AdminPagination";
+import { getAdminProducts, toggleProductStatus } from "../../services/admin.service.js";
+import { getProducts } from "../../services/product.service.js";
+import { getImageUrl } from "../../utils/imageUrl.js";
 import "./AdminDashboard.css";
 import "./AdminProducts.css";
 
@@ -54,10 +56,9 @@ function AdminProducts() {
   const [activeTab, setActiveTab] = useState("products");
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  // Modal State: null | "create" | "edit" | "view" | "delete"
+  // Modal State: null | "create" | "edit" | "view"
   const [activeModal, setActiveModal] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   // Request race-condition tracking
   const requestIdRef = useRef(0);
@@ -89,36 +90,28 @@ function AdminProducts() {
         setLoading(true);
         setFetchError(null);
 
-        const queryParams = new URLSearchParams({
+        const params = {
           page: targetPage,
           limit: 10,
-        });
+        };
 
         if (targetCategory && targetCategory !== "All") {
-          queryParams.set("category", targetCategory);
+          params.category = targetCategory;
         }
 
         if (targetSearch) {
-          queryParams.set("search", targetSearch);
+          params.search = targetSearch;
         }
 
         if (targetStatus && targetStatus !== "All") {
-          queryParams.set("status", targetStatus);
+          params.status = targetStatus;
         }
 
-        const response = await fetch(
-          `http://localhost:5000/api/admin/products?${queryParams.toString()}`,
-          {
-            method: "GET",
-            credentials: "include",
-          }
-        );
+        const data = await getAdminProducts(params);
 
         if (currentReqId !== requestIdRef.current) return;
 
-        const data = await response.json();
-
-        if (response.ok && data.success) {
+        if (data && data.success) {
           setProducts(data.products || []);
           setPagination(
             data.pagination || { page: 1, limit: 10, totalProducts: 0, totalPages: 1 }
@@ -128,8 +121,7 @@ function AdminProducts() {
           } else {
             // Fallback: fetch category counts from public products endpoint
             try {
-              const countRes = await fetch("http://localhost:5000/api/products?limit=1");
-              const countData = await countRes.json();
+              const countData = await getProducts({ limit: 1 });
               if (countData?.categoryCounts) {
                 setCategoryCounts(countData.categoryCounts);
               }
@@ -138,12 +130,12 @@ function AdminProducts() {
             }
           }
         } else {
-          setFetchError(data.message || "Unable to fetch product catalogue.");
+          setFetchError(data?.message || "Unable to fetch product catalogue.");
         }
       } catch (err) {
         if (currentReqId !== requestIdRef.current) return;
         console.error("Fetch admin products error:", err);
-        setFetchError("Unable to connect to the server. Please ensure the backend is running.");
+        setFetchError(err.response?.data?.message || "Unable to connect to the server. Please ensure the backend is running.");
       } finally {
         if (currentReqId === requestIdRef.current) {
           setLoading(false);
@@ -187,79 +179,26 @@ function AdminProducts() {
   const handleToggleStatus = async (prod) => {
     try {
       setToast(null);
-      const response = await fetch(
-        `http://localhost:5000/api/admin/products/${prod._id}/status`,
-        {
-          method: "PATCH",
-          credentials: "include",
-        }
-      );
+      const data = await toggleProductStatus(prod._id);
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setToast({
           type: "success",
-          text: data.message || `Status updated to ${data.product.status}.`,
+          text: data.message || `Status updated to ${data.product?.status || "updated"}.`,
         });
         fetchProducts(activeCategoryTab, page, debouncedSearch, statusFilter);
       } else {
         setToast({
           type: "error",
-          text: data.message || "Failed to update product status.",
+          text: data?.message || "Failed to update product status.",
         });
       }
     } catch (err) {
       console.error("Toggle product status error:", err);
       setToast({
         type: "error",
-        text: "Network error while toggling product status.",
+        text: err.response?.data?.message || "Network error while toggling product status.",
       });
-    }
-  };
-
-  // Delete Action Confirmation
-  const handleConfirmDelete = async (prod) => {
-    try {
-      setIsDeleting(true);
-      setToast(null);
-
-      const response = await fetch(
-        `http://localhost:5000/api/admin/products/${prod._id}`,
-        {
-          method: "DELETE",
-          credentials: "include",
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setToast({
-          type: "success",
-          text: data.message || "Product deleted successfully.",
-        });
-        setActiveModal(null);
-        setSelectedProduct(null);
-        const nextPage = products.length === 1 && page > 1 ? page - 1 : page;
-        if (nextPage !== page) {
-          setPage(nextPage);
-        }
-        fetchProducts(activeCategoryTab, nextPage, debouncedSearch, statusFilter);
-      } else {
-        setToast({
-          type: "error",
-          text: data.message || "Failed to delete product.",
-        });
-      }
-    } catch (err) {
-      console.error("Delete product error:", err);
-      setToast({
-        type: "error",
-        text: "Network error while deleting product.",
-      });
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -516,212 +455,199 @@ function AdminProducts() {
           <div className="admin-table-card">
             {/* Scroll wrapper: ONLY the table scrolls horizontally; pagination stays outside */}
             <div className="admin-table-scroll-wrapper">
-            <table className="admin-products-table">
-              <thead>
-                <tr>
-                  <th>IMAGE</th>
-                  <th>PRODUCT NAME</th>
-                  <th>BRAND</th>
-                  <th>CATEGORY</th>
-                  <th>PRICE</th>
-                  <th>STOCK</th>
-                  <th>STATUS</th>
-                  <th>CREATED DATE</th>
-                  <th>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
+              <table className="admin-products-table">
+                <thead>
                   <tr>
-                    <td colSpan="9" className="admin-loading-row">
-                      Loading{" "}
-                      {activeCategoryTab === "All"
-                        ? "catalogue products"
-                        : `${activeCategoryTab} products`}
-                      ...
-                    </td>
+                    <th>IMAGE</th>
+                    <th>PRODUCT NAME</th>
+                    <th>BRAND</th>
+                    <th>CATEGORY</th>
+                    <th>PRICE</th>
+                    <th>STOCK</th>
+                    <th>STATUS</th>
+                    <th>CREATED DATE</th>
+                    <th>ACTIONS</th>
                   </tr>
-                ) : products.length === 0 ? (
-                  <tr>
-                    <td colSpan="9" style={{ padding: "0" }}>
-                      <div className="category-empty-state">
-                        <span className="empty-state-icon">⚗️</span>
-                        <h4 className="empty-state-title">
-                          {debouncedSearch
-                            ? `No products found matching "${debouncedSearch}"${
-                                activeCategoryTab !== "All"
-                                  ? ` in ${activeCategoryTab}`
-                                  : ""
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan="9" className="admin-loading-row">
+                        Loading{" "}
+                        {activeCategoryTab === "All"
+                          ? "catalogue products"
+                          : `${activeCategoryTab} products`}
+                        ...
+                      </td>
+                    </tr>
+                  ) : products.length === 0 ? (
+                    <tr>
+                      <td colSpan="9" style={{ padding: "0" }}>
+                        <div className="category-empty-state">
+                          <span className="empty-state-icon">⚗️</span>
+                          <h4 className="empty-state-title">
+                            {debouncedSearch
+                              ? `No products found matching "${debouncedSearch}"${activeCategoryTab !== "All"
+                                ? ` in ${activeCategoryTab}`
+                                : ""
                               }`
-                            : activeCategoryTab === "All"
-                            ? "No products found in the catalogue."
-                            : `No products found in ${activeCategoryTab} category.`}
-                        </h4>
-                        <p className="empty-state-sub">
-                          {debouncedSearch
-                            ? "Check your spelling, try different keywords, or clear the search filter."
-                            : "Click '+ ADD PRODUCT' to add your first fragrance to this collection."}
-                        </p>
-                        {debouncedSearch ? (
-                          <button
-                            type="button"
-                            className="empty-state-btn"
-                            onClick={handleClearSearch}
-                          >
-                            Clear Search Filter
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="empty-state-btn"
-                            onClick={() => {
-                              setSelectedProduct(null);
-                              setActiveModal("create");
-                            }}
-                          >
-                            + Add New Product
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  products.map((prod) => {
-                    const primaryImage =
-                      prod.images && prod.images.length > 0
-                        ? prod.images[0].startsWith("http")
-                          ? prod.images[0]
-                          : `http://localhost:5000${prod.images[0]}`
-                        : null;
-
-                    return (
-                      <tr key={prod._id}>
-                        <td>
-                          <div className="product-img-thumbnail">
-                            {primaryImage ? (
-                              <img src={primaryImage} alt={prod.name} />
-                            ) : (
-                              <span className="no-img-icon">⚗️</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="user-name-cell">
-                          <div>{prod.name}</div>
-                          {prod.slug && <small className="product-slug-sub">/{prod.slug}</small>}
-                        </td>
-                        <td>{prod.brand || "FEXA"}</td>
-                        <td>
-                          <span className="category-pill">{prod.category}</span>
-                          {(prod.subCategory?.name || prod.subCategoryName) && (
-                            <span
-                              style={{
-                                display: "block",
-                                fontSize: "0.72rem",
-                                color: "#cbb8de",
-                                marginTop: "4px",
-                                fontWeight: 500,
+                              : activeCategoryTab === "All"
+                                ? "No products found in the catalogue."
+                                : `No products found in ${activeCategoryTab} category.`}
+                          </h4>
+                          <p className="empty-state-sub">
+                            {debouncedSearch
+                              ? "Check your spelling, try different keywords, or clear the search filter."
+                              : "Click '+ ADD PRODUCT' to add your first fragrance to this collection."}
+                          </p>
+                          {debouncedSearch ? (
+                            <button
+                              type="button"
+                              className="empty-state-btn"
+                              onClick={handleClearSearch}
+                            >
+                              Clear Search Filter
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="empty-state-btn"
+                              onClick={() => {
+                                setSelectedProduct(null);
+                                setActiveModal("create");
                               }}
                             >
-                              ↳ {prod.subCategory?.name || prod.subCategoryName}
-                            </span>
+                              + Add New Product
+                            </button>
                           )}
-                        </td>
-                        <td className="product-price-cell">
-                          {prod.variants && prod.variants.length > 1 ? (
-                            <>
-                              <span>From {formatCurrency(Math.min(...prod.variants.map((v) => Number(v.sellingPrice))))}</span>
-                              <span className="compare-price-sub">
-                                {prod.variants.length} sizes configured
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              {formatCurrency(prod.price)}
-                              {prod.compareAtPrice > prod.price && (
-                                <span className="compare-price-sub">
-                                  {formatCurrency(prod.compareAtPrice)}
-                                </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    products.map((prod) => {
+                      const primaryImage =
+                        prod.images && prod.images.length > 0
+                          ? getImageUrl(prod.images[0])
+                          : null;
+
+                      return (
+                        <tr key={prod._id}>
+                          <td>
+                            <div className="product-img-thumbnail">
+                              {primaryImage ? (
+                                <img src={primaryImage} alt={prod.name} />
+                              ) : (
+                                <span className="no-img-icon">⚗️</span>
                               )}
-                            </>
-                          )}
-                        </td>
-                        <td>
-                          {prod.stock === 0 ? (
-                            <span className="stock-pill zero">0 (Out of Stock)</span>
-                          ) : prod.stock <= 5 ? (
-                            <span className="stock-pill low">{prod.stock} (Low Stock)</span>
-                          ) : (
-                            <span className="stock-pill in-stock">{prod.stock} in stock</span>
-                          )}
-                        </td>
-                        <td>
-                          {prod.status === "Active" && (
-                            <span className="status-badge active">● Active</span>
-                          )}
-                          {prod.status === "Inactive" && (
-                            <span className="status-badge blocked">● Inactive</span>
-                          )}
-                          {prod.status === "Out of Stock" && (
-                            <span className="status-badge out-of-stock">● Out of Stock</span>
-                          )}
-                        </td>
-                        <td>{formatDate(prod.createdAt)}</td>
-                        <td>
-                          <div className="admin-actions-cell">
-                            <button
-                              type="button"
-                              className="action-view-btn"
-                              onClick={() => {
-                                setSelectedProduct(prod);
-                                setActiveModal("view");
-                              }}
-                            >
-                              VIEW
-                            </button>
-
-                            <button
-                              type="button"
-                              className="action-edit-btn"
-                              onClick={() => {
-                                setSelectedProduct(prod);
-                                setActiveModal("edit");
-                              }}
-                            >
-                              EDIT
-                            </button>
-
-                            {prod.stock > 0 && (
+                            </div>
+                          </td>
+                          <td className="user-name-cell">
+                            <div>{prod.name}</div>
+                            {prod.slug && <small className="product-slug-sub">/{prod.slug}</small>}
+                          </td>
+                          <td>{prod.brand || "FEXA"}</td>
+                          <td>
+                            <span className="category-pill">{prod.category}</span>
+                            {(prod.subCategory?.name || prod.subCategoryName) && (
+                              <span
+                                style={{
+                                  display: "block",
+                                  fontSize: "0.72rem",
+                                  color: "#cbb8de",
+                                  marginTop: "4px",
+                                  fontWeight: 500,
+                                }}
+                              >
+                                ↳ {prod.subCategory?.name || prod.subCategoryName}
+                              </span>
+                            )}
+                          </td>
+                          <td className="product-price-cell">
+                            {prod.variants && prod.variants.length > 1 ? (
+                              <>
+                                <span>From {formatCurrency(Math.min(...prod.variants.map((v) => Number(v.sellingPrice))))}</span>
+                                <span className="compare-price-sub">
+                                  {prod.variants.length} sizes configured
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                {formatCurrency(prod.price)}
+                                {prod.compareAtPrice > prod.price && (
+                                  <span className="compare-price-sub">
+                                    {formatCurrency(prod.compareAtPrice)}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </td>
+                          <td>
+                            {prod.stock === 0 ? (
+                              <span className="stock-pill zero">0 (Out of Stock)</span>
+                            ) : prod.stock <= 5 ? (
+                              <span className="stock-pill low">{prod.stock} (Low Stock)</span>
+                            ) : (
+                              <span className="stock-pill in-stock">{prod.stock} in stock</span>
+                            )}
+                          </td>
+                          <td>
+                            {prod.status === "Active" && (
+                              <span className="status-badge active">● Active</span>
+                            )}
+                            {prod.status === "Inactive" && (
+                              <span className="status-badge blocked">● Inactive</span>
+                            )}
+                            {prod.status === "Out of Stock" && (
+                              <span className="status-badge out-of-stock">● Out of Stock</span>
+                            )}
+                          </td>
+                          <td>{formatDate(prod.createdAt)}</td>
+                          <td>
+                            <div className="admin-actions-cell">
                               <button
                                 type="button"
-                                className={
-                                  prod.status === "Active"
-                                    ? "action-block-btn"
-                                    : "action-unblock-btn"
-                                }
-                                onClick={() => handleToggleStatus(prod)}
+                                className="action-view-btn"
+                                onClick={() => {
+                                  setSelectedProduct(prod);
+                                  setActiveModal("view");
+                                }}
                               >
-                                {prod.status === "Active" ? "DEACTIVATE" : "ACTIVATE"}
+                                VIEW
                               </button>
-                            )}
 
-                            <button
-                              type="button"
-                              className="action-delete-btn"
-                              onClick={() => {
-                                setSelectedProduct(prod);
-                                setActiveModal("delete");
-                              }}
-                            >
-                              DELETE
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                              <button
+                                type="button"
+                                className="action-edit-btn"
+                                onClick={() => {
+                                  setSelectedProduct(prod);
+                                  setActiveModal("edit");
+                                }}
+                              >
+                                EDIT
+                              </button>
+
+                              {prod.stock > 0 && (
+                                <button
+                                  type="button"
+                                  className={
+                                    prod.status === "Active"
+                                      ? "action-block-btn"
+                                      : "action-unblock-btn"
+                                  }
+                                  onClick={() => handleToggleStatus(prod)}
+                                >
+                                  {prod.status === "Active" ? "DEACTIVATE" : "ACTIVATE"}
+                                </button>
+                              )}
+
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>{/* end admin-table-scroll-wrapper */}
 
             {/* PAGINATION CONTROLS */}
@@ -766,20 +692,6 @@ function AdminProducts() {
           setSelectedProduct(prod);
           setActiveModal("edit");
         }}
-      />
-
-      {/* DELETE PRODUCT CONFIRMATION MODAL */}
-      <DeleteProductModal
-        isOpen={activeModal === "delete"}
-        product={selectedProduct}
-        onClose={() => {
-          if (!isDeleting) {
-            setActiveModal(null);
-            setSelectedProduct(null);
-          }
-        }}
-        onConfirm={handleConfirmDelete}
-        isDeleting={isDeleting}
       />
     </div>
   );

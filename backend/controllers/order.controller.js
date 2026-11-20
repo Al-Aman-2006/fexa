@@ -17,6 +17,11 @@ import {
 } from "../utils/couponAllocation.js";
 import { getActiveValidOffers, findBestOfferForProduct } from "../utils/offerCalculator.js";
 import { streamOrderInvoicePDF } from "../services/pdf.service.js";
+import {
+  deductOrderStock,
+  restoreOrderStock,
+  restoreOrderItemStock,
+} from "../services/inventory.service.js";
 
 // ========================================================
 // HELPER: Validate and calculate single coupon for order
@@ -46,15 +51,32 @@ const resolveOrderCoupon = async (couponCode, subtotal, userId, originalSubtotal
   return { coupon, discountAmount };
 };
 
+// Concurrency lock per user to strictly prevent race conditions / duplicate button clicks
+const activeOrderLocks = new Set();
+
 // ========================================================
 // CREATE ORDER (With Re-validation & Atomic Variant Stock Deduction)
 // ========================================================
 const createOrder = async (req, res) => {
   const deductedItems = []; // Tracking for rollback in case of concurrency failure
+  let walletDeductedAmount = 0; // Tracking for wallet balance rollback in case of unexpected failure
+  const userId = req.user.id;
+  const userLockKey = userId.toString();
+
+  if (activeOrderLocks.has(userLockKey)) {
+    return res.status(429).json({
+      success: false,
+      message: "An order is already being processed for your account. Please wait.",
+    });
+  }
+  activeOrderLocks.add(userLockKey);
 
   try {
-    const userId = req.user.id;
-    const { addressId, shippingAddressId, paymentMethod = "COD", couponCode } = req.body;
+    const { addressId, shippingAddressId, couponCode } = req.body;
+    const rawPaymentMethod = String(req.body.paymentMethod || "COD").trim();
+    const isWallet = rawPaymentMethod.toLowerCase() === "wallet";
+    const isRazorpay = rawPaymentMethod === "Razorpay" || Boolean(req.body.razorpay_payment_id);
+    const paymentMethod = isRazorpay ? "Razorpay" : isWallet ? "Wallet" : "COD";
 
     // 0. Verify authenticated user and validate saved address
     const user = await User.findById(userId);
@@ -272,8 +294,70 @@ const createOrder = async (req, res) => {
       });
     }
 
-    // 3. Atomically deduct stock from selected variants
-    for (const it of orderItems) {
+    // 3. Resolve coupon & calculate authoritative discount
+    let targetCouponCode = couponCode;
+    if (!targetCouponCode && req.body.orderId && mongoose.Types.ObjectId.isValid(req.body.orderId)) {
+      const prevOrder = await Order.findOne({ _id: req.body.orderId, user: userId });
+      if (prevOrder && prevOrder.couponCode) {
+        targetCouponCode = prevOrder.couponCode;
+      }
+    }
+
+    let appliedCoupon = null;
+    let discountAmount = 0;
+    if (targetCouponCode) {
+      const couponResult = await resolveOrderCoupon(
+        targetCouponCode,
+        calculatedSubtotal,
+        userId,
+        originalSubtotal
+      );
+      if (couponResult.error) {
+        return res.status(400).json({
+          success: false,
+          message: couponResult.error,
+        });
+      }
+      appliedCoupon = couponResult.coupon;
+    }
+
+    // Authoritative Product-Level Coupon Allocation
+    const allocation = calculateItemCouponAllocations({
+      items: orderItems,
+      coupon: appliedCoupon,
+      merchandiseSubtotal: calculatedSubtotal,
+      originalSubtotal,
+    });
+
+    const finalOrderItems = allocation.allocatedItems;
+    discountAmount = allocation.totalCouponDiscount;
+    const discountedMerchandiseTotal = allocation.discountedMerchandiseTotal;
+
+    const shippingCost = calculatedSubtotal >= 5000 ? 0 : 250;
+    const totalAmount = Math.max(0, discountedMerchandiseTotal) + shippingCost;
+
+    // 4. Pre-Payment Validation for FEXA Wallet: Validate balance BEFORE deducting stock
+    let userWalletDoc = null;
+    let walletBalanceBefore = 0;
+    if (paymentMethod === "Wallet") {
+      const wallet = await getOrCreateUserWallet(userId);
+      const currentBalance = roundToPaise(wallet.balance || 0);
+
+      if (currentBalance < totalAmount) {
+        return res.status(400).json({
+          success: false,
+          errorType: "INSUFFICIENT_WALLET_BALANCE",
+          message: "Payment Failed – Insufficient Wallet Balance",
+          walletBalance: currentBalance,
+          requiredAmount: totalAmount,
+          shortfall: roundToPaise(totalAmount - currentBalance),
+        });
+      }
+      walletBalanceBefore = currentBalance;
+    }
+
+    // 5. Atomically deduct stock from selected perfume variants
+    for (const it of finalOrderItems) {
       const updateResult = await Product.updateOne(
         {
           _id: it.product,
@@ -304,7 +388,7 @@ const createOrder = async (req, res) => {
 
         return res.status(400).json({
           success: false,
-          message: `Could not reserve stock for ${it.name} (${it.volumeMl} ml). Another customer may have just placed an order.`,
+          message: "Sorry, this product is currently out of stock or the requested quantity is unavailable.",
         });
       }
 
@@ -314,68 +398,62 @@ const createOrder = async (req, res) => {
         quantity: it.quantity,
       });
 
+      it.stockDeducted = true;
+      it.stockRestored = false;
+
       // Update product status to Out of Stock if total stock reached 0
       const updatedProd = await Product.findById(it.product);
-      if (updatedProd && updatedProd.stock <= 0 && updatedProd.status === "Active") {
-        updatedProd.status = "Out of Stock";
+      if (updatedProd) {
+        const v = updatedProd.variants.id(it.variantId);
+        if (v && v.stock <= 0) {
+          v.isAvailable = false;
+        }
+        if (updatedProd.stock <= 0 && updatedProd.status === "Active") {
+          updatedProd.status = "Out of Stock";
+        }
         await updatedProd.save();
       }
     }
 
-    // 4. Resolve coupon & calculate discount
-    let targetCouponCode = couponCode;
-    if (!targetCouponCode && req.body.orderId && mongoose.Types.ObjectId.isValid(req.body.orderId)) {
-      const prevOrder = await Order.findOne({ _id: req.body.orderId, user: userId });
-      if (prevOrder && prevOrder.couponCode) {
-        targetCouponCode = prevOrder.couponCode;
-      }
-    }
-
-    let appliedCoupon = null;
-    let discountAmount = 0;
-    if (targetCouponCode) {
-      const couponResult = await resolveOrderCoupon(
-        targetCouponCode,
-        calculatedSubtotal,
-        userId,
-        originalSubtotal
+    // 6. Perform atomic wallet balance deduction (if Wallet payment method)
+    if (paymentMethod === "Wallet") {
+      const updatedWallet = await Wallet.findOneAndUpdate(
+        { user: userId, balance: { $gte: totalAmount } },
+        { $inc: { balance: -totalAmount } },
+        { returnDocument: "after" }
       );
-      if (couponResult.error) {
-        // Rollback stock
+
+      if (!updatedWallet) {
+        // Concurrency failure: balance was spent concurrently. Roll back reserved stock!
         for (const rolled of deductedItems) {
           await Product.updateOne(
             { _id: rolled.product, "variants._id": rolled.variantId },
             { $inc: { "variants.$.stock": rolled.quantity, stock: rolled.quantity } }
           );
         }
+
+        const freshWallet = await Wallet.findOne({ user: userId });
+        const freshBalance = freshWallet ? roundToPaise(freshWallet.balance) : 0;
         return res.status(400).json({
           success: false,
-          message: couponResult.error,
+          errorType: "INSUFFICIENT_WALLET_BALANCE",
+          message: "Payment Failed – Insufficient Wallet Balance",
+          walletBalance: freshBalance,
+          requiredAmount: totalAmount,
+          shortfall: roundToPaise(Math.max(0, totalAmount - freshBalance)),
         });
       }
-      appliedCoupon = couponResult.coupon;
+
+      walletDeductedAmount = totalAmount;
+      userWalletDoc = updatedWallet;
     }
 
-    // Authoritative Product-Level Coupon Allocation
-    const allocation = calculateItemCouponAllocations({
-      items: orderItems,
-      coupon: appliedCoupon,
-      merchandiseSubtotal: calculatedSubtotal,
-      originalSubtotal,
-    });
-
-    const finalOrderItems = allocation.allocatedItems;
-    discountAmount = allocation.totalCouponDiscount;
-    const discountedMerchandiseTotal = allocation.discountedMerchandiseTotal;
-
-    const shippingCost = calculatedSubtotal >= 5000 ? 0 : 250;
-    const totalAmount = Math.max(0, discountedMerchandiseTotal) + shippingCost;
-
-    // 5. Generate unique order number
+    // 7. Generate unique order number
     const orderNumber = `FEXA-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     // 6. Create immutable order snapshot or reuse existing internal order
-    const isRazorpay = paymentMethod === "Razorpay" || Boolean(req.body.razorpay_payment_id);
+    const resolvedPaymentMethod = isRazorpay ? "Razorpay" : isWallet ? "Wallet" : "COD";
+    const resolvedPaymentStatus = isRazorpay || isWallet ? "Paid" : "Pending";
     let order = null;
 
     if (req.body.orderId && mongoose.Types.ObjectId.isValid(req.body.orderId)) {
@@ -396,11 +474,15 @@ const createOrder = async (req, res) => {
       order.eligibleSubtotal = calculatedSubtotal;
       order.shippingCost = shippingCost;
       order.totalAmount = totalAmount;
-      order.paymentMethod = isRazorpay ? "Razorpay" : paymentMethod;
-      order.paymentStatus = paymentMethod === "COD" ? "Pending" : "Paid";
+      order.paymentMethod = resolvedPaymentMethod;
+      order.paymentStatus = resolvedPaymentStatus;
       order.orderStatus = "Processing";
       order.paymentFailureReason = null;
       order.paymentErrorCode = null;
+      order.inventoryProcessed = true;
+      order.stockDeductedAt = new Date();
+      order.stockRestored = false;
+      order.stockRestoredAt = null;
       if (req.body.razorpay_order_id) order.razorpayOrderId = req.body.razorpay_order_id;
       if (req.body.razorpay_payment_id) order.razorpayPaymentId = req.body.razorpay_payment_id;
       if (req.body.razorpay_signature) order.razorpaySignature = req.body.razorpay_signature;
@@ -422,17 +504,54 @@ const createOrder = async (req, res) => {
         eligibleSubtotal: calculatedSubtotal,
         shippingCost,
         totalAmount,
-        paymentMethod: isRazorpay ? "Razorpay" : paymentMethod,
-        paymentStatus: paymentMethod === "COD" ? "Pending" : "Paid",
+        paymentMethod: resolvedPaymentMethod,
+        paymentStatus: resolvedPaymentStatus,
         orderStatus: "Processing",
+        inventoryProcessed: true,
+        stockDeductedAt: new Date(),
+        stockRestored: false,
+        stockRestoredAt: null,
         razorpayOrderId: req.body.razorpay_order_id || null,
         razorpayPaymentId: req.body.razorpay_payment_id || null,
         razorpaySignature: req.body.razorpay_signature || null,
       });
     }
 
-    // If order confirmed as COD, commit coupon usage atomically
-    if (paymentMethod === "COD" && (appliedCoupon || order.coupon)) {
+    // 6b. If order paid using FEXA Wallet, record the immutable debit transaction in user's wallet
+    let walletTxDetails = null;
+    if (isWallet && userWalletDoc) {
+      const walletTxId = `TXN-WLT-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const newBalance = roundToPaise(userWalletDoc.balance);
+      userWalletDoc.transactions.push({
+        transactionId: walletTxId,
+        type: "Purchase Debit",
+        amount: totalAmount,
+        direction: "Debit",
+        description: `Order Payment for ${order.orderNumber}`,
+        referenceId: order.orderNumber,
+        orderId: order._id,
+        balanceBefore: walletBalanceBefore,
+        balanceAfter: newBalance,
+        status: "Completed",
+        createdAt: new Date(),
+      });
+      await userWalletDoc.save();
+
+      order.walletTransactionId = walletTxId;
+      order.paidAt = new Date();
+      await order.save();
+
+      walletTxDetails = {
+        transactionId: walletTxId,
+        amount: totalAmount,
+        balanceBefore: walletBalanceBefore,
+        balanceAfter: newBalance,
+        newBalance: newBalance,
+      };
+    }
+
+    // If order confirmed as COD or Wallet, commit coupon usage atomically
+    if ((paymentMethod === "COD" || paymentMethod === "Wallet") && (appliedCoupon || order.coupon)) {
       const targetCouponId = appliedCoupon ? appliedCoupon._id : order.coupon;
       await Coupon.updateOne(
         { _id: targetCouponId },
@@ -455,10 +574,16 @@ const createOrder = async (req, res) => {
       await cart.save();
     }
 
+    const orderData = normalizeOrderWithAllocations(order.toObject ? order.toObject() : order);
+    if (walletTxDetails) {
+      orderData.walletTransaction = walletTxDetails;
+    }
+
     return res.status(201).json({
       success: true,
       message: "Order placed successfully.",
-      order: normalizeOrderWithAllocations(order.toObject ? order.toObject() : order),
+      order: orderData,
+      walletTransaction: walletTxDetails,
     });
   } catch (error) {
     console.error("Create order error:", error);
@@ -480,10 +605,24 @@ const createOrder = async (req, res) => {
       }
     }
 
+    // Rollback wallet deduction if order saving failed after wallet debit
+    if (walletDeductedAmount > 0) {
+      try {
+        await Wallet.updateOne(
+          { user: req.user.id },
+          { $inc: { balance: walletDeductedAmount } }
+        );
+      } catch (walletRollbackErr) {
+        console.error("Critical: Failed to restore wallet balance on failed order:", walletRollbackErr);
+      }
+    }
+
     return res.status(500).json({
       success: false,
       message: error.message || "Failed to process order. Please try again.",
     });
+  } finally {
+    activeOrderLocks.delete(userLockKey);
   }
 };
 
@@ -553,7 +692,13 @@ const getOrderById = async (req, res) => {
 // ========================================================
 const getRazorpayKey = async (req, res) => {
   try {
-    const keyId = process.env.RAZORPAY_KEY_ID || "rzp_test_TqUYTgZOU4T32M";
+    const keyId = process.env.RAZORPAY_KEY_ID ? process.env.RAZORPAY_KEY_ID.trim() : "";
+    if (!keyId) {
+      return res.status(500).json({
+        success: false,
+        message: "Payment gateway configuration is missing on server.",
+      });
+    }
     return res.status(200).json({
       success: true,
       keyId,
@@ -873,7 +1018,7 @@ const createRazorpayOrder = async (req, res) => {
     internalOrder.razorpayOrderId = rzpOrder.id;
     await internalOrder.save();
 
-    const keyId = process.env.RAZORPAY_KEY_ID || "rzp_test_TqUYTgZOU4T32M";
+    const keyId = process.env.RAZORPAY_KEY_ID ? process.env.RAZORPAY_KEY_ID.trim() : "";
 
     return res.status(200).json({
       success: true,
@@ -930,7 +1075,13 @@ const verifyRazorpayPayment = async (req, res) => {
     }
 
     // 1. Verify HMAC SHA256 Signature
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || "vlYvPndeLZ07y6a3ovxB3aPp";
+    const keySecret = process.env.RAZORPAY_KEY_SECRET ? process.env.RAZORPAY_KEY_SECRET.trim() : "";
+    if (!keySecret) {
+      return res.status(500).json({
+        success: false,
+        message: "Payment verification configuration is missing on server.",
+      });
+    }
     const generatedSignature = crypto
       .createHmac("sha256", keySecret)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
@@ -945,7 +1096,7 @@ const verifyRazorpayPayment = async (req, res) => {
 
     // 2. Prevent replay attacks & check idempotency
     const existingPaymentOrder = await Order.findOne({ razorpayPaymentId: razorpay_payment_id });
-    if (existingPaymentOrder && existingPaymentOrder.paymentStatus === "Paid") {
+    if (existingPaymentOrder && (existingPaymentOrder.paymentStatus === "Paid" || existingPaymentOrder.inventoryProcessed)) {
       return res.status(201).json({
         success: true,
         message: "Order already verified and confirmed.",
@@ -962,8 +1113,8 @@ const verifyRazorpayPayment = async (req, res) => {
       targetOrder = await Order.findOne({ razorpayOrderId: razorpay_order_id, user: userId });
     }
 
-    // If order was already confirmed as Paid
-    if (targetOrder && targetOrder.paymentStatus === "Paid") {
+    // If order was already confirmed as Paid or stock already processed
+    if (targetOrder && (targetOrder.paymentStatus === "Paid" || targetOrder.inventoryProcessed)) {
       return res.status(201).json({
         success: true,
         message: "Order already verified and confirmed.",
@@ -1120,52 +1271,62 @@ const verifyRazorpayPayment = async (req, res) => {
       });
     }
 
-    // 6. Atomically deduct inventory
-    for (const it of orderItems) {
-      const updateResult = await Product.updateOne(
-        {
-          _id: it.product,
-          "variants._id": it.variantId,
-          "variants.stock": { $gte: it.quantity },
-        },
-        {
-          $inc: {
-            "variants.$.stock": -it.quantity,
-            stock: -it.quantity,
+    // 6. Atomically deduct inventory (Idempotent: only if not already deducted)
+    const shouldDeductInventory = !(targetOrder && targetOrder.inventoryProcessed);
+    if (shouldDeductInventory) {
+      for (const it of orderItems) {
+        const updateResult = await Product.updateOne(
+          {
+            _id: it.product,
+            "variants._id": it.variantId,
+            "variants.stock": { $gte: it.quantity },
           },
-        }
-      );
+          {
+            $inc: {
+              "variants.$.stock": -it.quantity,
+              stock: -it.quantity,
+            },
+          }
+        );
 
-      if (updateResult.matchedCount === 0 || updateResult.modifiedCount === 0) {
-        // Concurrency rollback
-        for (const rolled of deductedItems) {
-          await Product.updateOne(
-            { _id: rolled.product, "variants._id": rolled.variantId },
-            {
-              $inc: {
-                "variants.$.stock": rolled.quantity,
-                stock: rolled.quantity,
-              },
-            }
-          );
+        if (updateResult.matchedCount === 0 || updateResult.modifiedCount === 0) {
+          // Concurrency rollback
+          for (const rolled of deductedItems) {
+            await Product.updateOne(
+              { _id: rolled.product, "variants._id": rolled.variantId },
+              {
+                $inc: {
+                  "variants.$.stock": rolled.quantity,
+                  stock: rolled.quantity,
+                },
+              }
+            );
+          }
+
+          return res.status(400).json({
+            success: false,
+            message: "Sorry, this product is currently out of stock or the requested quantity is unavailable.",
+          });
         }
 
-        return res.status(400).json({
-          success: false,
-          message: `Could not reserve stock for ${it.name} (${it.volumeMl} ml). Another patron may have just placed an order.`,
+        deductedItems.push({
+          product: it.product,
+          variantId: it.variantId,
+          quantity: it.quantity,
         });
-      }
 
-      deductedItems.push({
-        product: it.product,
-        variantId: it.variantId,
-        quantity: it.quantity,
-      });
+        it.stockDeducted = true;
+        it.stockRestored = false;
 
-      const updatedProd = await Product.findById(it.product);
-      if (updatedProd && updatedProd.stock <= 0 && updatedProd.status === "Active") {
-        updatedProd.status = "Out of Stock";
-        await updatedProd.save();
+        const updatedProd = await Product.findById(it.product);
+        if (updatedProd) {
+          const v = updatedProd.variants.id(it.variantId);
+          if (v && v.stock <= 0) v.isAvailable = false;
+          if (updatedProd.stock <= 0 && updatedProd.status === "Active") {
+            updatedProd.status = "Out of Stock";
+          }
+          await updatedProd.save();
+        }
       }
     }
 
@@ -1258,6 +1419,10 @@ const verifyRazorpayPayment = async (req, res) => {
       finalOrder.paymentMethod = paymentMethod || "Razorpay";
       finalOrder.paymentStatus = "Paid";
       finalOrder.orderStatus = "Processing";
+      finalOrder.inventoryProcessed = true;
+      finalOrder.stockDeductedAt = new Date();
+      finalOrder.stockRestored = false;
+      finalOrder.stockRestoredAt = null;
       finalOrder.razorpayOrderId = razorpay_order_id;
       finalOrder.razorpayPaymentId = razorpay_payment_id;
       finalOrder.razorpaySignature = razorpay_signature;
@@ -1285,6 +1450,10 @@ const verifyRazorpayPayment = async (req, res) => {
         paymentMethod: paymentMethod || "Razorpay",
         paymentStatus: "Paid",
         orderStatus: "Processing",
+        inventoryProcessed: true,
+        stockDeductedAt: new Date(),
+        stockRestored: false,
+        stockRestoredAt: null,
         razorpayOrderId: razorpay_order_id,
         razorpayPaymentId: razorpay_payment_id,
         razorpaySignature: razorpay_signature,
@@ -1551,18 +1720,20 @@ const checkOrderStatus = async (req, res) => {
 // ========================================================
 const handleRazorpayWebhook = async (req, res) => {
   try {
-    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
-    if (webhookSecret) {
-      const signature = req.headers["x-razorpay-signature"];
-      if (!signature) {
-        return res.status(400).json({ success: false, message: "Missing webhook signature." });
-      }
-      const shasum = crypto.createHmac("sha256", webhookSecret);
-      shasum.update(JSON.stringify(req.body));
-      const digest = shasum.digest("hex");
-      if (digest !== signature) {
-        return res.status(400).json({ success: false, message: "Invalid webhook signature." });
-      }
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET ? process.env.RAZORPAY_WEBHOOK_SECRET.trim() : "";
+    if (!webhookSecret) {
+      return res.status(500).json({ success: false, message: "Webhook secret is not configured on server." });
+    }
+
+    const signature = req.headers["x-razorpay-signature"];
+    if (!signature) {
+      return res.status(400).json({ success: false, message: "Missing webhook signature." });
+    }
+    const shasum = crypto.createHmac("sha256", webhookSecret);
+    shasum.update(JSON.stringify(req.body));
+    const digest = shasum.digest("hex");
+    if (digest !== signature) {
+      return res.status(400).json({ success: false, message: "Invalid webhook signature." });
     }
 
     const event = req.body.event;
@@ -1575,70 +1746,45 @@ const handleRazorpayWebhook = async (req, res) => {
       if (rzpOrderId) {
         const order = await Order.findOne({ razorpayOrderId: rzpOrderId });
         if (order && order.paymentStatus !== "Paid") {
-          const deductedItems = [];
-          let stockOk = true;
+          // If inventory was not yet deducted, deduct it atomically & idempotently
+          if (!order.inventoryProcessed) {
+            const deductionRes = await deductOrderStock(order);
+            if (!deductionRes.success) {
+              console.error("Webhook inventory deduction failed for order:", order.orderNumber);
+              return res.status(200).json({ status: "acknowledged", error: "stock_unavailable" });
+            }
+          }
 
-          for (const it of order.items) {
-            const updateResult = await Product.updateOne(
+          order.paymentStatus = "Paid";
+          order.orderStatus = "Processing";
+          if (paymentEntity && paymentEntity.id) {
+            order.razorpayPaymentId = paymentEntity.id;
+          }
+          order.paymentFailureReason = null;
+          order.paymentErrorCode = null;
+          await order.save();
+
+          // Commit coupon usage if order has coupon
+          if (order.coupon) {
+            await Coupon.updateOne(
+              { _id: order.coupon },
               {
-                _id: it.product,
-                "variants._id": it.variantId,
-                "variants.stock": { $gte: it.quantity },
-              },
-              {
-                $inc: {
-                  "variants.$.stock": -it.quantity,
-                  stock: -it.quantity,
+                $inc: { usedCount: 1 },
+                $push: {
+                  userRedemptions: {
+                    user: order.user,
+                    orderId: order._id,
+                    redeemedAt: new Date(),
+                  },
                 },
               }
             );
-
-            if (updateResult.matchedCount === 0 || updateResult.modifiedCount === 0) {
-              stockOk = false;
-              break;
-            }
-            deductedItems.push(it);
           }
 
-          if (stockOk) {
-            order.paymentStatus = "Paid";
-            order.orderStatus = "Processing";
-            if (paymentEntity && paymentEntity.id) {
-              order.razorpayPaymentId = paymentEntity.id;
-            }
-            order.paymentFailureReason = null;
-            order.paymentErrorCode = null;
-            await order.save();
-
-            // Commit coupon usage if order has coupon
-            if (order.coupon) {
-              await Coupon.updateOne(
-                { _id: order.coupon },
-                {
-                  $inc: { usedCount: 1 },
-                  $push: {
-                    userRedemptions: {
-                      user: order.user,
-                      orderId: order._id,
-                      redeemedAt: new Date(),
-                    },
-                  },
-                }
-              );
-            }
-
-            const cart = await Cart.findOne({ user: order.user });
-            if (cart) {
-              cart.items = [];
-              await cart.save();
-            }
-          } else {
-            for (const rolled of deductedItems) {
-              await Product.updateOne(
-                { _id: rolled.product, "variants._id": rolled.variantId },
-                { $inc: { "variants.$.stock": rolled.quantity, stock: rolled.quantity } }
-              );
-            }
+          const cart = await Cart.findOne({ user: order.user });
+          if (cart) {
+            cart.items = [];
+            await cart.save();
           }
         }
       }
@@ -1832,25 +1978,8 @@ const cancelOrderItem = async (req, res) => {
       }
     }
 
-    // 3. Atomically restore inventory to available stock in MongoDB
-    if (item.product && item.variantId) {
-      await Product.updateOne(
-        { _id: item.product, "variants._id": item.variantId },
-        {
-          $inc: {
-            "variants.$.stock": item.quantity,
-            stock: item.quantity,
-          },
-        }
-      );
-
-      // Reactivate product if it was previously marked Out of Stock
-      const prod = await Product.findById(item.product);
-      if (prod && prod.status === "Out of Stock" && prod.stock > 0) {
-        prod.status = "Active";
-        await prod.save();
-      }
-    }
+    // 3. Atomically restore inventory to available stock in MongoDB (Idempotent: only if deducted and not already restored)
+    await restoreOrderItemStock(order, itemId);
 
     // 4. Update the item's stored allocations & status
     if (normalizedItem) {
@@ -1923,6 +2052,142 @@ const cancelOrderItem = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: error.message || "Failed to cancel item.",
+    });
+  }
+};
+
+// ========================================================
+// 9b. USER: CANCEL FULL ORDER (With Atomic Stock Restoration & Wallet Refund)
+// ========================================================
+const cancelOrder = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { orderId } = req.params;
+    const { reason = "Customer requested cancellation" } = req.body || {};
+
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ success: false, message: "Invalid order identifier." });
+    }
+
+    const order = await Order.findOne({ _id: orderId, user: userId });
+    if (!order) {
+      return res.status(404).json({ success: false, message: "Order not found in your purchase history." });
+    }
+
+    const nonCancellableOrderStatuses = [
+      "Dispatched",
+      "Shipped",
+      "Out for Delivery",
+      "Delivered",
+      "Cancelled",
+      "Return Requested",
+      "Return Approved",
+      "Returned",
+      "Refunded",
+    ];
+
+    if (nonCancellableOrderStatuses.includes(order.orderStatus)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          order.orderStatus === "Delivered"
+            ? "This order has already been delivered. You can request a return instead."
+            : order.orderStatus === "Cancelled"
+            ? "This order is already cancelled."
+            : `Order cannot be cancelled because it is already ${order.orderStatus.toLowerCase()}.`,
+      });
+    }
+
+    // 1. Disburse wallet refund if Paid
+    let refundAmount = 0;
+    let refundTransactionId = null;
+    let refundStatus = "None";
+
+    if (order.paymentStatus === "Paid") {
+      refundAmount = Math.max(0, (order.totalAmount || 0) - (order.totalRefundedAmount || 0));
+      if (refundAmount > 0) {
+        try {
+          const wallet = await getOrCreateUserWallet(userId);
+          const balBefore = roundToPaise(wallet.balance);
+          const balAfter = roundToPaise(balBefore + refundAmount);
+          const txId = `TXN-RFND-ORD-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+          wallet.balance = balAfter;
+          wallet.transactions.push({
+            transactionId: txId,
+            type: "Order Cancellation Refund",
+            amount: refundAmount,
+            direction: "Credit",
+            description: `Refund for cancellation of order ${order.orderNumber}`,
+            referenceId: order.orderNumber,
+            orderId: order._id,
+            balanceBefore: balBefore,
+            balanceAfter: balAfter,
+            status: "Completed",
+            createdAt: new Date(),
+          });
+          await wallet.save();
+
+          refundStatus = "Refunded";
+          refundTransactionId = txId;
+          order.totalRefundedAmount = roundToPaise((order.totalRefundedAmount || 0) + refundAmount);
+        } catch (wltErr) {
+          console.error("Wallet order cancellation refund error:", wltErr);
+          return res.status(500).json({
+            success: false,
+            message: "Failed to credit refund to your wallet. Cancellation was not finalized.",
+          });
+        }
+      }
+    }
+
+    // 2. Restore inventory atomically & idempotently
+    await restoreOrderStock(order);
+
+    // 3. Mark items and order as Cancelled
+    for (const item of order.items) {
+      if (item.itemStatus !== "Cancelled") {
+        item.itemStatus = "Cancelled";
+        item.cancelledAt = new Date();
+        item.cancellationReason = String(reason || "Customer requested cancellation").trim();
+        item.refundStatus = refundStatus;
+        if (refundTransactionId) {
+          item.refundTransactionId = refundTransactionId;
+          item.refundedAt = new Date();
+        }
+      }
+    }
+
+    const prevStatus = order.orderStatus;
+    order.orderStatus = "Cancelled";
+    order.statusHistory.push({
+      previousStatus: prevStatus,
+      newStatus: "Cancelled",
+      changedBy: userId,
+      timestamp: new Date(),
+      note: `Full order cancelled by patron. Reason: ${reason}`,
+    });
+
+    await order.save();
+
+    const finalizedOrder = normalizeOrderWithAllocations(order.toObject ? order.toObject() : order);
+
+    return res.status(200).json({
+      success: true,
+      message: `Order ${order.orderNumber} has been successfully cancelled.${
+        refundStatus === "Refunded"
+          ? ` ₹${refundAmount.toLocaleString("en-IN")} has been refunded to your FEXA Wallet.`
+          : ""
+      }`,
+      order: finalizedOrder,
+      refundAmount,
+      refundStatus,
+    });
+  } catch (error) {
+    console.error("Cancel order error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to cancel order.",
     });
   }
 };
@@ -2255,6 +2520,7 @@ export {
   checkOrderStatus,
   handleRazorpayWebhook,
   cancelOrderItem,
+  cancelOrder,
   requestItemReturn,
   approveItemReturn,
   rejectItemReturn,
@@ -2273,6 +2539,7 @@ export default {
   checkOrderStatus,
   handleRazorpayWebhook,
   cancelOrderItem,
+  cancelOrder,
   requestItemReturn,
   approveItemReturn,
   rejectItemReturn,

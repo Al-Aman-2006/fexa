@@ -11,6 +11,7 @@ import {
   checkOrderStatus,
   handleRazorpayWebhook,
   cancelOrderItem,
+  cancelOrder,
   requestItemReturn,
   approveItemReturn,
   rejectItemReturn,
@@ -40,6 +41,9 @@ router.get("/", getMyOrders);
 
 // Product Cancellation (Individual Item)
 router.post("/:orderId/items/:itemId/cancel", cancelOrderItem);
+
+// Full Order Cancellation
+router.post("/:orderId/cancel", cancelOrder);
 
 // Returns & Refunds
 router.post("/:orderId/items/:itemId/return", requestItemReturn);

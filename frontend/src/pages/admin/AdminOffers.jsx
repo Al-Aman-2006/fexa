@@ -3,6 +3,15 @@ import { useLocation } from "react-router-dom";
 import { useAdminAuth } from "../../context/AdminAuthContext";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminPagination from "../../components/admin/AdminPagination";
+import { getImageUrl } from "../../utils/imageUrl.js";
+import {
+  getAdminOffers,
+  searchOfferProducts,
+  createAdminOffer,
+  updateAdminOffer,
+  toggleOfferStatus,
+  deleteAdminOffer,
+} from "../../services/admin.service.js";
 import "./AdminDashboard.css";
 import "./AdminOffers.css";
 
@@ -93,36 +102,32 @@ function AdminOffers() {
     async (targetPage = 1, targetSearch = "", targetStatus = "All", targetScope = "All") => {
       try {
         setLoading(true);
-        const queryParams = new URLSearchParams({
-          page: targetPage.toString(),
-          limit: "10",
-        });
+        const params = {
+          page: targetPage,
+          limit: 10,
+        };
 
-        if (targetSearch.trim()) queryParams.set("search", targetSearch.trim());
-        if (targetStatus && targetStatus !== "All") queryParams.set("status", targetStatus);
-        if (targetScope && targetScope !== "All") queryParams.set("scope", targetScope);
+        if (targetSearch.trim()) params.search = targetSearch.trim();
+        if (targetStatus && targetStatus !== "All") params.status = targetStatus;
+        if (targetScope && targetScope !== "All") params.scope = targetScope;
 
-        const res = await fetch(`http://localhost:5000/api/admin/offers?${queryParams.toString()}`, {
-          credentials: "include",
-        });
+        const data = await getAdminOffers(params);
 
-        const data = await res.json();
-
-        if (res.ok && data.success) {
+        if (data && data.success) {
           setOffers(data.offers || []);
           if (data.stats) setStats(data.stats);
           if (data.pagination) setPagination(data.pagination);
         } else {
           setToast({
             type: "error",
-            text: data.message || "Failed to load offer catalogue.",
+            text: data?.message || "Failed to load offer catalogue.",
           });
         }
       } catch (err) {
         console.error("Fetch admin offers error:", err);
         setToast({
           type: "error",
-          text: "Unable to connect to server. Please check your connection.",
+          text: err.response?.data?.message || "Unable to connect to server. Please check your connection.",
         });
       } finally {
         setLoading(false);
@@ -139,15 +144,11 @@ function AdminOffers() {
   const searchCatalogueProducts = useCallback(async (queryStr) => {
     try {
       setProductSearchLoading(true);
-      const params = new URLSearchParams();
-      if (queryStr) params.set("search", queryStr);
+      const params = {};
+      if (queryStr) params.search = queryStr;
 
-      const res = await fetch(
-        `http://localhost:5000/api/admin/offers/search-products?${params.toString()}`,
-        { credentials: "include" }
-      );
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = await searchOfferProducts(params);
+      if (data && data.success) {
         setProductSearchResults(data.products || []);
       }
     } catch (err) {
@@ -554,23 +555,12 @@ function AdminOffers() {
         priority: Number(formData.priority) || 0,
       };
 
-      const url =
+      const data =
         activeModal === "create"
-          ? "http://localhost:5000/api/admin/offers"
-          : `http://localhost:5000/api/admin/offers/${modalOffer._id}`;
+          ? await createAdminOffer(payload)
+          : await updateAdminOffer(modalOffer._id, payload);
 
-      const method = activeModal === "create" ? "POST" : "PUT";
-
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (res.ok && data.success) {
+      if (data && data.success) {
         setToast({
           type: "success",
           text: activeModal === "create" ? "Offer created successfully!" : "Offer updated successfully!",
@@ -578,19 +568,23 @@ function AdminOffers() {
         handleCloseModal();
         fetchOffers(page, appliedSearch, statusFilter, scopeFilter);
       } else {
-        if (data.errors) {
+        if (data?.errors) {
           setFormErrors((prev) => ({ ...prev, ...data.errors }));
         }
         setToast({
           type: "error",
-          text: data.message || "Failed to save offer. Please check the inputs.",
+          text: data?.message || "Failed to save offer. Please check the inputs.",
         });
       }
     } catch (err) {
       console.error("Save offer error:", err);
+      const resData = err.response?.data;
+      if (resData?.errors) {
+        setFormErrors((prev) => ({ ...prev, ...resData.errors }));
+      }
       setToast({
         type: "error",
-        text: "Network error occurred while saving offer.",
+        text: resData?.message || "Network error occurred while saving offer.",
       });
     } finally {
       setActionProcessing(false);
@@ -603,14 +597,9 @@ function AdminOffers() {
     if (togglingOfferId === off._id) return; // Prevent duplicate rapid requests
     try {
       setTogglingOfferId(off._id);
-      const res = await fetch(`http://localhost:5000/api/admin/offers/${off._id}/status`, {
-        method: "PATCH",
-        credentials: "include",
-      });
+      const data = await toggleOfferStatus(off._id);
 
-      const data = await res.json();
-
-      if (res.ok && data.success) {
+      if (data && data.success) {
         setToast({
           type: "success",
           text: data.message || "Offer status updated.",
@@ -624,14 +613,14 @@ function AdminOffers() {
       } else {
         setToast({
           type: "error",
-          text: data.message || "Failed to toggle status.",
+          text: data?.message || "Failed to toggle status.",
         });
       }
     } catch (err) {
       console.error("Toggle status error:", err);
       setToast({
         type: "error",
-        text: "Unable to update offer status.",
+        text: err.response?.data?.message || "Unable to update offer status.",
       });
     } finally {
       setTogglingOfferId(null);
@@ -643,14 +632,9 @@ function AdminOffers() {
     if (!modalOffer) return;
     try {
       setActionProcessing(true);
-      const res = await fetch(`http://localhost:5000/api/admin/offers/${modalOffer._id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      const data = await deleteAdminOffer(modalOffer._id);
 
-      const data = await res.json();
-
-      if (res.ok && data.success) {
+      if (data && data.success) {
         setToast({
           type: "success",
           text: data.message || "Offer archived safely.",
@@ -660,14 +644,14 @@ function AdminOffers() {
       } else {
         setToast({
           type: "error",
-          text: data.message || "Failed to remove offer.",
+          text: data?.message || "Failed to remove offer.",
         });
       }
     } catch (err) {
       console.error("Delete offer error:", err);
       setToast({
         type: "error",
-        text: "Network error while deleting offer.",
+        text: err.response?.data?.message || "Network error while deleting offer.",
       });
     } finally {
       setActionProcessing(false);
@@ -1284,11 +1268,7 @@ function AdminOffers() {
                         <div className="selected-thumb">
                           {selectedProductDetails.images && selectedProductDetails.images[0] ? (
                             <img
-                              src={
-                                selectedProductDetails.images[0].startsWith("http")
-                                  ? selectedProductDetails.images[0]
-                                  : `http://localhost:5000${selectedProductDetails.images[0]}`
-                              }
+                              src={getImageUrl(selectedProductDetails.images[0])}
                               alt={selectedProductDetails.name}
                             />
                           ) : (
@@ -1343,11 +1323,7 @@ function AdminOffers() {
                                 <div className="picker-thumb">
                                   {prod.images && prod.images[0] ? (
                                     <img
-                                      src={
-                                        prod.images[0].startsWith("http")
-                                          ? prod.images[0]
-                                          : `http://localhost:5000${prod.images[0]}`
-                                      }
+                                      src={getImageUrl(prod.images[0])}
                                       alt={prod.name}
                                     />
                                   ) : (
@@ -1447,11 +1423,7 @@ function AdminOffers() {
                               <div className="picker-thumb">
                                 {prod.images && prod.images[0] ? (
                                   <img
-                                    src={
-                                      prod.images[0].startsWith("http")
-                                        ? prod.images[0]
-                                        : `http://localhost:5000${prod.images[0]}`
-                                    }
+                                    src={getImageUrl(prod.images[0])}
                                     alt={prod.name}
                                   />
                                 ) : (

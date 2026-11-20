@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import Order from "../models/order.model.js";
 import Product from "../models/product.model.js";
 import User from "../models/user.model.js";
+import Wallet from "../models/wallet.model.js";
+import { restoreOrderStock } from "../services/inventory.service.js";
 import {
   calculateItemRefund,
   normalizeOrderWithAllocations,
@@ -19,7 +21,7 @@ export const ALLOWED_STATUS_TRANSITIONS = {
   Dispatched: ["Out for Delivery", "Delivered", "Cancelled"],
   Shipped: ["Out for Delivery", "Delivered", "Cancelled"],
   "Out for Delivery": ["Delivered", "Cancelled"],
-  Delivered: ["Return Requested"], // Cannot cancel delivered orders via normal dropdown
+  Delivered: [], // Terminal fulfillment state for admin - Return requests must be initiated exclusively by users
   Cancelled: [], // Terminal
   "Return Requested": ["Return Approved", "Return Rejected"],
   "Return Approved": ["Returned", "Refunded"],
@@ -271,6 +273,7 @@ export const getAdminOrderById = async (req, res) => {
 
     const order = await Order.findById(orderId)
       .populate("user", "name email phone addresses")
+      .populate("items.product", "name images price variants")
       .populate("statusHistory.changedBy", "name email")
       .lean();
 
@@ -284,12 +287,28 @@ export const getAdminOrderById = async (req, res) => {
     const normalized = normalizeOrderWithAllocations(order);
     const paymentBlock = getPaymentFulfillmentBlock(order);
 
-    // Filter allowed transitions to exclude shipping/delivery if payment is unverified or failed
-    let allowedNextStatuses = ALLOWED_STATUS_TRANSITIONS[order.orderStatus] || [];
+    // Filter allowed transitions to exclude shipping/delivery if payment is unverified or failed, and ensure Return Requested is never offered to admins
+    let allowedNextStatuses = (ALLOWED_STATUS_TRANSITIONS[order.orderStatus] || []).filter(
+      (st) => st !== "Return Requested"
+    );
     if (paymentBlock.blocked) {
       allowedNextStatuses = allowedNextStatuses.filter(
         (st) => !FULFILLMENT_STATUSES.includes(st)
       );
+    }
+
+    // Attach product images to items if missing
+    if (Array.isArray(normalized.items)) {
+      normalized.items = normalized.items.map((it) => {
+        let itemImage = it.image;
+        if (!itemImage && it.product && Array.isArray(it.product.images) && it.product.images.length > 0) {
+          itemImage = it.product.images[0];
+        }
+        return {
+          ...it,
+          image: itemImage || null,
+        };
+      });
     }
 
     return res.status(200).json({
@@ -337,6 +356,15 @@ export const updateOrderStatus = async (req, res) => {
     }
 
     const targetStatus = status.trim();
+
+    // Business Rule: Administrators cannot initiate return requests
+    if (targetStatus === "Return Requested") {
+      return res.status(400).json({
+        success: false,
+        message: "Administrators cannot initiate return requests. Return requests must be initiated exclusively by the customer.",
+      });
+    }
+
     const order = await Order.findById(orderId);
 
     if (!order) {
@@ -389,37 +417,66 @@ export const updateOrderStatus = async (req, res) => {
       });
     }
 
-    // Restock Inventory on Cancellation (Idempotent: only when moving to Cancelled)
-    if (targetStatus === "Cancelled") {
-      for (const item of order.items) {
-        if (item.product && item.variantId && item.itemStatus !== "Cancelled") {
-          const qtyToRestore = Math.max(0, item.quantity - (item.returnedQuantity || 0));
-          if (qtyToRestore > 0) {
-            await Product.updateOne(
-              { _id: item.product, "variants._id": item.variantId },
-              {
-                $inc: {
-                  "variants.$.stock": qtyToRestore,
-                  stock: qtyToRestore,
-                },
-              }
-            );
+    // Record Status Audit History identifiers
+    const adminIdentifier = req.user?._id || req.admin?._id || null;
+    const adminEmail = req.user?.email || req.admin?.email || "Admin";
 
-            // Re-activate product status if previously marked Out of Stock
-            const updatedProduct = await Product.findById(item.product);
-            if (updatedProduct && updatedProduct.stock > 0 && updatedProduct.status === "Out of Stock") {
-              updatedProduct.status = "Active";
-              await updatedProduct.save();
-            }
-          }
+    // Restock Inventory on Cancellation (Idempotent: only restores if inventory was deducted and not yet restored)
+    if (targetStatus === "Cancelled") {
+      await restoreOrderStock(order);
+      for (const item of order.items) {
+        if (item.itemStatus !== "Cancelled") {
           item.itemStatus = "Cancelled";
+          item.cancelledAt = new Date();
+          item.cancellationReason = `Order marked as Cancelled by administrator (${adminEmail}).`;
+        }
+      }
+
+      // If order was Paid, process wallet refund idempotently
+      if (order.paymentStatus === "Paid" && order.user) {
+        const remainingRefund = Math.max(0, (order.totalAmount || 0) - (order.totalRefundedAmount || 0));
+        if (remainingRefund > 0) {
+          try {
+            const customerId = order.user._id || order.user;
+            let userWallet = await Wallet.findOne({ user: customerId });
+            if (!userWallet) {
+              userWallet = await Wallet.create({ user: customerId, balance: 0, transactions: [] });
+            }
+            const balBefore = roundToPaise(userWallet.balance);
+            const balAfter = roundToPaise(balBefore + remainingRefund);
+            const txId = `TXN-RFND-ADMIN-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+            userWallet.balance = balAfter;
+            userWallet.transactions.push({
+              transactionId: txId,
+              type: "Cancellation Refund",
+              amount: remainingRefund,
+              direction: "Credit",
+              description: `Administrative refund for cancellation of order ${order.orderNumber}`,
+              referenceId: order.orderNumber,
+              orderId: order._id,
+              balanceBefore: balBefore,
+              balanceAfter: balAfter,
+              status: "Completed",
+              createdAt: new Date(),
+            });
+            await userWallet.save();
+
+            order.totalRefundedAmount = roundToPaise((order.totalRefundedAmount || 0) + remainingRefund);
+            for (const item of order.items) {
+              if (item.refundStatus !== "Refunded") {
+                item.refundStatus = "Refunded";
+                item.refundedAt = new Date();
+                item.refundTransactionId = txId;
+                item.refundAmount = item.discountedLineAmount || item.lineTotal || 0;
+              }
+            }
+          } catch (wErr) {
+            console.error("Admin order cancellation wallet refund error:", wErr);
+          }
         }
       }
     }
-
-    // Record Status Audit History
-    const adminIdentifier = req.user?._id || req.admin?._id || null;
-    const adminEmail = req.user?.email || req.admin?.email || "Admin";
 
     if (!Array.isArray(order.statusHistory)) {
       order.statusHistory = [];
@@ -445,14 +502,49 @@ export const updateOrderStatus = async (req, res) => {
 
     await order.save();
 
-    const normalized = normalizeOrderWithAllocations(order.toObject ? order.toObject() : order);
+    const freshOrder = await Order.findById(orderId)
+      .populate("user", "name email phone addresses")
+      .populate("items.product", "name images price variants")
+      .populate("statusHistory.changedBy", "name email")
+      .lean();
+
+    const normalized = normalizeOrderWithAllocations(freshOrder || (order.toObject ? order.toObject() : order));
+    const paymentBlock = getPaymentFulfillmentBlock(order);
+
+    let allowedNextStatuses = (ALLOWED_STATUS_TRANSITIONS[targetStatus] || []).filter(
+      (st) => st !== "Return Requested"
+    );
+    if (paymentBlock.blocked) {
+      allowedNextStatuses = allowedNextStatuses.filter(
+        (st) => !FULFILLMENT_STATUSES.includes(st)
+      );
+    }
+
+    if (Array.isArray(normalized.items)) {
+      normalized.items = normalized.items.map((it) => {
+        let itemImage = it.image;
+        if (!itemImage && it.product && Array.isArray(it.product.images) && it.product.images.length > 0) {
+          itemImage = it.product.images[0];
+        }
+        return {
+          ...it,
+          image: itemImage || null,
+        };
+      });
+    }
 
     return res.status(200).json({
       success: true,
       message: `Order status successfully transitioned from "${currentStatus}" to "${targetStatus}".`,
       order: {
         ...normalized,
-        allowedNextStatuses: ALLOWED_STATUS_TRANSITIONS[targetStatus] || [],
+        customerName:
+          freshOrder?.shippingAddress?.fullName || freshOrder?.user?.name || "Private Patron",
+        customerEmail: freshOrder?.user?.email || "N/A",
+        customerPhone: freshOrder?.shippingAddress?.phone || freshOrder?.user?.phone || "N/A",
+        allowedNextStatuses,
+        isFulfillmentBlocked: paymentBlock.blocked,
+        paymentBlockReason: paymentBlock.reason,
       },
     });
   } catch (error) {

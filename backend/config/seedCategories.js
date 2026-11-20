@@ -39,7 +39,8 @@ const seedCategories = async () => {
       // Index might not exist or already dropped
     }
 
-    await Category.syncIndexes();
+    // Ensure defined schema indexes exist without destructively dropping Atlas indexes
+    await Category.init();
 
     // 2. Seed Default Parent Categories
     const categoryDocMap = {};

@@ -1,10 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAdminAuth } from "../../context/AdminAuthContext";
 import AdminSidebar from "../../components/admin/AdminSidebar";
+import {
+  getAdminCategories,
+  createAdminCategory,
+  updateAdminCategory,
+  deleteAdminCategory,
+  toggleCategoryStatus,
+} from "../../services/admin.service.js";
 import "./AdminDashboard.css";
 import "./AdminCategories.css";
-
-const API_BASE = "http://localhost:5000/api/admin/categories";
 
 export default function AdminCategories() {
   const { admin, logoutAdmin } = useAdminAuth();
@@ -51,9 +56,8 @@ export default function AdminCategories() {
   const fetchCategories = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(API_BASE, { credentials: "include" });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = await getAdminCategories();
+      if (data && data.success) {
         setCategories(data.categories || []);
         if (data.stats) {
           setStats(data.stats);
@@ -65,11 +69,11 @@ export default function AdminCategories() {
         });
         setExpandedParents((prev) => (Object.keys(prev).length === 0 ? initialExpanded : prev));
       } else {
-        showToast(data.message || "Failed to load categories.", "error");
+        showToast(data?.message || "Failed to load categories.", "error");
       }
     } catch (err) {
       console.error("Fetch categories error:", err);
-      showToast("Network error while loading categories.", "error");
+      showToast(err.response?.data?.message || "Network error while loading categories.", "error");
     } finally {
       setLoading(false);
     }
@@ -182,9 +186,6 @@ export default function AdminCategories() {
     setActionProcessing(true);
     try {
       const isEdit = modalMode === "edit-parent" || modalMode === "edit-child";
-      const url = isEdit ? `${API_BASE}/${selectedCategory._id}` : API_BASE;
-      const method = isEdit ? "PUT" : "POST";
-
       const payload = {
         name: formData.name.trim(),
         description: formData.description.trim(),
@@ -198,15 +199,11 @@ export default function AdminCategories() {
         payload.parentCategory = null;
       }
 
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
+      const data = isEdit
+        ? await updateAdminCategory(selectedCategory._id, payload)
+        : await createAdminCategory(payload);
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      if (data && data.success) {
         showToast(
           isEdit
             ? `Category "${data.category?.name || formData.name}" updated successfully.`
@@ -216,14 +213,18 @@ export default function AdminCategories() {
         handleCloseModal();
         fetchCategories();
       } else {
-        showToast(data.message || "Failed to save category.", "error");
-        if (data.errors) {
+        showToast(data?.message || "Failed to save category.", "error");
+        if (data?.errors) {
           setFormErrors(data.errors);
         }
       }
     } catch (err) {
       console.error("Save category error:", err);
-      showToast("Network error while saving category.", "error");
+      const resData = err.response?.data;
+      if (resData?.errors) {
+        setFormErrors(resData.errors);
+      }
+      showToast(resData?.message || "Network error while saving category.", "error");
     } finally {
       setActionProcessing(false);
     }
@@ -233,26 +234,20 @@ export default function AdminCategories() {
   const handleToggleStatus = async (cat) => {
     try {
       const newStatus = !cat.isActive;
-      const res = await fetch(`${API_BASE}/${cat._id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ isActive: newStatus }),
-      });
+      const data = await toggleCategoryStatus(cat._id, { isActive: newStatus });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      if (data && data.success) {
         showToast(
           `"${cat.name}" is now ${newStatus ? "Active" : "Inactive"}.`,
           "success"
         );
         fetchCategories();
       } else {
-        showToast(data.message || "Failed to update status.", "error");
+        showToast(data?.message || "Failed to update status.", "error");
       }
     } catch (err) {
       console.error("Toggle status error:", err);
-      showToast("Network error while updating status.", "error");
+      showToast(err.response?.data?.message || "Network error while updating status.", "error");
     }
   };
 
@@ -261,22 +256,17 @@ export default function AdminCategories() {
     if (!selectedCategory) return;
     setActionProcessing(true);
     try {
-      const res = await fetch(`${API_BASE}/${selectedCategory._id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = await deleteAdminCategory(selectedCategory._id);
+      if (data && data.success) {
         showToast(`Category "${selectedCategory.name}" removed successfully.`, "success");
         handleCloseModal();
         fetchCategories();
       } else {
-        showToast(data.message || "Failed to delete category.", "error");
+        showToast(data?.message || "Failed to delete category.", "error");
       }
     } catch (err) {
       console.error("Delete category error:", err);
-      showToast("Network error while deleting category.", "error");
+      showToast(err.response?.data?.message || "Network error while deleting category.", "error");
     } finally {
       setActionProcessing(false);
     }

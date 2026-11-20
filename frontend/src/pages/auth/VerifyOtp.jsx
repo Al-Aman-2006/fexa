@@ -3,6 +3,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
+import { verifyOtp as verifyOtpApi, resendOtp as resendOtpApi } from "../../services/auth.service.js";
 
 import "./VerifyOtp.css";
 
@@ -204,46 +205,12 @@ function VerifyOtp() {
         enteredOtp
       );
 
-      const response = await fetch(
-        "http://localhost:5000/api/auth/verify-otp",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-
-          body: JSON.stringify({
-            email: email,
-            otp: enteredOtp,
-          }),
-        }
-      );
-
-      const data = await response.json();
+      const data = await verifyOtpApi(email, enteredOtp);
 
       console.log(
         "OTP verification response:",
         data
       );
-
-      // ========================================
-      // VERIFICATION FAILED
-      // ========================================
-
-      if (!response.ok) {
-        setMessage(
-          data.message ||
-            "Invalid OTP. Please try again."
-        );
-
-        setMessageType("error");
-
-        setIsVerifying(false);
-
-        return;
-      }
 
       // ========================================
       // VERIFICATION SUCCESS
@@ -270,9 +237,13 @@ function VerifyOtp() {
         error
       );
 
-      setMessage(
-        "Unable to connect to the server. Please try again."
-      );
+      const errorMsg =
+        error.response?.data?.message ||
+        (error.response
+          ? "Invalid OTP. Please try again."
+          : "Unable to connect to the server. Please try again.");
+
+      setMessage(errorMsg);
 
       setMessageType("error");
 
@@ -314,45 +285,12 @@ function VerifyOtp() {
         "Requesting new OTP..."
       );
 
-      const response = await fetch(
-        "http://localhost:5000/api/auth/resend-otp",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-
-          body: JSON.stringify({
-            email: email,
-          }),
-        }
-      );
-
-      const data = await response.json();
+      const data = await resendOtpApi(email);
 
       console.log(
         "Resend OTP response:",
         data
       );
-
-      // ========================================
-      // RESEND FAILED
-      // ========================================
-
-      if (!response.ok) {
-        setMessage(
-          data.message ||
-            "Unable to resend OTP."
-        );
-
-        setMessageType("error");
-
-        setIsResending(false);
-
-        return;
-      }
 
       // ========================================
       // RESEND SUCCESS
@@ -389,9 +327,13 @@ function VerifyOtp() {
         error
       );
 
-      setMessage(
-        "Unable to connect to the server."
-      );
+      const errorMsg =
+        error.response?.data?.message ||
+        (error.response
+          ? "Unable to resend OTP."
+          : "Unable to connect to the server.");
+
+      setMessage(errorMsg);
 
       setMessageType("error");
 

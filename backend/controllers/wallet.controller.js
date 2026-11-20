@@ -121,7 +121,13 @@ export const createTopUpOrder = async (req, res) => {
       },
     });
 
-    const keyId = process.env.RAZORPAY_KEY_ID || "rzp_test_TqUYTgZOU4T32M";
+    const keyId = process.env.RAZORPAY_KEY_ID ? process.env.RAZORPAY_KEY_ID.trim() : "";
+    if (!keyId) {
+      return res.status(500).json({
+        success: false,
+        message: "Payment gateway configuration is missing on server.",
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -167,7 +173,13 @@ export const verifyTopUpPayment = async (req, res) => {
     }
 
     // 1. Verify HMAC SHA256 Signature
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || "vlYvPndeLZ07y6a3ovxB3aPp";
+    const keySecret = process.env.RAZORPAY_KEY_SECRET ? process.env.RAZORPAY_KEY_SECRET.trim() : "";
+    if (!keySecret) {
+      return res.status(500).json({
+        success: false,
+        message: "Payment verification configuration is missing on server.",
+      });
+    }
     const generatedSignature = crypto
       .createHmac("sha256", keySecret)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)

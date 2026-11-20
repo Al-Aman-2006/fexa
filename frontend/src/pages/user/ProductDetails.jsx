@@ -1,10 +1,18 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useCart } from "../../context/CartContext";
 import { useWishlist } from "../../context/WishlistContext";
 import ProductImageZoomViewer from "../../components/user/ProductImageZoomViewer";
 import Navbar from "../../components/common/Navbar";
+import { getImageUrl } from "../../utils/imageUrl";
+import {
+  getProductById,
+  getProducts,
+  getProductReviews,
+  submitProductReview,
+  deleteProductReview,
+} from "../../services/product.service.js";
 import "./ProductDetails.css";
 
 function ProductDetails() {
@@ -28,6 +36,18 @@ function ProductDetails() {
   // Gallery and UI states
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [isHoverZooming, setIsHoverZooming] = useState(false);
+  const [zoomCoords, setZoomCoords] = useState({ x: 50, y: 50 });
+  const imageViewportRef = useRef(null);
+
+  const handleMouseMoveZoom = (e) => {
+    if (!imageViewportRef.current) return;
+    const rect = imageViewportRef.current.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+    setZoomCoords({ x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 });
+  };
   const [selectedVariantId, setSelectedVariantId] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [toastMessage, setToastMessage] = useState(null);
@@ -72,19 +92,9 @@ function ProductDetails() {
       setActiveImageIndex(0);
       setQuantity(1);
 
-      const res = await fetch(`http://localhost:5000/api/products/${targetId}`);
-      const data = await res.json();
+      const data = await getProductById(targetId);
 
-      if (res.status === 404) {
-        setErrorState({
-          type: "404",
-          message: data.message || "Product not found.",
-        });
-        setProduct(null);
-        return;
-      }
-
-      if (data.isInactive || res.status === 400 || res.status === 403) {
+      if (data?.isInactive) {
         setErrorState({
           type: "inactive",
           message: data.message || "Product unavailable.",
@@ -93,7 +103,7 @@ function ProductDetails() {
         return;
       }
 
-      if (res.ok && data.success && data.product) {
+      if (data && data.success && data.product) {
         setProduct(data.product);
         setErrorState(null);
 
@@ -111,17 +121,34 @@ function ProductDetails() {
       } else {
         setErrorState({
           type: "network",
-          message: data.message || "Unable to load this product. Please try again.",
+          message: data?.message || "Unable to load this product. Please try again.",
         });
         setProduct(null);
       }
     } catch (err) {
       console.error("Fetch product error:", err);
-      setErrorState({
-        type: "network",
-        message: "Unable to load this product. Please check your connection and try again.",
-      });
-      setProduct(null);
+      const status = err.response?.status;
+      const resData = err.response?.data;
+
+      if (status === 404) {
+        setErrorState({
+          type: "404",
+          message: resData?.message || "Product not found.",
+        });
+        setProduct(null);
+      } else if (resData?.isInactive || status === 400 || status === 403) {
+        setErrorState({
+          type: "inactive",
+          message: resData?.message || "Product unavailable.",
+        });
+        setProduct(null);
+      } else {
+        setErrorState({
+          type: "network",
+          message: resData?.message || "Unable to load this product. Please check your connection and try again.",
+        });
+        setProduct(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -132,18 +159,17 @@ function ProductDetails() {
     if (!category) return;
     try {
       setRelatedLoading(true);
-      const params = new URLSearchParams({
+      const params = {
         category: category.toLowerCase(),
-        limit: "4",
-      });
+        limit: 4,
+      };
       if (currentId) {
-        params.set("excludeId", currentId);
+        params.excludeId = currentId;
       }
 
-      const res = await fetch(`http://localhost:5000/api/products?${params.toString()}`);
-      const data = await res.json();
+      const data = await getProducts(params);
 
-      if (res.ok && data.success && Array.isArray(data.products)) {
+      if (data && data.success && Array.isArray(data.products)) {
         // Exclude current product ID in case backend didn't
         const filtered = data.products.filter((p) => p._id !== currentId).slice(0, 4);
         setRelatedProducts(filtered);
@@ -274,28 +300,17 @@ function ProductDetails() {
       if (!productId) return;
       try {
         setReviewsLoading(true);
-        const token = localStorage.getItem("token");
-        const headers = {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        };
-        const queryParams = new URLSearchParams({
+        const params = {
           page: String(page),
           limit: "5",
           sort: sort || "newest",
-        });
+        };
         if (starFilter) {
-          queryParams.set("rating", String(starFilter));
+          params.rating = String(starFilter);
         }
 
-        const res = await fetch(
-          `http://localhost:5000/api/reviews/product/${productId}?${queryParams.toString()}`,
-          {
-            headers,
-            credentials: "include",
-          }
-        );
-        const data = await res.json();
-        if (res.ok && data.success) {
+        const data = await getProductReviews(productId, params);
+        if (data && data.success) {
           setReviews(data.reviews || []);
           if (data.ratingSummary) {
             setReviewsSummary(data.ratingSummary);
@@ -371,25 +386,16 @@ function ProductDetails() {
     try {
       setReviewSubmitting(true);
       setReviewFormError("");
-      const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/reviews", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          productId: product._id,
-          rating: Number(reviewFormData.rating),
-          title: reviewFormData.title ? reviewFormData.title.trim() : "",
-          comment: reviewFormData.comment.trim(),
-        }),
+
+      const data = await submitProductReview({
+        productId: product._id,
+        rating: Number(reviewFormData.rating),
+        title: reviewFormData.title ? reviewFormData.title.trim() : "",
+        comment: reviewFormData.comment.trim(),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to submit review.");
+      if (!data || !data.success) {
+        throw new Error(data?.message || "Failed to submit review.");
       }
 
       setIsReviewModalOpen(false);
@@ -401,7 +407,9 @@ function ProductDetails() {
       fetchReviews(product._id, 1, reviewsSort, ratingFilter);
     } catch (err) {
       console.error("Submit review error:", err);
-      setReviewFormError(err.message || "An error occurred while submitting your review.");
+      const errMsg =
+        err.response?.data?.message || err.message || "An error occurred while submitting your review.";
+      setReviewFormError(errMsg);
     } finally {
       setReviewSubmitting(false);
     }
@@ -412,17 +420,9 @@ function ProductDetails() {
     if (!userReview?._id) return;
     try {
       setDeleteSubmitting(true);
-      const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/reviews/${userReview._id}`, {
-        method: "DELETE",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to delete review.");
+      const data = await deleteProductReview(userReview._id);
+      if (!data || !data.success) {
+        throw new Error(data?.message || "Failed to delete review.");
       }
 
       setIsDeleteModalOpen(false);
@@ -434,9 +434,11 @@ function ProductDetails() {
       fetchReviews(product._id, 1, reviewsSort, ratingFilter);
     } catch (err) {
       console.error("Delete review error:", err);
+      const errMsg =
+        err.response?.data?.message || err.message || "Failed to delete review.";
       setToastMessage({
         type: "error",
-        text: err.message || "Failed to delete review.",
+        text: errMsg,
       });
     } finally {
       setDeleteSubmitting(false);
@@ -457,15 +459,6 @@ function ProductDetails() {
   const formatPrice = (val) => {
     if (val === undefined || val === null) return "₹0";
     return `₹${Number(val).toLocaleString("en-IN")}`;
-  };
-
-  // Resolve image URL safely
-  const getImageUrl = (imgPath) => {
-    if (!imgPath) return null;
-    if (imgPath.startsWith("http://") || imgPath.startsWith("https://")) {
-      return imgPath;
-    }
-    return `http://localhost:5000${imgPath}`;
   };
 
   // ── Derived state (uses helpers above) ──
@@ -708,15 +701,46 @@ function ProductDetails() {
           <div className="product-details-showcase">
             {/* LEFT COLUMN: IMAGE GALLERY & LIGHTBOX TRIGGER */}
             <div className="product-gallery-column">
-              <div className="main-image-viewport">
+              <div
+                ref={imageViewportRef}
+                className={`main-image-viewport ${isHoverZooming ? "is-zooming" : ""}`}
+                onMouseEnter={() => setIsHoverZooming(true)}
+                onMouseMove={handleMouseMoveZoom}
+                onMouseLeave={() => {
+                  setIsHoverZooming(false);
+                  setZoomCoords({ x: 50, y: 50 });
+                }}
+                onClick={() => setIsLightboxOpen(true)}
+                title="Click or tap to enlarge fragrance flacon"
+              >
                 {activeImageSrc ? (
-                  <img
-                    src={activeImageSrc}
-                    alt={product.name}
-                    className="details-main-img"
-                    onClick={() => setIsLightboxOpen(true)}
-                    title="Click to expand fragrance flacon"
-                  />
+                  <div className="zoom-image-wrapper">
+                    <img
+                      src={activeImageSrc}
+                      alt={product.name}
+                      className="details-main-img"
+                      style={
+                        isHoverZooming
+                          ? {
+                              transformOrigin: `${zoomCoords.x}% ${zoomCoords.y}%`,
+                              transform: "scale(2.35)",
+                            }
+                          : {
+                              transformOrigin: "center center",
+                              transform: "scale(1)",
+                            }
+                      }
+                    />
+                    {isHoverZooming && (
+                      <div
+                        className="zoom-lens-indicator"
+                        style={{
+                          left: `${zoomCoords.x}%`,
+                          top: `${zoomCoords.y}%`,
+                        }}
+                      />
+                    )}
+                  </div>
                 ) : (
                   <div className="details-image-fallback">
                     <span className="fallback-monogram">FEXA</span>
@@ -738,7 +762,10 @@ function ProductDetails() {
                   <button
                     type="button"
                     className="gallery-zoom-button"
-                    onClick={() => setIsLightboxOpen(true)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsLightboxOpen(true);
+                    }}
                     aria-label="Enlarge product image"
                     title="View enlarged flacon"
                   >
@@ -759,7 +786,11 @@ function ProductDetails() {
                         type="button"
                         key={`thumb-${idx}`}
                         className={`thumbnail-thumb-btn ${isActive ? "active" : ""}`}
-                        onClick={() => setActiveImageIndex(idx)}
+                        onClick={() => {
+                          setActiveImageIndex(idx);
+                          setIsHoverZooming(false);
+                          setZoomCoords({ x: 50, y: 50 });
+                        }}
                         aria-label={`View image ${idx + 1} of ${imagesList.length}`}
                         role="tab"
                         aria-selected={isActive}

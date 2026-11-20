@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { getDashboardRevenue } from "../../services/admin.service.js";
 import "./RevenueAnalyticsGraph.css";
 
 const FILTER_PRESETS = [
@@ -53,35 +54,22 @@ export default function RevenueAnalyticsGraph() {
       setLoading(true);
       setError(null);
 
-      const params = new URLSearchParams();
-      params.set("period", activePeriod);
+      const params = { period: activePeriod };
       if (activePeriod === "custom") {
-        if (start) params.set("startDate", start);
-        if (end) params.set("endDate", end);
+        if (start) params.startDate = start;
+        if (end) params.endDate = end;
       }
 
-      const apiHost = window.location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost";
-      const res = await fetch(`http://${apiHost}:5000/api/admin/sales/dashboard-revenue?${params.toString()}`, {
-        credentials: "include",
-      });
+      const data = await getDashboardRevenue(params);
 
-      const contentType = res.headers.get("content-type");
-      let data = {};
-      if (contentType && contentType.includes("application/json")) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        throw new Error(`Server responded with ${res.status}: ${text.slice(0, 100)}`);
-      }
-
-      if (res.ok && data.success) {
+      if (data && data.success) {
         setAnalyticsData(data.data);
       } else {
-        setError(data.message || `Failed to load revenue analytics (${res.status}).`);
+        setError(data?.message || "Failed to load revenue analytics.");
       }
     } catch (err) {
       console.error("Dashboard revenue fetch error:", err);
-      setError(err.message || "Unable to connect to revenue service.");
+      setError(err.response?.data?.message || err.message || "Unable to connect to revenue service.");
     } finally {
       setLoading(false);
     }

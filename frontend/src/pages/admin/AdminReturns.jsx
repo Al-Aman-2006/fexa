@@ -2,6 +2,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useAdminAuth } from "../../context/AdminAuthContext";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminPagination from "../../components/admin/AdminPagination";
+import { getImageUrl } from "../../utils/imageUrl.js";
+import {
+  getAdminReturns,
+  approveAdminReturn,
+  rejectAdminReturn,
+} from "../../services/admin.service.js";
 import "./AdminReturns.css";
 
 const STATUS_FILTER_OPTIONS = [
@@ -12,14 +18,6 @@ const STATUS_FILTER_OPTIONS = [
   "Refunded",
   "Rejected",
 ];
-
-const getImageUrl = (imagePath) => {
-  if (!imagePath) return null;
-  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
-    return imagePath;
-  }
-  return `http://localhost:5000${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
-};
 
 const formatINR = (val) => {
   if (val === undefined || val === null) return "₹0.00";
@@ -92,23 +90,19 @@ export default function AdminReturns() {
   const fetchReturns = useCallback(async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: "10",
+      const params = {
+        page,
+        limit: 10,
         search: appliedSearch,
         status: statusFilter,
-      });
+      };
 
-      if (startDate) params.append("startDate", startDate);
-      if (endDate) params.append("endDate", endDate);
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
 
-      const res = await fetch(`http://localhost:5000/api/admin/returns?${params.toString()}`, {
-        method: "GET",
-        credentials: "include",
-      });
+      const data = await getAdminReturns(params);
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      if (data && data.success) {
         setReturnsList(data.returns || []);
         if (data.stats) setStats(data.stats);
         if (data.pagination) {
@@ -118,11 +112,11 @@ export default function AdminReturns() {
           }
         }
       } else {
-        showToast(data.message || "Failed to load return requests.", "error");
+        showToast(data?.message || "Failed to load return requests.", "error");
       }
     } catch (err) {
       console.error("Fetch admin returns error:", err);
-      showToast("Unable to reach FEXA return service.", "error");
+      showToast(err.response?.data?.message || "Unable to reach FEXA return service.", "error");
     } finally {
       setLoading(false);
     }
@@ -156,18 +150,9 @@ export default function AdminReturns() {
 
     try {
       setActionProcessing(true);
-      const res = await fetch(
-        `http://localhost:5000/api/admin/returns/${approveConfirmReturn._id}/approve`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ adminNotes }),
-        }
-      );
+      const data = await approveAdminReturn(approveConfirmReturn._id, { adminNotes });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      if (data && data.success) {
         showToast(
           `Return #${approveConfirmReturn.requestNumber} approved! ${formatINR(data.refundAmount)} credited to customer's wallet.`,
           "success"
@@ -177,11 +162,11 @@ export default function AdminReturns() {
         if (isDetailModalOpen) setIsDetailModalOpen(false);
         fetchReturns();
       } else {
-        showToast(data.message || "Failed to approve return.", "error");
+        showToast(data?.message || "Failed to approve return.", "error");
       }
     } catch (err) {
       console.error("Approve return error:", err);
-      showToast("Server communication error during approval.", "error");
+      showToast(err.response?.data?.message || "Server communication error during approval.", "error");
     } finally {
       setActionProcessing(false);
     }
@@ -199,21 +184,12 @@ export default function AdminReturns() {
 
     try {
       setActionProcessing(true);
-      const res = await fetch(
-        `http://localhost:5000/api/admin/returns/${rejectModalReturn._id}/reject`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            rejectionReason: rejectionReason.trim(),
-            adminNotes: adminNotes.trim(),
-          }),
-        }
-      );
+      const data = await rejectAdminReturn(rejectModalReturn._id, {
+        rejectionReason: rejectionReason.trim(),
+        adminNotes: adminNotes.trim(),
+      });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      if (data && data.success) {
         showToast(`Return request #${rejectModalReturn.requestNumber} has been rejected.`, "success");
         setRejectModalReturn(null);
         setRejectionReason("");
@@ -221,11 +197,11 @@ export default function AdminReturns() {
         if (isDetailModalOpen) setIsDetailModalOpen(false);
         fetchReturns();
       } else {
-        showToast(data.message || "Failed to reject return.", "error");
+        showToast(data?.message || "Failed to reject return.", "error");
       }
     } catch (err) {
       console.error("Reject return error:", err);
-      showToast("Server error during rejection.", "error");
+      showToast(err.response?.data?.message || "Server error during rejection.", "error");
     } finally {
       setActionProcessing(false);
     }
@@ -844,7 +820,7 @@ export default function AdminReturns() {
                 <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "#34d399" }}>
                   {formatINR(
                     approveConfirmReturn.actualRefundAmount ||
-                      approveConfirmReturn.eligibleRefundAmount
+                    approveConfirmReturn.eligibleRefundAmount
                   )}
                 </div>
                 <div style={{ fontSize: "0.74rem", color: "#9494a8", marginTop: "4px" }}>

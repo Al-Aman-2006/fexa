@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import Navbar from "../../components/common/Navbar";
 import ProductCard from "../../components/product/ProductCard";
 import ContactSection from "../../components/common/ContactSection";
+import { getProducts } from "../../services/product.service.js";
 
 // Editorial assets
 import aboutAtelierImg from "../../assets/images/about/about_atelier.jpg";
@@ -47,19 +48,20 @@ function Home() {
       try {
         setLoadingProducts(true);
         setProductsError(null);
-        const res = await fetch("http://localhost:5000/api/products?limit=8&sort=featured");
-        const data = await res.json();
+        const data = await getProducts({ limit: 8, sort: "featured" });
         if (isMounted) {
-          if (res.ok && data.success) {
+          if (data && data.success) {
             setFeaturedProducts(data.products || []);
           } else {
-            setProductsError(data.message || "Unable to load featured fragrances.");
+            setProductsError(data?.message || "Unable to load featured fragrances.");
           }
         }
       } catch (err) {
         if (isMounted) {
           console.error("Home featured products fetch error:", err);
-          setProductsError("Unable to connect to the FEXA atelier service.");
+          setProductsError(
+            err.response?.data?.message || "Unable to connect to the FEXA atelier service."
+          );
         }
       } finally {
         if (isMounted) {

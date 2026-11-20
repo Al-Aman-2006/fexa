@@ -269,25 +269,25 @@ export const validatePhone = (value, country = "India") => {
 
 export const validateHouse = (value) => {
   const trimmed = (value || "").trim();
-  if (!trimmed) return "House / Building is required.";
-  if (trimmed.length < 2) return "House / Building must be at least 2 characters.";
+  if (!trimmed) return "House / Building name is required.";
+  if (trimmed.length < 1) return "House / Building name is required.";
   if (trimmed.length > 100) return "House / Building cannot exceed 100 characters.";
   if (!/[a-zA-Z0-9]/.test(trimmed)) {
-    return "House / Building cannot contain only punctuation.";
+    return "House / Building must contain valid alphanumeric characters.";
   }
   return null;
 };
 
 export const validateStreet = (value) => {
   const trimmed = (value || "").trim();
-  if (!trimmed) return "Street address is required.";
-  if (trimmed.length < 5) return "Street address must be at least 5 characters.";
-  if (trimmed.length > 200) return "Street address cannot exceed 200 characters.";
+  if (!trimmed) return "Street / Locality is required.";
+  if (trimmed.length < 2) return "Street / Locality must be at least 2 characters.";
+  if (trimmed.length > 200) return "Street / Locality cannot exceed 200 characters.";
   if (!/[a-zA-Z0-9]/.test(trimmed)) {
-    return "Street address cannot contain only punctuation.";
+    return "Street / Locality must contain valid alphanumeric characters.";
   }
-  if (!/^[a-zA-Z0-9\u00C0-\u024F\u1E00-\u1EFF\s,.\-#/&'’]+$/.test(trimmed)) {
-    return "Street address contains invalid characters.";
+  if (!/^[a-zA-Z0-9\u00C0-\u024F\u1E00-\u1EFF\s,.\-#/&'’()]+$/.test(trimmed)) {
+    return "Street / Locality contains invalid characters.";
   }
   return null;
 };
@@ -297,12 +297,13 @@ export const validateCity = (value) => {
   if (!trimmed) return "City is required.";
   if (trimmed.length < 2) return "City must be at least 2 characters.";
   if (trimmed.length > 100) return "City cannot exceed 100 characters.";
-  if (/^\d+$/.test(trimmed)) return "City cannot contain only numbers.";
-  if (!/[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF]/.test(trimmed)) {
-    return "City must contain letters.";
-  }
+  if (/\d/.test(trimmed)) return "City cannot contain numbers.";
   if (!/^[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF\s.'-]+$/.test(trimmed)) {
-    return "City contains invalid characters.";
+    return "City can only contain letters, spaces, hyphens, and apostrophes.";
+  }
+  const letterCount = (trimmed.match(/[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF]/g) || []).length;
+  if (letterCount < 2) {
+    return "City must contain at least 2 letters.";
   }
   return null;
 };
@@ -312,12 +313,13 @@ export const validateState = (value) => {
   if (!trimmed) return "State is required.";
   if (trimmed.length < 2) return "State must be at least 2 characters.";
   if (trimmed.length > 100) return "State cannot exceed 100 characters.";
-  if (/^\d+$/.test(trimmed)) return "State cannot contain only numbers.";
-  if (!/[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF]/.test(trimmed)) {
-    return "State must contain letters.";
-  }
+  if (/\d/.test(trimmed)) return "State cannot contain numbers.";
   if (!/^[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF\s.'-]+$/.test(trimmed)) {
-    return "State contains invalid characters.";
+    return "State can only contain letters, spaces, hyphens, and apostrophes.";
+  }
+  const letterCount = (trimmed.match(/[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF]/g) || []).length;
+  if (letterCount < 2) {
+    return "State must contain at least 2 letters.";
   }
   return null;
 };
@@ -334,7 +336,7 @@ export const validatePincode = (value, country = "India") => {
       return "PIN code cannot contain letters.";
     }
     if (!/^[1-9][0-9]{5}$/.test(normalized)) {
-      return "Please enter a valid 6-digit Indian PIN code.";
+      return "Please enter a valid 6-digit Indian PIN code (cannot start with 0).";
     }
   } else {
     if (!/^[a-zA-Z0-9-]{3,10}$/.test(normalized)) {

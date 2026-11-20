@@ -5,6 +5,7 @@ import { useCart } from "../../context/CartContext";
 import { useWishlist } from "../../context/WishlistContext";
 import UserSidebar from "../../components/user/UserSidebar";
 import Navbar from "../../components/common/Navbar";
+import { getImageUrl } from "../../utils/imageUrl.js";
 import {
   validateAddressField,
   validateAddressForm,
@@ -14,6 +15,30 @@ import {
   normalizeEmail,
   validateProfilePhone,
 } from "../../utils/validation";
+import {
+  getProfile,
+  updateProfile,
+  uploadProfileImage,
+  verifyEmailChange,
+  resendEmailChangeOtp,
+  addAddress,
+  updateAddress,
+  deleteAddress,
+  getWalletBalance,
+  getWalletTransactions,
+} from "../../services/user.service.js";
+import {
+  createWalletTopUp,
+  verifyWalletTopUp,
+} from "../../services/payment.service.js";
+import {
+  getMyOrders,
+  getCustomerReturns,
+  getEligibleReturnItems,
+  cancelOrderItem,
+  createReturnRequest,
+  downloadInvoice,
+} from "../../services/order.service.js";
 
 import "./profile.css";
 
@@ -59,21 +84,7 @@ const loadRazorpayScript = () => {
   });
 };
 
-const getProfileImageUrl = (imagePath) => {
-  if (!imagePath) return null;
-  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
-    return imagePath;
-  }
-  return `http://localhost:5000${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
-};
-
-const getImageUrl = (imagePath) => {
-  if (!imagePath) return null;
-  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
-    return imagePath;
-  }
-  return `http://localhost:5000${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
-};
+const getProfileImageUrl = getImageUrl;
 
 const formatPrice = (val) => {
   if (val === undefined || val === null) return "₹0";
@@ -106,25 +117,16 @@ function Profile() {
     try {
       setOrdersLoading(true);
       setOrdersError("");
-      const token = localStorage.getItem("token");
-      const headers = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const res = await fetch("http://localhost:5000/api/orders", {
-        method: "GET",
-        credentials: "include",
-        headers,
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = await getMyOrders();
+      if (data && data.success) {
         setOrders(data.orders || []);
       } else {
-        setOrdersError(data.message || "Failed to load orders.");
+        setOrdersError(data?.message || "Failed to load orders.");
       }
     } catch (err) {
       console.error("Fetch orders error:", err);
-      setOrdersError("Unable to retrieve order history.");
+      setOrdersError(err.response?.data?.message || "Unable to retrieve order history.");
     } finally {
       setOrdersLoading(false);
     }
@@ -157,39 +159,27 @@ function Profile() {
   const fetchWalletData = useCallback(async () => {
     try {
       setWalletLoading(true);
-      const token = localStorage.getItem("token");
-      const headers = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const params = new URLSearchParams({
+      const queryParams = {
         page: String(walletTxPage),
         limit: "10",
         type: walletTxFilter,
         direction: walletTxDirection,
-      });
-      if (walletSearch.trim()) params.append("search", walletSearch.trim());
+      };
+      if (walletSearch.trim()) queryParams.search = walletSearch.trim();
 
-      const [balRes, txRes] = await Promise.all([
-        fetch("http://localhost:5000/api/wallet", {
-          credentials: "include",
-          headers,
-        }),
-        fetch(`http://localhost:5000/api/wallet/transactions?${params.toString()}`, {
-          credentials: "include",
-          headers,
-        }),
+      const [balData, txData] = await Promise.all([
+        getWalletBalance(),
+        getWalletTransactions(queryParams),
       ]);
 
-      const balData = await balRes.json();
-      const txData = await txRes.json();
-
-      if (balRes.ok && balData.success) {
+      if (balData?.success) {
         setWalletBalance(balData.balance || 0);
         setWalletTotalCredited(balData.totalCredited || 0);
         setWalletTotalDebited(balData.totalDebited || 0);
         setWalletCurrency(balData.currency || "INR");
       }
-      if (txRes.ok && txData.success) {
+      if (txData?.success) {
         setWalletTransactions(txData.transactions || []);
         if (txData.pagination) setWalletTxPagination(txData.pagination);
       }
@@ -227,20 +217,18 @@ function Profile() {
 
     try {
       setTopUpProcessing(true);
-      const token = localStorage.getItem("token");
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const res = await fetch("http://localhost:5000/api/wallet/topup/create-order", {
-        method: "POST",
-        credentials: "include",
-        headers,
-        body: JSON.stringify({ amount: numAmount }),
-      });
+      let data;
+      try {
+        data = await createWalletTopUp({ amount: numAmount });
+      } catch (createErr) {
+        setTopUpError(createErr.response?.data?.message || "Failed to initialize payment gateway.");
+        setTopUpProcessing(false);
+        return;
+      }
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        setTopUpError(data.message || "Failed to initialize payment gateway.");
+      if (!data?.success) {
+        setTopUpError(data?.message || "Failed to initialize payment gateway.");
         setTopUpProcessing(false);
         return;
       }
@@ -270,20 +258,15 @@ function Profile() {
         handler: async function (paymentResponse) {
           try {
             setTopUpProcessing(true);
-            const verifyRes = await fetch("http://localhost:5000/api/wallet/topup/verify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({
-                razorpay_order_id: paymentResponse.razorpay_order_id,
-                razorpay_payment_id: paymentResponse.razorpay_payment_id,
-                razorpay_signature: paymentResponse.razorpay_signature,
-                amount: numAmount,
-              }),
+
+            const verifyData = await verifyWalletTopUp({
+              razorpay_order_id: paymentResponse.razorpay_order_id,
+              razorpay_payment_id: paymentResponse.razorpay_payment_id,
+              razorpay_signature: paymentResponse.razorpay_signature,
+              amount: numAmount,
             });
 
-            const verifyData = await verifyRes.json();
-            if (verifyRes.ok && verifyData.success) {
+            if (verifyData?.success) {
               setTopUpSuccessModal({
                 amount: numAmount,
                 balance: verifyData.balance,
@@ -292,11 +275,11 @@ function Profile() {
               setTopUpAmount("");
               fetchWalletData();
             } else {
-              setTopUpError(verifyData.message || "Payment verification failed.");
+              setTopUpError(verifyData?.message || "Payment verification failed.");
             }
           } catch (vErr) {
             console.error("Verification error:", vErr);
-            setTopUpError("Failed to finalize wallet credit.");
+            setTopUpError(vErr.response?.data?.message || "Failed to finalize wallet credit.");
           } finally {
             setTopUpProcessing(false);
           }
@@ -354,16 +337,8 @@ function Profile() {
   const fetchCustomerReturns = useCallback(async () => {
     try {
       setReturnsLoading(true);
-      const token = localStorage.getItem("token");
-      const headers = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const res = await fetch(`http://localhost:5000/api/returns?page=${returnsPage}&limit=10`, {
-        credentials: "include",
-        headers,
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = await getCustomerReturns({ page: returnsPage, limit: 10 });
+      if (data && data.success) {
         setCustomerReturns(data.returns || []);
         if (data.pagination) setReturnsPagination(data.pagination);
       }
@@ -377,16 +352,8 @@ function Profile() {
   const fetchEligibleReturnItems = async () => {
     try {
       setEligibleLoading(true);
-      const token = localStorage.getItem("token");
-      const headers = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const res = await fetch("http://localhost:5000/api/returns/eligible-items", {
-        credentials: "include",
-        headers,
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = await getEligibleReturnItems();
+      if (data && data.success) {
         setEligibleItems(data.items || []);
         setIsEligiblePickerOpen(true);
       }
@@ -439,10 +406,6 @@ function Profile() {
       setCancelErrorMsg("");
       setCancelSuccessMsg("");
 
-      const token = localStorage.getItem("token");
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
       const finalReason =
         cancelReason === "Other" && cancelCustomerNotes
           ? `Other: ${cancelCustomerNotes.trim()}`
@@ -451,27 +414,29 @@ function Profile() {
       const orderId = cancelModalOrder._id || cancelModalOrder.orderId;
       const itemId = cancelModalItem._id || cancelModalItem.itemId;
 
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/items/${itemId}/cancel`, {
-        method: "POST",
-        credentials: "include",
-        headers,
-        body: JSON.stringify({ reason: finalReason }),
-      });
+      let data;
+      try {
+        data = await cancelOrderItem(orderId, itemId, { reason: finalReason });
+      } catch (cancelErr) {
+        data = cancelErr.response?.data;
+        if (!data) throw cancelErr;
+      }
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      if (data && data.success) {
         setCancelSuccessMsg(data.message || "Fragrance cancelled successfully.");
         if (data.order) {
           setOrders((prevOrders) =>
             prevOrders.map((ord) => (ord._id === data.order._id ? data.order : ord))
           );
         }
-        await fetchOrders();
+        await Promise.all([fetchOrders(), fetchWalletData()]);
+        window.dispatchEvent(new CustomEvent("fexa:orders-updated"));
+        window.dispatchEvent(new CustomEvent("fexa:wallet-updated"));
         setTimeout(() => {
           handleCloseCancelModal();
         }, 1500);
       } else {
-        setCancelErrorMsg(data.message || "Unable to cancel fragrance item.");
+        setCancelErrorMsg(data?.message || "Unable to cancel fragrance item.");
       }
     } catch (err) {
       console.error("Cancel item error:", err);
@@ -495,33 +460,30 @@ function Profile() {
       setReturnErrorMsg("");
       setReturnSuccessMsg("");
 
-      const token = localStorage.getItem("token");
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const res = await fetch("http://localhost:5000/api/returns", {
-        method: "POST",
-        credentials: "include",
-        headers,
-        body: JSON.stringify({
+      let data;
+      try {
+        data = await createReturnRequest({
           orderId: returnModalOrder._id || returnModalOrder.orderId,
           itemId: returnModalItem._id || returnModalItem.itemId,
           returnReason,
           customerNotes,
           quantity: returnQuantity,
-        }),
-      });
+        });
+      } catch (retErr) {
+        data = retErr.response?.data;
+        if (!data) throw retErr;
+      }
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      if (data && data.success) {
         setReturnSuccessMsg(data.message || "Return request submitted successfully.");
         await Promise.all([fetchOrders(), fetchCustomerReturns()]);
+        window.dispatchEvent(new CustomEvent("fexa:orders-updated"));
         setTimeout(() => {
           handleCloseReturnModal();
           setIsEligiblePickerOpen(false);
         }, 1500);
       } else {
-        setReturnErrorMsg(data.message || "Unable to submit return request.");
+        setReturnErrorMsg(data?.message || "Unable to submit return request.");
       }
     } catch (err) {
       console.error("Submit return error:", err);
@@ -535,21 +497,8 @@ function Profile() {
   const handleDownloadInvoice = async (orderId, orderNumber) => {
     try {
       setDownloadingInvoiceId(orderId);
-      const token = localStorage.getItem("token");
-      const headers = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/invoice`, {
-        credentials: "include",
-        headers,
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to download invoice.");
-      }
-
-      const blob = await res.blob();
+      const blob = await downloadInvoice(orderId);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -587,9 +536,11 @@ function Profile() {
     };
 
     window.addEventListener("focus", handleWindowFocus);
+    window.addEventListener("fexa:wallet-updated", fetchWalletData);
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", handleWindowFocus);
+      window.removeEventListener("fexa:wallet-updated", fetchWalletData);
     };
   }, [activeTab, fetchWalletData, fetchCustomerReturns]);
 
@@ -695,23 +646,7 @@ function Profile() {
 
   const fetchProfile = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/profile", {
-        method: "GET",
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          await logout();
-          navigate("/login");
-          return;
-        }
-
-        setError(data.message || "Unable to load profile.");
-        return;
-      }
+      const data = await getProfile();
 
       setUser(data.user);
       setName(data.user.name || "");
@@ -726,7 +661,12 @@ function Profile() {
       }
     } catch (error) {
       console.error("Profile error:", error);
-      setError("Unable to connect to the server.");
+      if (error.response?.status === 401) {
+        await logout();
+        navigate("/login");
+        return;
+      }
+      setError(error.response?.data?.message || "Unable to connect to the server.");
     } finally {
       setLoading(false);
     }
@@ -856,53 +796,11 @@ function Profile() {
       const normalizedEmail = isGoogleUser ? user?.email : normalizeEmail(email);
       const normalizedPhone = phone ? phone.trim() : "";
 
-      const response = await fetch("http://localhost:5000/api/profile", {
-        method: "PUT",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: normalizedName,
-          phone: normalizedPhone,
-          email: normalizedEmail,
-        }),
+      const data = await updateProfile({
+        name: normalizedName,
+        phone: normalizedPhone,
+        email: normalizedEmail,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          await logout();
-          navigate("/login");
-          return;
-        }
-
-        if (data.errors) {
-          if (data.errors.name) {
-            setNameError(data.errors.name);
-            setNameTouched(true);
-          }
-          if (data.errors.email) {
-            setEmailError(data.errors.email);
-            setEmailTouched(true);
-          }
-          if (data.errors.phone) {
-            setPhoneError(data.errors.phone);
-            setPhoneTouched(true);
-          }
-
-          if (data.errors.name) {
-            document.getElementById("profile-name-input")?.focus();
-          } else if (data.errors.email) {
-            document.getElementById("profile-email-input")?.focus();
-          } else if (data.errors.phone) {
-            document.getElementById("profile-phone-input")?.focus();
-          }
-        }
-        setError(data.message || "Unable to update profile.");
-        return;
-      }
 
       if (data.emailChangePending) {
         setPendingEmail(data.pendingEmail);
@@ -928,7 +826,36 @@ function Profile() {
       }
     } catch (error) {
       console.error("Update profile error:", error);
-      setError("Unable to connect to the server.");
+      if (error.response?.status === 401) {
+        await logout();
+        navigate("/login");
+        return;
+      }
+
+      const data = error.response?.data;
+      if (data?.errors) {
+        if (data.errors.name) {
+          setNameError(data.errors.name);
+          setNameTouched(true);
+        }
+        if (data.errors.email) {
+          setEmailError(data.errors.email);
+          setEmailTouched(true);
+        }
+        if (data.errors.phone) {
+          setPhoneError(data.errors.phone);
+          setPhoneTouched(true);
+        }
+
+        if (data.errors.name) {
+          document.getElementById("profile-name-input")?.focus();
+        } else if (data.errors.email) {
+          document.getElementById("profile-email-input")?.focus();
+        } else if (data.errors.phone) {
+          document.getElementById("profile-phone-input")?.focus();
+        }
+      }
+      setError(data?.message || "Unable to update profile.");
     } finally {
       setSaving(false);
     }
@@ -946,27 +873,7 @@ function Profile() {
 
       setVerifyingOtp(true);
 
-      const response = await fetch("http://localhost:5000/api/profile/verify-email-change", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ otp: otp.trim() }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          await logout();
-          navigate("/login");
-          return;
-        }
-
-        setError(data.message || "Unable to verify email code.");
-        return;
-      }
+      const data = await verifyEmailChange({ otp: otp.trim() });
 
       setUser((previousUser) => ({
         ...previousUser,
@@ -987,7 +894,12 @@ function Profile() {
       setSuccessMessage("Email updated successfully.");
     } catch (error) {
       console.error("Verify email error:", error);
-      setError("Unable to connect to the server.");
+      if (error.response?.status === 401) {
+        await logout();
+        navigate("/login");
+        return;
+      }
+      setError(error.response?.data?.message || "Unable to verify email code.");
     } finally {
       setVerifyingOtp(false);
     }
@@ -1001,25 +913,15 @@ function Profile() {
       setSuccessMessage("");
       setResendingOtp(true);
 
-      const response = await fetch("http://localhost:5000/api/profile/resend-email-change-otp", {
-        method: "POST",
-        credentials: "include",
-      });
+      const data = await resendEmailChangeOtp();
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || "Unable to resend verification code.");
-        return;
-      }
-
-      if (data.emailChangeOtpExpiresAt) {
+      if (data?.emailChangeOtpExpiresAt) {
         setOtpExpiresAt(data.emailChangeOtpExpiresAt);
       }
-      setSuccessMessage(data.message || "New verification code sent.");
+      setSuccessMessage(data?.message || "New verification code sent.");
     } catch (error) {
       console.error("Resend OTP error:", error);
-      setError("Unable to connect to the server.");
+      setError(error.response?.data?.message || "Unable to resend verification code.");
     } finally {
       setResendingOtp(false);
     }
@@ -1054,24 +956,7 @@ function Profile() {
       const formData = new FormData();
       formData.append("profileImage", file);
 
-      const response = await fetch("http://localhost:5000/api/profile/upload-image", {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          await logout();
-          navigate("/login");
-          return;
-        }
-
-        setError(data.message || "Unable to upload profile image.");
-        return;
-      }
+      const data = await uploadProfileImage(formData);
 
       const updatedImage = data.profileImage || (data.user && data.user.profileImage);
 
@@ -1089,7 +974,12 @@ function Profile() {
       setSuccessMessage("Profile picture updated successfully.");
     } catch (error) {
       console.error("Profile image upload error:", error);
-      setError("Unable to connect to the server.");
+      if (error.response?.status === 401) {
+        await logout();
+        navigate("/login");
+        return;
+      }
+      setError(error.response?.data?.message || "Unable to upload profile image.");
     } finally {
       setUploadingImage(false);
       event.target.value = "";
@@ -1250,35 +1140,9 @@ function Profile() {
 
       setSavingAddress(true);
 
-      const endpoint = editingAddressId
-        ? `http://localhost:5000/api/profile/addresses/${editingAddressId}`
-        : "http://localhost:5000/api/profile/addresses";
-      const method = editingAddressId ? "PUT" : "POST";
-
-      const response = await fetch(endpoint, {
-        method,
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(addressForm),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          await logout();
-          navigate("/login");
-          return;
-        }
-
-        if (data.errors) {
-          setAddressErrors(data.errors);
-        }
-        setError(data.message || (editingAddressId ? "Unable to update address." : "Unable to add address."));
-        return;
-      }
+      const data = editingAddressId
+        ? await updateAddress(editingAddressId, addressForm)
+        : await addAddress(addressForm);
 
       setUser((previousUser) => ({
         ...previousUser,
@@ -1289,7 +1153,17 @@ function Profile() {
       setSuccessMessage(editingAddressId ? "Address updated successfully." : "Address added successfully.");
     } catch (error) {
       console.error("Save address error:", error);
-      setError("Unable to connect to the server.");
+      if (error.response?.status === 401) {
+        await logout();
+        navigate("/login");
+        return;
+      }
+
+      const data = error.response?.data;
+      if (data?.errors) {
+        setAddressErrors(data.errors);
+      }
+      setError(data?.message || (editingAddressId ? "Unable to update address." : "Unable to add address."));
     } finally {
       setSavingAddress(false);
     }
@@ -1302,22 +1176,8 @@ function Profile() {
     try {
       setError("");
       setSuccessMessage("");
-      const response = await fetch(`http://localhost:5000/api/profile/addresses/${addressId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          await logout();
-          navigate("/login");
-          return;
-        }
-        setError(data.message || "Unable to delete address.");
-        return;
-      }
+      const data = await deleteAddress(addressId);
 
       setUser((previousUser) => ({
         ...previousUser,
@@ -1330,7 +1190,12 @@ function Profile() {
       setSuccessMessage("Address deleted successfully.");
     } catch (error) {
       console.error("Delete address error:", error);
-      setError("Unable to connect to the server.");
+      if (error.response?.status === 401) {
+        await logout();
+        navigate("/login");
+        return;
+      }
+      setError(error.response?.data?.message || "Unable to delete address.");
     }
   };
 
@@ -2417,18 +2282,63 @@ function Profile() {
                                 {order.shippingCost === 0 ? "Complimentary" : formatPrice(order.shippingCost)}
                               </span>
                             </div>
-                            <div className="breakdown-row">
-                              <span>Payment Method</span>
-                              <span>{order.paymentMethod === "COD" ? "Cash on Delivery" : order.paymentMethod === "Razorpay" ? "Razorpay Online" : order.paymentMethod} ({order.paymentStatus || "Pending"})</span>
-                            </div>
-                            {order.razorpayPaymentId && (
+                            <div className="order-payment-info-box" style={{ marginTop: "10px", padding: "10px 12px", background: "#fcfaff", borderRadius: "8px", border: "1px solid #ebdff5" }}>
+                              <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#6a4f82", letterSpacing: "0.06em", marginBottom: "6px" }}>
+                                PAYMENT DETAILS
+                              </div>
                               <div className="breakdown-row">
-                                <span>Razorpay Payment ID</span>
-                                <span style={{ fontFamily: "monospace", fontSize: "0.78rem", color: "#6a4f82" }}>
-                                  {order.razorpayPaymentId}
+                                <span>Payment Method</span>
+                                <strong>
+                                  {order.paymentMethod === "COD"
+                                    ? "Cash on Delivery"
+                                    : order.paymentMethod === "Razorpay"
+                                    ? "Razorpay Online Gateway"
+                                    : order.paymentMethod === "Wallet" || order.paymentMethod === "wallet"
+                                    ? "FEXA Wallet"
+                                    : order.paymentMethod}
+                                </strong>
+                              </div>
+                              <div className="breakdown-row">
+                                <span>Payment Status</span>
+                                <span style={{ color: order.paymentStatus === "Paid" ? "#059669" : "#d97706", fontWeight: 700 }}>
+                                  {order.paymentStatus === "Paid" ? "✓ Paid & Confirmed" : order.paymentStatus || "Pending"}
                                 </span>
                               </div>
-                            )}
+                              {(order.paymentMethod === "Wallet" || order.paymentMethod === "wallet") && (
+                                <>
+                                  <div className="breakdown-row">
+                                    <span>Wallet Transaction ID</span>
+                                    <span style={{ fontFamily: "monospace", fontSize: "0.78rem", color: "#6a4f82", fontWeight: 700 }}>
+                                      {order.walletTransactionId || `TXN-WLT-${order.orderNumber}`}
+                                    </span>
+                                  </div>
+                                  <div className="breakdown-row">
+                                    <span>Amount Deducted</span>
+                                    <strong style={{ color: "#059669" }}>
+                                      {formatPrice(order.totalAmount)}
+                                    </strong>
+                                  </div>
+                                  <div className="breakdown-row">
+                                    <span>Payment Date</span>
+                                    <span style={{ fontSize: "0.78rem", color: "#6b5d7d" }}>
+                                      {new Date(order.paidAt || order.createdAt).toLocaleDateString("en-IN", {
+                                        day: "numeric",
+                                        month: "short",
+                                        year: "numeric",
+                                      })}
+                                    </span>
+                                  </div>
+                                </>
+                              )}
+                              {order.razorpayPaymentId && (
+                                <div className="breakdown-row">
+                                  <span>Razorpay Payment ID</span>
+                                  <span style={{ fontFamily: "monospace", fontSize: "0.78rem", color: "#6a4f82" }}>
+                                    {order.razorpayPaymentId}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                             <div className="breakdown-divider" />
                             <div className="breakdown-row total">
                               <span>Total Paid / Due</span>
@@ -3008,13 +2918,13 @@ function Profile() {
                 <div className="callout-row refund-highlight">
                   <span>Payment / Refund Mode</span>
                   <span className="refund-mode-tag">
-                    {cancelModalOrder.paymentMethod === "Razorpay" && cancelModalOrder.paymentStatus === "Paid"
-                      ? "Razorpay Online Gateway"
+                    {cancelModalOrder.paymentStatus === "Paid"
+                      ? "FEXA Atelier Wallet (Instant Credit)"
                       : "Cash on Delivery"}
                   </span>
                 </div>
 
-                {cancelModalOrder.paymentMethod === "Razorpay" && cancelModalOrder.paymentStatus === "Paid" ? (
+                {cancelModalOrder.paymentStatus === "Paid" ? (
                   <p className="callout-explanation">
                     ✓ A refund of{" "}
                     <strong>
@@ -3023,7 +2933,7 @@ function Profile() {
                         (cancelModalItem.lineTotal - (cancelModalItem.allocatedCouponDiscount || 0))
                       )}
                     </strong>{" "}
-                    will be initiated directly to your original payment method (Card / UPI / NetBanking) upon confirmation.
+                    will be credited directly to your FEXA Atelier Wallet immediately upon confirmation.
                   </p>
                 ) : (
                   <p className="callout-explanation">

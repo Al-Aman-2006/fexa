@@ -20,34 +20,13 @@ import {
   resendEmailChangeOtp,
 } from "../controllers/profile.controller.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const router = express.Router();
 
-const uploadDir = path.join(__dirname, "../uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
 // ========================================
-// MULTER CONFIGURATION
+// MULTER CONFIGURATION (In-Memory Storage)
 // ========================================
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-
-  filename: (req, file, cb) => {
-    const extension = path.extname(file.originalname);
-
-    const filename =
-      `profile-${req.user.id}-${Date.now()}${extension}`;
-
-    cb(null, filename);
-  },
-});
+const storage = multer.memoryStorage();
 
 // ========================================
 // FILE FILTER
