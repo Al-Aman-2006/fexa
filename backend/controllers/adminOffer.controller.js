@@ -3,6 +3,7 @@ import Offer from "../models/offer.model.js";
 import Product from "../models/product.model.js";
 import Order from "../models/order.model.js";
 import Category from "../models/category.model.js";
+import { resolveProductImages } from "../services/imageResolver.service.js";
 
 /**
  * GET ADMIN OFFERS
@@ -110,14 +111,32 @@ export const getAdminOffers = async (req, res) => {
         ? orderStatsAggregate[0].totalOrdersWithOffers.length
         : 0;
 
-    const totalOfferSavings =
-      orderStatsAggregate.length > 0 && orderStatsAggregate[0].totalSavingsGranted
-        ? Math.round(orderStatsAggregate[0].totalSavingsGranted)
-        : 0;
+   const totalOfferSavings =
+  orderStatsAggregate.length > 0 && orderStatsAggregate[0].totalSavingsGranted
+    ? Math.round(orderStatsAggregate[0].totalSavingsGranted)
+    : 0;
+
+    const resolvedOffers = await Promise.all(
+      offers.map(async (offer) => {
+        const offerData = offer.toObject();
+
+        if (offerData.productId) {
+          offerData.productId = await resolveProductImages(offerData.productId);
+        }
+
+        if (Array.isArray(offerData.productIds)) {
+          offerData.productIds = await Promise.all(
+            offerData.productIds.map((product) => resolveProductImages(product))
+          );
+        }
+
+        return offerData;
+      })
+    );
 
     return res.status(200).json({
       success: true,
-      offers,
+      offers: resolvedOffers,
       pagination: {
         page,
         limit,
@@ -134,13 +153,14 @@ export const getAdminOffers = async (req, res) => {
         totalOfferSavings,
       },
     });
-  } catch (error) {
-    console.error("Get admin offers error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to retrieve offer list. Please try again.",
-    });
-  }
+
+} catch (error) {
+  console.error("Get admin offers error:", error);
+  return res.status(500).json({
+    success: false,
+    message: "Failed to retrieve offer list. Please try again.",
+  });
+}
 };
 
 /**
@@ -160,17 +180,34 @@ export const getOfferById = async (req, res) => {
       .populate("productId", "name brand category price images status variants")
       .populate("productIds", "name brand category price images status variants");
 
-    if (!offer || offer.isArchived) {
-      return res.status(404).json({
-        success: false,
-        message: "Offer not found",
-      });
-    }
+   if (!offer || offer.isArchived) {
+  return res.status(404).json({
+    success: false,
+    message: "Offer not found",
+  });
+}
 
-    return res.status(200).json({
-      success: true,
-      offer,
-    });
+// Resolve S3 product images
+const resolvedOffer = offer.toObject();
+
+if (resolvedOffer.productId) {
+  resolvedOffer.productId = await resolveProductImages(
+    resolvedOffer.productId
+  );
+}
+
+if (Array.isArray(resolvedOffer.productIds)) {
+  resolvedOffer.productIds = await Promise.all(
+    resolvedOffer.productIds.map((product) =>
+      resolveProductImages(product)
+    )
+  );
+}
+
+return res.status(200).json({
+  success: true,
+  offer: resolvedOffer,
+});
   } catch (error) {
     console.error("Get offer by ID error:", error);
     return res.status(500).json({
@@ -432,10 +469,20 @@ export const createOffer = async (req, res) => {
       .populate("productId", "name brand category price images status variants")
       .populate("productIds", "name brand category price images status variants");
 
+    const resolvedOffer = populatedOffer.toObject();
+    if (resolvedOffer.productId) {
+      resolvedOffer.productId = await resolveProductImages(resolvedOffer.productId);
+    }
+    if (Array.isArray(resolvedOffer.productIds)) {
+      resolvedOffer.productIds = await Promise.all(
+        resolvedOffer.productIds.map((p) => resolveProductImages(p))
+      );
+    }
+
     return res.status(201).json({
       success: true,
       message: "Offer created successfully",
-      offer: populatedOffer,
+      offer: resolvedOffer,
     });
   } catch (error) {
     console.error("Create offer error:", error);
@@ -565,10 +612,20 @@ export const updateOffer = async (req, res) => {
       .populate("productId", "name brand category price images status variants")
       .populate("productIds", "name brand category price images status variants");
 
+    const resolvedUpdated = updated.toObject();
+    if (resolvedUpdated.productId) {
+      resolvedUpdated.productId = await resolveProductImages(resolvedUpdated.productId);
+    }
+    if (Array.isArray(resolvedUpdated.productIds)) {
+      resolvedUpdated.productIds = await Promise.all(
+        resolvedUpdated.productIds.map((p) => resolveProductImages(p))
+      );
+    }
+
     return res.status(200).json({
       success: true,
       message: "Offer updated successfully",
-      offer: updated,
+      offer: resolvedUpdated,
     });
   } catch (error) {
     console.error("Update offer error:", error);
@@ -701,9 +758,13 @@ export const searchAdminOfferProducts = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(30);
 
+    const resolvedProducts = await Promise.all(
+      products.map((product) => resolveProductImages(product))
+    );
+
     return res.status(200).json({
       success: true,
-      products,
+      products: resolvedProducts,
     });
   } catch (error) {
     console.error("Search admin offer products error:", error);

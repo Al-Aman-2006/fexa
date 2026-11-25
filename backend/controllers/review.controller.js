@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import Review from "../models/review.model.js";
 import Product from "../models/product.model.js";
 import User from "../models/user.model.js";
-
+import { resolveProductImages } from "../services/imageResolver.service.js";
 // Helper to extract authenticated user from cookies or Bearer token (optional auth)
 const getOptionalUserId = (req) => {
   try {
@@ -81,15 +81,28 @@ export const getProductReviews = async (req, res) => {
     const totalFilteredReviews = await Review.countDocuments(queryFilter);
     const totalPages = Math.ceil(totalFilteredReviews / limit) || 1;
 
-    const reviews = await Review.find(queryFilter)
-      .populate({
-        path: "user",
-        select: "name profileImage email",
-      })
-      .sort(sortOptions)
-      .skip((page - 1) * limit)
-      .limit(limit);
+const rawReviews = await Review.find(queryFilter)
+  .populate({
+    path: "product",
+    select: "name slug brand category price compareAtPrice images status",
+  })
+  .populate({
+    path: "user",
+    select: "name email profileImage",
+  })
+  .sort(sortOptions)
+  .skip((page - 1) * limit)
+  .limit(limit);
 
+const reviews = await Promise.all(
+  rawReviews.map(async (review) => {
+    const reviewData = review.toObject();
+
+    reviewData.product = await resolveProductImages(reviewData.product);
+
+    return reviewData;
+  })
+);
     // 3. Check if current visitor is authenticated and has a review (even if pending)
     let userReview = null;
     const currentUserId = getOptionalUserId(req);

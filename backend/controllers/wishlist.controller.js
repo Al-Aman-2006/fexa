@@ -4,6 +4,7 @@ import Product from "../models/product.model.js";
 import Category from "../models/category.model.js";
 import Cart from "../models/cart.model.js";
 import { formatCartResponse } from "./cart.controller.js";
+import { resolveProductImages } from "../services/imageResolver.service.js";
 
 // Helper to format wishlist products and prune deleted product references
 const formatWishlistProducts = async (userDoc) => {
@@ -33,6 +34,7 @@ const formatWishlistProducts = async (userDoc) => {
     }
 
     const isCategoryInactive = categoryStatusMap[item.category] === false;
+    const resolvedItem = await resolveProductImages(item);
     const isInactive = item.status === "Inactive" || isCategoryInactive;
     let isOutOfStock = false;
     let livePrice = Number(item.price) || 0;
@@ -60,8 +62,11 @@ const formatWishlistProducts = async (userDoc) => {
       category: item.category,
       price: livePrice,
       compareAtPrice,
-      images: item.images || [],
-      primaryImage: item.images && item.images.length > 0 ? item.images[0] : null,
+     images: resolvedItem.images || [],
+     primaryImage:
+    resolvedItem.images && resolvedItem.images.length > 0
+    ? resolvedItem.images[0]
+    : null,
       stock: liveStock,
       status: item.status,
       variants: item.variants || [],

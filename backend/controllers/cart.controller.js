@@ -3,6 +3,7 @@ import Cart from "../models/cart.model.js";
 import Product from "../models/product.model.js";
 import Category from "../models/category.model.js";
 import { getActiveValidOffers, findBestOfferForProduct, roundToPaise } from "../utils/offerCalculator.js";
+import { resolveProductImages } from "../services/imageResolver.service.js";
 
 // Format cart helper: cleans up deleted products, computes live subtotal and item count
 const formatCartResponse = async (cartDoc) => {
@@ -49,6 +50,7 @@ const formatCartResponse = async (cartDoc) => {
     }
 
     const prod = item.product;
+    const resolvedProd = await resolveProductImages(prod);
     const isCategoryInactive = categoryStatusMap[prod.category] === false;
     const isInactive = prod.status === "Inactive" || isCategoryInactive;
 
@@ -138,8 +140,11 @@ const formatCartResponse = async (cartDoc) => {
           }
         : null,
       compareAtPrice: liveOriginalPrice,
-      images: prod.images || [],
-      primaryImage: prod.images && prod.images.length > 0 ? prod.images[0] : null,
+     images: resolvedProd.images || [],
+primaryImage:
+  resolvedProd.images && resolvedProd.images.length > 0
+    ? resolvedProd.images[0]
+    : null,
       stock: liveStock,
       quantity: qty,
       itemTotal: lineTotal,

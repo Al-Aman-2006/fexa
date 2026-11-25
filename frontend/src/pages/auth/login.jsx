@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { useGoogleLogin } from "@react-oauth/google";
+import { GoogleLogin } from "@react-oauth/google";
 import { login as loginApi, googleLogin as googleLoginApi } from "../../services/auth.service.js";
 
 import "./login.css";
@@ -47,37 +47,28 @@ function Login() {
   // GOOGLE LOGIN
   // ========================================
 
-  const handleGoogleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      try {
-        const data = await googleLoginApi(tokenResponse.access_token);
+  
+const handleGoogleLogin = async (credentialResponse) => {
+  try {
+    const data = await googleLoginApi(credentialResponse.credential);
 
-        login(data.user);
+    login(data.user);
 
-        navigate("/home", {
-          replace: true,
-        });
-      } catch (err) {
-        console.error("Google auth error:", err);
+    navigate("/home", {
+      replace: true,
+    });
+  } catch (err) {
+    console.error("Google auth error:", err);
 
-        setErrors((prev) => ({
-          ...prev,
-          email:
-            err.response?.data?.message ||
-            "Unable to connect to Google auth server.",
-        }));
-      }
-    },
+    setErrors((prev) => ({
+      ...prev,
+      email:
+        err.response?.data?.message ||
+        "Unable to connect to Google auth server.",
+    }));
+  }
+};
 
-    onError: (err) => {
-      console.error("Google OAuth error:", err);
-
-      setErrors((prev) => ({
-        ...prev,
-        email: "Google sign-in failed.",
-      }));
-    },
-  });
 
   // ========================================
   // EMAIL VALIDATION
@@ -307,39 +298,23 @@ function Login() {
             GOOGLE LOGIN
         ======================================== */}
 
-        <button
-          type="button"
-          className="google-btn"
-          onClick={() =>
-            handleGoogleLogin()
-          }
-          style={{
-            width: "100%",
-            padding: "12px",
-            background: "#1a1622",
-            border: "1px solid #332a3d",
-            color: "#f5f0e6",
-            borderRadius: "6px",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "10px",
-            marginBottom: "20px",
-            fontSize: "14px",
-            fontWeight: "600",
-          }}
-        >
-          <strong
-            style={{
-              color: "#a184bd",
-            }}
-          >
-            G
-          </strong>
+<div style={{ width: "100%", display: "flex", justifyContent: "center", marginBottom: "20px" }}>
+  <GoogleLogin
+    onSuccess={handleGoogleLogin}
+    onError={() => {
+      console.error("Google OAuth failed");
 
-          Continue with Google
-        </button>
+      setErrors((prev) => ({
+        ...prev,
+        email: "Google sign-in failed.",
+      }));
+    }}
+    theme="filled_black"
+    shape="rectangular"
+    text="continue_with"
+    width="350"
+  />
+</div>
 
         {/* ========================================
             LOGIN FORM

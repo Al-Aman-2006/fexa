@@ -3,6 +3,7 @@ import Product from "../models/product.model.js";
 import Category from "../models/category.model.js";
 import Review from "../models/review.model.js";
 import { getActiveValidOffers, applyOffersToProduct } from "../utils/offerCalculator.js";
+import { resolveProductImages } from "../services/imageResolver.service.js";
 
 // Normalizer for category matching (Men, Women, Unisex or dynamic)
 const normalizeCategory = (cat) => {
@@ -294,7 +295,12 @@ const getPublicProducts = async (req, res) => {
 
     // Retrieve active valid offers and calculate real-time promotional pricing
     const activeOffers = await getActiveValidOffers();
-    const products = rawProducts.map((p) => applyOffersToProduct(p, activeOffers));
+   const products = await Promise.all(
+  rawProducts.map(async (p) => {
+    const enrichedProduct = applyOffersToProduct(p, activeOffers);
+    return resolveProductImages(enrichedProduct);
+  })
+);
 
     return res.status(200).json({
       success: true,
@@ -368,10 +374,26 @@ const getPublicProductCollections = async (req, res) => {
     // Retrieve active valid offers and calculate real-time promotional pricing
     const activeOffers = await getActiveValidOffers();
 
-    const enrichedMenProducts = (menProducts || []).map((p) => applyOffersToProduct(p, activeOffers));
-    const enrichedWomenProducts = (womenProducts || []).map((p) => applyOffersToProduct(p, activeOffers));
-    const enrichedUnisexProducts = (unisexProducts || []).map((p) => applyOffersToProduct(p, activeOffers));
+   const enrichedMenProducts = await Promise.all(
+  (menProducts || []).map(async (p) => {
+    const enriched = applyOffersToProduct(p, activeOffers);
+    return resolveProductImages(enriched);
+  })
+);
 
+const enrichedWomenProducts = await Promise.all(
+  (womenProducts || []).map(async (p) => {
+    const enriched = applyOffersToProduct(p, activeOffers);
+    return resolveProductImages(enriched);
+  })
+);
+
+const enrichedUnisexProducts = await Promise.all(
+  (unisexProducts || []).map(async (p) => {
+    const enriched = applyOffersToProduct(p, activeOffers);
+    return resolveProductImages(enriched);
+  })
+);
     return res.status(200).json({
       success: true,
       collections: {
@@ -467,8 +489,10 @@ const getPublicProductById = async (req, res) => {
     const ratingSummary = await Review.getProductRatingSummary(product._id);
 
     // Retrieve active valid offers and calculate real-time promotional pricing
-    const activeOffers = await getActiveValidOffers();
-    const enrichedProduct = applyOffersToProduct(product, activeOffers);
+   const activeOffers = await getActiveValidOffers();
+
+const enrichedProduct = applyOffersToProduct(product, activeOffers);
+const resolvedProduct = await resolveProductImages(enrichedProduct);
 
     return res.status(200).json({
       success: true,

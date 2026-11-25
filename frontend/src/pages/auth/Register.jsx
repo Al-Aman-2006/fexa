@@ -2,7 +2,7 @@ import { useState } from "react";
 import "./Register.css";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { useGoogleLogin } from "@react-oauth/google";
+import { GoogleLogin } from "@react-oauth/google";
 import heroImage from "../../assets/hero.png";
 import { validateName, normalizeName } from "../../utils/validation";
 import { register as registerApi, googleLogin as googleLoginApi } from "../../services/auth.service.js";
@@ -13,25 +13,24 @@ function Register() {
 const navigate = useNavigate();
   const { login } = useAuth();
 
-  const handleGoogleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      try {
-        const data = await googleLoginApi(tokenResponse.access_token);
-        login(data.user);
-        navigate("/home", { replace: true });
-      } catch (err) {
-        console.error("Google auth error:", err);
-        setErrors((prev) => ({
-          ...prev,
-          email: err.response?.data?.message || "Google authentication failed.",
-        }));
-      }
-    },
-    onError: (err) => {
-      console.error("Google OAuth error:", err);
-      setErrors((prev) => ({ ...prev, email: "Google sign-in failed." }));
-    },
-  });
+const handleGoogleLogin = async (credentialResponse) => {
+  try {
+    const data = await googleLoginApi(credentialResponse.credential);
+
+    login(data.user);
+
+    navigate("/home", { replace: true });
+  } catch (err) {
+    console.error("Google auth error:", err);
+
+    setErrors((prev) => ({
+      ...prev,
+      email:
+        err.response?.data?.message ||
+        "Google authentication failed.",
+    }));
+  }
+};
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -183,11 +182,25 @@ const navigate = useNavigate();
           </div>
 
           {/* GOOGLE */}
-          <button type="button" className="google-btn" onClick={() => handleGoogleLogin()} disabled={isLoading}>
-            <strong>G</strong>
-            Continue with Google
-          </button>
+         
+{/* GOOGLE */}
+<div className="google-btn-container">
+  <GoogleLogin
+    onSuccess={handleGoogleLogin}
+    onError={() => {
+      console.error("Google OAuth failed");
 
+      setErrors((prev) => ({
+        ...prev,
+        email: "Google sign-in failed.",
+      }));
+    }}
+    theme="filled_black"
+    shape="rectangular"
+    text="continue_with"
+    width="350"
+  />
+</div>
           {/* DIVIDER */}
           <div className="divider">
             <span />

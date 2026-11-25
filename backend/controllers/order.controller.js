@@ -23,6 +23,8 @@ import {
   restoreOrderItemStock,
 } from "../services/inventory.service.js";
 
+import { resolveImageUrl } from "../services/imageResolver.service.js";
+
 // ========================================================
 // HELPER: Validate and calculate single coupon for order
 // ========================================================
@@ -633,9 +635,24 @@ const getMyOrders = async (req, res) => {
   try {
     const userId = req.user.id;
     const orders = await Order.find({ user: userId }).sort({ createdAt: -1 });
-    const normalizedOrders = orders.map((o) =>
-      normalizeOrderWithAllocations(o.toObject ? o.toObject() : o)
+ const normalizedOrders = await Promise.all(
+  orders.map(async (o) => {
+    const normalizedOrder = normalizeOrderWithAllocations(
+      o.toObject ? o.toObject() : o
     );
+
+    if (Array.isArray(normalizedOrder.items)) {
+      normalizedOrder.items = await Promise.all(
+        normalizedOrder.items.map(async (item) => ({
+          ...item,
+          image: await resolveImageUrl(item.image),
+        }))
+      );
+    }
+
+    return normalizedOrder;
+  })
+);
 
     return res.status(200).json({
       success: true,
@@ -670,10 +687,18 @@ const getOrderById = async (req, res) => {
       });
     }
 
-    const normalizedOrder = normalizeOrderWithAllocations(
-      order.toObject ? order.toObject() : order
-    );
+   const normalizedOrder = normalizeOrderWithAllocations(
+  order.toObject ? order.toObject() : order
+);
 
+if (Array.isArray(normalizedOrder.items)) {
+  normalizedOrder.items = await Promise.all(
+    normalizedOrder.items.map(async (item) => ({
+      ...item,
+      image: await resolveImageUrl(item.image),
+    }))
+  );
+}
     return res.status(200).json({
       success: true,
       order: normalizedOrder,

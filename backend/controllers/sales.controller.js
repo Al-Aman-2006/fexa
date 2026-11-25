@@ -3,6 +3,7 @@ import Order from "../models/order.model.js";
 import Category from "../models/category.model.js";
 import { normalizeOrderWithAllocations } from "../utils/couponAllocation.js";
 import { streamSalesReportPDF } from "../services/pdf.service.js";
+import { resolveImageUrl } from "../services/imageResolver.service.js";
 
 // =========================================================================
 // HELPER: DATE RANGE PARSER
@@ -796,8 +797,13 @@ const getProductPerformance = async (req, res) => {
     ];
 
     const allVariants = await Order.aggregate(pipeline);
-    const totalVariants = allVariants.length;
-    const paginatedVariants = allVariants.slice(skip, skip + limitNum);
+    
+    const totalVariants = allVariants.length;const paginatedVariants = await Promise.all(
+  allVariants.slice(skip, skip + limitNum).map(async (variant) => ({
+    ...variant,
+    image: (await resolveImageUrl(variant.image)) || null,
+  }))
+);
 
     return res.status(200).json({
       success: true,

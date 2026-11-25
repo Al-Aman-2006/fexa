@@ -4,6 +4,8 @@ import Product from "../models/product.model.js";
 import User from "../models/user.model.js";
 import Wallet from "../models/wallet.model.js";
 import { restoreOrderStock } from "../services/inventory.service.js";
+
+import { resolveImageUrl } from "../services/imageResolver.service.js";
 import {
   calculateItemRefund,
   normalizeOrderWithAllocations,
@@ -297,20 +299,29 @@ export const getAdminOrderById = async (req, res) => {
       );
     }
 
-    // Attach product images to items if missing
-    if (Array.isArray(normalized.items)) {
-      normalized.items = normalized.items.map((it) => {
-        let itemImage = it.image;
-        if (!itemImage && it.product && Array.isArray(it.product.images) && it.product.images.length > 0) {
-          itemImage = it.product.images[0];
-        }
-        return {
-          ...it,
-          image: itemImage || null,
-        };
-      });
-    }
+   
+   // Attach and resolve product images to order items
+if (Array.isArray(normalized.items)) {
+  normalized.items = await Promise.all(
+    normalized.items.map(async (it) => {
+      let itemImage = it.image;
 
+      if (
+        !itemImage &&
+        it.product &&
+        Array.isArray(it.product.images) &&
+        it.product.images.length > 0
+      ) {
+        itemImage = it.product.images[0];
+      }
+
+      return {
+        ...it,
+        image: (await resolveImageUrl(itemImage)) || null,
+      };
+    })
+  );
+}
     return res.status(200).json({
       success: true,
       order: {
@@ -520,18 +531,27 @@ export const updateOrderStatus = async (req, res) => {
       );
     }
 
-    if (Array.isArray(normalized.items)) {
-      normalized.items = normalized.items.map((it) => {
-        let itemImage = it.image;
-        if (!itemImage && it.product && Array.isArray(it.product.images) && it.product.images.length > 0) {
-          itemImage = it.product.images[0];
-        }
-        return {
-          ...it,
-          image: itemImage || null,
-        };
-      });
-    }
+if (Array.isArray(normalized.items)) {
+  normalized.items = await Promise.all(
+    normalized.items.map(async (it) => {
+      let itemImage = it.image;
+
+      if (
+        !itemImage &&
+        it.product &&
+        Array.isArray(it.product.images) &&
+        it.product.images.length > 0
+      ) {
+        itemImage = it.product.images[0];
+      }
+
+      return {
+        ...it,
+        image: (await resolveImageUrl(itemImage)) || null,
+      };
+    })
+  );
+}
 
     return res.status(200).json({
       success: true,

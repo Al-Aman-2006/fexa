@@ -10,6 +10,10 @@ import {
   deleteFromCloudinary,
 } from "../services/cloudinary.service.js";
 
+import { uploadMultipleToS3, deleteFromS3 } from "../services/s3.service.js";
+import { resolveProductImages } from "../services/imageResolver.service.js";
+
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -79,12 +83,16 @@ const getProducts = async (req, res) => {
     const totalPages = Math.ceil(totalProducts / limit) || 1;
 
     // Sorting: Latest first (-createdAt)
-    const products = await Product.find(queryFilter)
-      .populate("parentCategory", "name slug isActive")
-      .populate("subCategory", "name slug isActive")
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
+   const rawProducts = await Product.find(queryFilter)
+  .populate("parentCategory", "name slug isActive")
+  .populate("subCategory", "name slug isActive")
+  .sort({ createdAt: -1 })
+  .skip((page - 1) * limit)
+  .limit(limit);
+
+const products = await Promise.all(
+  rawProducts.map((product) => resolveProductImages(product))
+);
 
     // Compute live category product counts from MongoDB
     const [menCount, womenCount, unisexCount, allCount] = await Promise.all([
@@ -143,10 +151,12 @@ const getProductById = async (req, res) => {
       });
     }
 
-    return res.status(200).json({
-      success: true,
-      product,
-    });
+  const resolvedProduct = await resolveProductImages(product);
+
+return res.status(200).json({
+  success: true,
+  product: resolvedProduct,
+});
   } catch (error) {
     console.error("Get product by ID error:", error);
     return res.status(500).json({
@@ -237,25 +247,30 @@ const createProduct = async (req, res) => {
       });
     }
 
-    // Construct image URLs: upload memory buffers directly to Cloudinary
-    let imageUrls = [];
-    if (uploadedFiles && uploadedFiles.length > 0) {
-      try {
-        uploadedCloudinaryResults = await uploadMultipleToCloudinary(uploadedFiles, {
-          folder: "fexa/products",
-          resource_type: "image",
-        });
-        imageUrls = uploadedCloudinaryResults.map((r) => r.secure_url);
-      } catch (uploadErr) {
-        console.error("Cloudinary product upload error:", uploadErr.message);
-        return res.status(500).json({
-          success: false,
-          message: uploadErr.message || "Failed to upload product images to cloud storage.",
-          errors: { images: uploadErr.message || "Failed to upload images." },
-        });
-      }
-    }
+// Upload product images directly to AWS S3
+let imageUrls = [];
 
+if (uploadedFiles && uploadedFiles.length > 0) {
+  try {
+    const uploadedS3Results = await uploadMultipleToS3(uploadedFiles, {
+      folder: "uploads/products",
+    });
+
+    // Store S3 object keys in MongoDB, not temporary signed URLs
+    imageUrls = uploadedS3Results.map((image) => image.key);
+
+  } catch (uploadErr) {
+    console.error("S3 product upload error:", uploadErr.message);
+
+    return res.status(500).json({
+      success: false,
+      message: uploadErr.message || "Failed to upload product images to AWS S3.",
+      errors: {
+        images: uploadErr.message || "Failed to upload images.",
+      },
+    });
+  }
+}
     // If variants were provided and sanitized, use them
     let finalVariants = [];
     if (sanitized.variants && sanitized.variants.length > 0) {
@@ -454,25 +469,30 @@ const updateProduct = async (req, res) => {
 
     // Record previous images for deferred cleanup
     const previousImages = [...(product.images || [])];
+// Upload new product image buffers directly to AWS S3
+let newImageUrls = [];
 
-    // Upload new image buffers to Cloudinary if new files provided
-    let newImageUrls = [];
-    if (newFiles && newFiles.length > 0) {
-      try {
-        uploadedCloudinaryResults = await uploadMultipleToCloudinary(newFiles, {
-          folder: "fexa/products",
-          resource_type: "image",
-        });
-        newImageUrls = uploadedCloudinaryResults.map((r) => r.secure_url);
-      } catch (uploadErr) {
-        console.error("Cloudinary product update upload error:", uploadErr.message);
-        return res.status(500).json({
-          success: false,
-          message: uploadErr.message || "Failed to upload new product images to cloud storage.",
-          errors: { images: uploadErr.message || "Failed to upload images." },
-        });
-      }
-    }
+if (newFiles && newFiles.length > 0) {
+  try {
+    const uploadedS3Results = await uploadMultipleToS3(newFiles, {
+      folder: "uploads/products",
+    });
+
+    // Store S3 object keys in MongoDB
+    newImageUrls = uploadedS3Results.map((image) => image.key);
+
+  } catch (uploadErr) {
+    console.error("S3 product update upload error:", uploadErr.message);
+
+    return res.status(500).json({
+      success: false,
+      message: uploadErr.message || "Failed to upload new product images to AWS S3.",
+      errors: {
+        images: uploadErr.message || "Failed to upload images.",
+      },
+    });
+  }
+}
 
     const finalImages = [...existingImages, ...newImageUrls];
 
@@ -557,7 +577,9 @@ const updateProduct = async (req, res) => {
           images: imgUrl,
         });
         if (!isShared) {
-          if (imgUrl.includes("res.cloudinary.com")) {
+          if (imgUrl.startsWith("uploads/products/")) {
+            await deleteFromS3(imgUrl);
+          } else if (imgUrl.includes("res.cloudinary.com")) {
             await deleteFromCloudinary(imgUrl);
           } else if (imgUrl.startsWith("/uploads/")) {
             const fullDiskPath = path.join(__dirname, "..", imgUrl);
